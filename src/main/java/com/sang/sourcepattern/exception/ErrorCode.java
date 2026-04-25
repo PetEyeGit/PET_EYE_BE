@@ -13,7 +13,7 @@ public enum ErrorCode {
     UNAUTHENTICATED(1003, "Unauthenticated", HttpStatus.UNAUTHORIZED),
     UNAUTHORIZED(1004, "Unauthorized", HttpStatus.FORBIDDEN),
     INVALID_KEY(1005, "Invalid key", HttpStatus.BAD_REQUEST),
-    USER_NOT_EXISTED(10010, "User not existed",HttpStatus.NOT_FOUND),
+    USER_NOT_EXISTED(10010, "Email does not exist",HttpStatus.NOT_FOUND),
 //   Create user errors
     EMAIL_INVALID(1006, "EMAIL_INVALID", HttpStatus.BAD_REQUEST),
     EMAIL_REQUIRED(1009, "EMAIL_REQUIRED", HttpStatus.BAD_REQUEST),
@@ -23,6 +23,7 @@ public enum ErrorCode {
 //   Pet errors
     PET_NOT_EXISTED(2001, "Pet not existed", HttpStatus.NOT_FOUND),
     OLD_PASSWORD_INVALID(1011, "Old password is incorrect", HttpStatus.BAD_REQUEST),
+    WRONG_PASSWORD(1012, "Incorrect password", HttpStatus.UNAUTHORIZED),
 
     ;
 

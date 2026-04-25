@@ -59,12 +59,12 @@ public class AuthenticationServiceImpl implements AuthenticationService {
         User user = userRepository.findByEmail(request.getEmail())
                 .orElseThrow(() -> {
                     log.error("User not found: {}", request.getEmail());
-                    return new AppException(ErrorCode.UNAUTHENTICATED);
+                    return new AppException(ErrorCode.USER_NOT_EXISTED);
                 });
 
         if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
             log.error("Authentication failed for user: {}", request.getEmail());
-            throw new AppException(ErrorCode.UNAUTHENTICATED);
+            throw new AppException(ErrorCode.WRONG_PASSWORD);
         }
 
         log.info("Login successful for user: {}", request.getEmail());

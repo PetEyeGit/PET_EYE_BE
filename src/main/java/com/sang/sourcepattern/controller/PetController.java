@@ -1,6 +1,7 @@
 package com.sang.sourcepattern.controller;
 
 import com.sang.sourcepattern.dto.request.PetCreationRequest;
+import com.sang.sourcepattern.dto.request.PetUpdateRequest;
 import com.sang.sourcepattern.dto.response.ApiResponse;
 import com.sang.sourcepattern.dto.response.PetResponse;
 import com.sang.sourcepattern.service.PetService;
@@ -41,6 +42,14 @@ public class PetController {
     ApiResponse<PetResponse> getPet(@PathVariable int id) {
         return ApiResponse.<PetResponse>builder()
                 .result(petService.getPet(id))
+                .build();
+    }
+
+    @PutMapping("/{id}")
+    @Operation(summary = "Update pet information")
+    ApiResponse<PetResponse> updatePet(@PathVariable int id, @RequestBody @Valid PetUpdateRequest request) {
+        return ApiResponse.<PetResponse>builder()
+                .result(petService.updatePet(id, request))
                 .build();
     }
 

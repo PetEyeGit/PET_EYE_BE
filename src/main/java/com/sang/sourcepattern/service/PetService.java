@@ -9,5 +9,6 @@ public interface PetService {
     PetResponse createPet(PetCreationRequest request);
     List<PetResponse> getPetsByOwner(int ownerId);
     PetResponse getPet(int id);
+    PetResponse updatePet(int id, com.sang.sourcepattern.dto.request.PetUpdateRequest request);
     void deletePet(int id, String reason);
 }

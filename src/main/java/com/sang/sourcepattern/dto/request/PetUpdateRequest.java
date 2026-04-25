@@ -4,14 +4,13 @@ import lombok.*;
 import lombok.experimental.FieldDefaults;
 
 import java.time.LocalDate;
-import java.util.List;
 
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE)
-public class PetCreationRequest {
+public class PetUpdateRequest {
     String name;
     String species;
     String breed;
@@ -26,12 +25,9 @@ public class PetCreationRequest {
     String allergies;
     String hobbies;
     String walkTime;
-    List<PetMealDTO> nutritionPlan;
-    int ownerId;
-
-    List<PetDocumentRequest> initialDocuments;
-    List<PetMedicalRecordDTO> medicalRecords;
-    List<PetVaccinationDTO> vaccinations;
-    List<PetReminderDTO> reminders;
-    List<PetImageDTO> album;
+    java.util.List<PetMealDTO> nutritionPlan;
+    java.util.List<PetMedicalRecordDTO> medicalRecords;
+    java.util.List<PetVaccinationDTO> vaccinations;
+    java.util.List<PetReminderDTO> reminders;
+    java.util.List<PetImageDTO> album;
 }
