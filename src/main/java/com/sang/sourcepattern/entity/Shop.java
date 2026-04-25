@@ -23,10 +23,14 @@ public class Shop {
     User owner;
 
     String shopName;
+    String shopType;
+    String email;
+    String phone;
     String address;
     String city;
     String description;
     String licenseNumber;
+    String licenseImageUrl;
 
     @Builder.Default
     float ratingAvg = 0.0f;

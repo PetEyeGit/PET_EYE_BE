@@ -11,11 +11,15 @@ import lombok.experimental.FieldDefaults;
 public class ShopResponse {
     int id;
     String shopName;
+    String shopType;
+    String email;
+    String phone;
     String address;
     String city;
     String description;
     String licenseNumber;
-    float ratingAvg;
+    String licenseImageUrl;
     boolean isVerified;
-    String ownerFullName;
+    float ratingAvg;
+    int ownerId;
 }

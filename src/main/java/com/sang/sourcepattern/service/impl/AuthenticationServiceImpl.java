@@ -14,6 +14,7 @@ import com.sang.sourcepattern.entity.User;
 import com.sang.sourcepattern.exception.AppException;
 import com.sang.sourcepattern.exception.ErrorCode;
 import com.sang.sourcepattern.repository.InvalidatedTokenRepository;
+import com.sang.sourcepattern.repository.ShopRepository;
 import com.sang.sourcepattern.repository.UserRepository;
 import com.sang.sourcepattern.service.AuthenticationService;
 import lombok.AccessLevel;
@@ -36,6 +37,7 @@ import java.util.UUID;
 public class AuthenticationServiceImpl implements AuthenticationService {
 
     UserRepository userRepository;
+    ShopRepository shopRepository;
     PasswordEncoder passwordEncoder;
     InvalidatedTokenRepository invalidatedTokenRepository;
 
@@ -65,6 +67,26 @@ public class AuthenticationServiceImpl implements AuthenticationService {
         if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
             log.error("Authentication failed for user: {}", request.getEmail());
             throw new AppException(ErrorCode.WRONG_PASSWORD);
+        }
+
+        if (!user.isActive()) {
+            log.warn("Login attempt for deactivated account: {}", request.getEmail());
+            throw new AppException(ErrorCode.ACCOUNT_DEACTIVATED);
+        }
+
+        // If SHOP_OWNER, check if their shop is verified
+        boolean isShopOwner = user.getRoles().stream()
+                .anyMatch(role -> role.getName().equals("SHOP_OWNER"));
+        
+        if (isShopOwner) {
+            boolean shopVerified = shopRepository.findByOwnerId(user.getId())
+                    .map(shop -> shop.isVerified())
+                    .orElse(false);
+            
+            if (!shopVerified) {
+                log.warn("Login attempt for unverified shop owner: {}", request.getEmail());
+                throw new AppException(ErrorCode.ACCOUNT_NOT_VERIFIED);
+            }
         }
 
         log.info("Login successful for user: {}", request.getEmail());

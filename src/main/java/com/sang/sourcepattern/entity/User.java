@@ -32,6 +32,9 @@ public class User {
     @Builder.Default
     LocalDateTime createdAt = LocalDateTime.now();
 
+    @Builder.Default
+    boolean active = true;
+
     @ManyToMany
     @Builder.Default
     Set<Role> roles = new HashSet<>();

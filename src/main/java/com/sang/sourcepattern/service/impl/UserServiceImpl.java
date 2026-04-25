@@ -43,6 +43,7 @@ public class UserServiceImpl implements UserService {
         User user = userMapper.toUser(request);
         user.setEmail(request.getEmail());
         user.setPassword(passwordEncoder.encode(request.getPassword()));
+        user.setActive(true); // Regular users are active by default
         
         HashSet<Role> roles = new HashSet<>();
         roles.add(roleRepository.findByName("USER").orElseThrow(() -> new AppException(ErrorCode.ROLE_NOT_FOUND)));
