@@ -106,4 +106,22 @@ public class ShopServiceImpl implements ShopService {
                 .map(shopMapper::toShopResponse)
                 .orElseThrow(() -> new AppException(ErrorCode.SHOP_NOT_FOUND));
     }
+
+    @Override
+    public List<ShopResponse> searchVerifiedShops(String keyword, String city, String shopType) {
+        return shopRepository.searchVerified(keyword, city, shopType)
+                .stream()
+                .map(shopMapper::toShopResponse)
+                .toList();
+    }
+
+    @Override
+    public ShopResponse getVerifiedShopById(int id) {
+        Shop shop = shopRepository.findById(id)
+                .orElseThrow(() -> new AppException(ErrorCode.SHOP_NOT_FOUND));
+        if (!shop.isVerified()) {
+            throw new AppException(ErrorCode.SHOP_NOT_FOUND);
+        }
+        return shopMapper.toShopResponse(shop);
+    }
 }

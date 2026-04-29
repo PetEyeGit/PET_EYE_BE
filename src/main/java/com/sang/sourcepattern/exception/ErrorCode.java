@@ -35,6 +35,31 @@ public enum ErrorCode {
     ADDRESS_REQUIRED(3006, "Address is required", HttpStatus.BAD_REQUEST),
     CITY_REQUIRED(3007, "City is required", HttpStatus.BAD_REQUEST),
     DESCRIPTION_TOO_SHORT(3008, "Description must be at least 10 characters", HttpStatus.BAD_REQUEST),
+
+//   Service errors
+    SERVICE_NOT_FOUND(4001, "Service not found", HttpStatus.NOT_FOUND),
+    SERVICE_NAME_REQUIRED(4002, "Service name is required", HttpStatus.BAD_REQUEST),
+    SERVICE_CATEGORY_REQUIRED(4003, "Service category is required", HttpStatus.BAD_REQUEST),
+    SERVICE_PRICE_REQUIRED(4004, "Service price is required", HttpStatus.BAD_REQUEST),
+    SERVICE_PRICE_INVALID(4005, "Service price must be greater than 0", HttpStatus.BAD_REQUEST),
+    SERVICE_DURATION_INVALID(4006, "Service duration must be at least 1 minute", HttpStatus.BAD_REQUEST),
+    SERVICE_DESCRIPTION_TOO_SHORT(4007, "Service description must be at least 10 characters", HttpStatus.BAD_REQUEST),
+    SERVICE_NOT_BELONG_TO_SHOP(4008, "Service does not belong to your shop", HttpStatus.FORBIDDEN),
+    SHOP_NOT_VERIFIED(3009, "Shop is not verified yet", HttpStatus.FORBIDDEN),
+
+//   Booking errors
+    BOOKING_NOT_FOUND(5001, "Booking not found", HttpStatus.NOT_FOUND),
+    BOOKING_NOT_BELONG_TO_USER(5002, "Booking does not belong to you", HttpStatus.FORBIDDEN),
+    BOOKING_ALREADY_PAID(5003, "Booking is already paid", HttpStatus.BAD_REQUEST),
+    BOOKING_CANCELLED(5004, "Booking has been cancelled", HttpStatus.BAD_REQUEST),
+    PET_NOT_BELONG_TO_USER(5005, "Pet does not belong to you", HttpStatus.FORBIDDEN),
+    STAFF_NOT_BELONG_TO_SHOP(5006, "Staff does not belong to this shop", HttpStatus.BAD_REQUEST),
+    PAYOS_ERROR(5007, "Payment gateway error", HttpStatus.INTERNAL_SERVER_ERROR),
+    SHOP_ID_REQUIRED(5008, "Shop ID is required", HttpStatus.BAD_REQUEST),
+    SERVICE_ID_REQUIRED(5009, "Service ID is required", HttpStatus.BAD_REQUEST),
+    PET_ID_REQUIRED(5010, "Pet ID is required", HttpStatus.BAD_REQUEST),
+    APPOINTMENT_DATETIME_REQUIRED(5011, "Appointment datetime is required", HttpStatus.BAD_REQUEST),
+    APPOINTMENT_MUST_BE_FUTURE(5012, "Appointment must be in the future", HttpStatus.BAD_REQUEST),
 ;
 
     private final int code;

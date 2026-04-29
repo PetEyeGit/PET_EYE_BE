@@ -36,6 +36,11 @@ public class SecurityConfig {
             "/swagger-ui/**",
             "/v3/api-docs/**",
             "/swagger-ui.html",
+            "/services/shop/**",
+            "/services/{id}",
+            "/shops/public",
+            "/shops/public/**",
+            "/bookings/staff/**"
     };
 
     private final String[] PUBLIC_ENDPOINTS_PATCH = {
@@ -84,7 +89,10 @@ public class SecurityConfig {
     @Bean
     JwtAuthenticationConverter jwtAuthenticationConverter() {
         JwtGrantedAuthoritiesConverter converter = new JwtGrantedAuthoritiesConverter();
-        converter.setAuthorityPrefix("");
+        // JWT stores roles in the "roles" claim as a list, e.g. ["SHOP_OWNER"]
+        // @PreAuthorize("hasRole('X')") checks for authority "ROLE_X", so we keep the prefix
+        converter.setAuthoritiesClaimName("roles");
+        converter.setAuthorityPrefix("ROLE_");
         JwtAuthenticationConverter jwtConverter = new JwtAuthenticationConverter();
         jwtConverter.setJwtGrantedAuthoritiesConverter(converter);
         return jwtConverter;

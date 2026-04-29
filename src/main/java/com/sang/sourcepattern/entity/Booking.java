@@ -39,6 +39,16 @@ public class Booking {
     Staff staff;
 
     LocalDateTime appointmentDatetime;
-    String status; // PENDING, CONFIRMED, COMPLETED, CANCELLED
+
+    /** PENDING_PAYMENT → CONFIRMED → COMPLETED | CANCELLED */
+    @Builder.Default
+    String status = "PENDING_PAYMENT";
+
     String note;
+
+    /** PayOS order code — unique long used to match webhook callback */
+    Long payosOrderCode;
+
+    @Builder.Default
+    LocalDateTime createdAt = LocalDateTime.now();
 }

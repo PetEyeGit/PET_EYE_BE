@@ -1,0 +1,35 @@
+package com.sang.sourcepattern.dto.response;
+
+import lombok.*;
+import lombok.experimental.FieldDefaults;
+
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+@FieldDefaults(level = AccessLevel.PRIVATE)
+public class BookingResponse {
+    int id;
+    int userId;
+    int shopId;
+    String shopName;
+    int serviceId;
+    String serviceName;
+    BigDecimal servicePrice;
+    int petId;
+    String petName;
+    Integer staffId;
+    String staffName;
+    LocalDateTime appointmentDatetime;
+    String status;
+    String note;
+    Long payosOrderCode;
+    LocalDateTime createdAt;
+
+    // Payment info
+    String checkoutUrl;
+    String paymentStatus;
+}
