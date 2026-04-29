@@ -5,8 +5,10 @@ import lombok.*;
 import lombok.experimental.FieldDefaults;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 
 @Entity
+@Table(name = "pet_service")
 @Getter
 @Setter
 @Builder
@@ -23,7 +25,18 @@ public class Service {
     Shop shop;
 
     String serviceName;
-    String category; // CLINIC, SPA, BOARDING
+    String category; // CLINIC, SPA, BOARDING, GROOMING, etc.
     BigDecimal price;
     int durationMinutes;
+
+    @Column(columnDefinition = "TEXT")
+    String description;
+
+    String imageUrl;
+
+    @Builder.Default
+    boolean active = true;
+
+    @Builder.Default
+    LocalDateTime createdAt = LocalDateTime.now();
 }

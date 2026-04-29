@@ -10,4 +10,10 @@ public interface ShopService {
     ShopResponse approveShop(int shopId);
     List<ShopResponse> getAllShops();
     ShopResponse getShopById(int id);
+
+    /** Public: only verified shops, optional keyword/city/shopType filter */
+    List<ShopResponse> searchVerifiedShops(String keyword, String city, String shopType);
+
+    /** Public: get a single verified shop by id */
+    ShopResponse getVerifiedShopById(int id);
 }

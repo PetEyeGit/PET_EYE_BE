@@ -4,6 +4,8 @@ import com.sang.sourcepattern.dto.response.ApiResponse;
 import com.sang.sourcepattern.dto.request.ShopRegistrationRequest;
 import com.sang.sourcepattern.dto.response.ShopResponse;
 import com.sang.sourcepattern.service.ShopService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
@@ -17,9 +19,33 @@ import java.util.List;
 @RequestMapping("/shops")
 @RequiredArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
+@Tag(name = "Shop Management")
 public class ShopController {
 
     ShopService shopService;
+
+    // ─── Public endpoints ────────────────────────────────────────────────────
+
+    @GetMapping("/public")
+    @Operation(summary = "Search verified shops (public) — keyword, city, shopType are optional")
+    public ApiResponse<List<ShopResponse>> searchPublic(
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) String city,
+            @RequestParam(required = false) String shopType) {
+        return ApiResponse.<List<ShopResponse>>builder()
+                .result(shopService.searchVerifiedShops(keyword, city, shopType))
+                .build();
+    }
+
+    @GetMapping("/public/{id}")
+    @Operation(summary = "Get a verified shop by id (public)")
+    public ApiResponse<ShopResponse> getPublicById(@PathVariable int id) {
+        return ApiResponse.<ShopResponse>builder()
+                .result(shopService.getVerifiedShopById(id))
+                .build();
+    }
+
+    // ─── Registration ────────────────────────────────────────────────────────
 
     @PostMapping("/register")
     public ApiResponse<ShopResponse> register(@RequestBody @Valid ShopRegistrationRequest request) {
@@ -27,6 +53,8 @@ public class ShopController {
                 .result(shopService.registerShop(request))
                 .build();
     }
+
+    // ─── Admin endpoints ─────────────────────────────────────────────────────
 
     @PostMapping("/approve/{id}")
     @PreAuthorize("hasRole('ADMIN')")

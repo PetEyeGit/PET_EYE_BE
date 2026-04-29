@@ -1,0 +1,31 @@
+[INFO] Scanning for projects...
+[INFO] 
+[INFO] ------------------< sp26.group3.computer:PET_EYE_BE >-------------------
+[INFO] Building SourcePattern 0.0.1-SNAPSHOT
+[INFO]   from pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- clean:3.4.1:clean (default-clean) @ PET_EYE_BE ---
+[INFO] Deleting C:\Users\Admin\Desktop\SP26\EXE111\PETREAL\Code\PET_EYE_BE\target
+[INFO] 
+[INFO] --- resources:3.3.1:resources (default-resources) @ PET_EYE_BE ---
+[INFO] Copying 3 resources from src\main\resources to target\classes
+[INFO] Copying 1 resource from src\main\resources to target\classes
+[INFO] 
+[INFO] --- compiler:3.11.0:compile (default-compile) @ PET_EYE_BE ---
+[INFO] Changes detected - recompiling the module! :source
+[INFO] Compiling 107 source files with javac [debug release 21] to target\classes
+[WARNING] /C:/Users/Admin/Desktop/SP26/EXE111/PETREAL/Code/PET_EYE_BE/src/main/java/com/sang/sourcepattern/mapper/PetMapper.java:[19,9] Unmapped target properties: "active, unactiveReason".
+[WARNING] /C:/Users/Admin/Desktop/SP26/EXE111/PETREAL/Code/PET_EYE_BE/src/main/java/com/sang/sourcepattern/mapper/PetMapper.java:[29,10] Unmapped target properties: "active, unactiveReason".
+[WARNING] /C:/Users/Admin/Desktop/SP26/EXE111/PETREAL/Code/PET_EYE_BE/src/main/java/com/sang/sourcepattern/mapper/ShopMapper.java:[18,10] Unmapped target property: "licenseNumber".
+[WARNING] /C:/Users/Admin/Desktop/SP26/EXE111/PETREAL/Code/PET_EYE_BE/src/main/java/com/sang/sourcepattern/mapper/ShopMapper.java:[21,18] Unmapped target property: "isVerified".
+[WARNING] /C:/Users/Admin/Desktop/SP26/EXE111/PETREAL/Code/PET_EYE_BE/src/main/java/com/sang/sourcepattern/mapper/UserMapper.java:[14,10] Unmapped target properties: "id, avatar, createdAt, active, roles".
+[WARNING] /C:/Users/Admin/Desktop/SP26/EXE111/PETREAL/Code/PET_EYE_BE/src/main/java/com/sang/sourcepattern/mapper/UserMapper.java:[19,10] Unmapped target properties: "id, email, createdAt, active, roles".
+[INFO] /C:/Users/Admin/Desktop/SP26/EXE111/PETREAL/Code/PET_EYE_BE/src/main/java/com/sang/sourcepattern/exception/GlobalExceptionHandler.java: C:\Users\Admin\Desktop\SP26\EXE111\PETREAL\Code\PET_EYE_BE\src\main\java\com\sang\sourcepattern\exception\GlobalExceptionHandler.java uses unchecked or unsafe operations.
+[INFO] /C:/Users/Admin/Desktop/SP26/EXE111/PETREAL/Code/PET_EYE_BE/src/main/java/com/sang/sourcepattern/exception/GlobalExceptionHandler.java: Recompile with -Xlint:unchecked for details.
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD SUCCESS
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time:  7.984 s
+[INFO] Finished at: 2026-04-29T19:01:48+07:00
+[INFO] ------------------------------------------------------------------------
