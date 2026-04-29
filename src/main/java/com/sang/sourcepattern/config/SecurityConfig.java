@@ -1,6 +1,5 @@
 package com.sang.sourcepattern.config;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -28,6 +27,7 @@ public class SecurityConfig {
             "/users/**",
             "/auth/login", "/auth/introspect","/auth/logout","/auth/refresh",
             "/auth/google", "/auth/facebook", "/auth/zalo",
+            "/auth/forgot-password", "/auth/reset-password", "/auth/resend-verification", "/auth/verify-email",
             "/pets/**",
             "/shops/register",
             "/files/upload"
@@ -44,12 +44,11 @@ public class SecurityConfig {
             "/bookings/staff/**"
     };
 
-    private final String[] PUBLIC_ENDPOINTS_PATCH = {
+    private final CustomJwtDecoder customJwtDecoder;
 
-    };
-
-    @Autowired
-    private CustomJwtDecoder customJwtDecoder;
+    public SecurityConfig(CustomJwtDecoder customJwtDecoder) {
+        this.customJwtDecoder = customJwtDecoder;
+    }
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
@@ -59,7 +58,6 @@ public class SecurityConfig {
                 .authorizeHttpRequests(req -> req
                         .requestMatchers(HttpMethod.POST, PUBLIC_ENDPOINTS_POST).permitAll()
                         .requestMatchers(HttpMethod.GET,  PUBLIC_ENDPOINTS_GET).permitAll()
-                        .requestMatchers(HttpMethod.PATCH, PUBLIC_ENDPOINTS_PATCH).permitAll()
                         .anyRequest().authenticated()
                 )
                 .oauth2ResourceServer(oauth2 -> oauth2
