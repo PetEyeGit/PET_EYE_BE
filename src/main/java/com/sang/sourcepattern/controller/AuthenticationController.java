@@ -5,6 +5,7 @@ import com.sang.sourcepattern.dto.request.AuthenticationRequest;
 import com.sang.sourcepattern.dto.request.IntrospectRequest;
 import com.sang.sourcepattern.dto.request.LogoutRequest;
 import com.sang.sourcepattern.dto.request.RefreshRequest;
+import com.sang.sourcepattern.dto.request.SocialLoginRequest;
 import com.sang.sourcepattern.dto.response.ApiResponse;
 import com.sang.sourcepattern.dto.response.AuthenticationResponse;
 import com.sang.sourcepattern.dto.response.IntrospectResponse;
@@ -76,6 +77,36 @@ public class AuthenticationController {
 
         return ApiResponse.<AuthenticationResponse>builder()
                 .result(authenticationService.refreshToken(request))
+                .build();
+    }
+
+    /**
+     * SOCIAL LOGINS
+     */
+    @PostMapping("/google")
+    public ApiResponse<AuthenticationResponse> googleLogin(
+            @RequestBody SocialLoginRequest request
+    ) {
+        return ApiResponse.<AuthenticationResponse>builder()
+                .result(authenticationService.socialLoginGoogle(request))
+                .build();
+    }
+
+    @PostMapping("/facebook")
+    public ApiResponse<AuthenticationResponse> facebookLogin(
+            @RequestBody SocialLoginRequest request
+    ) {
+        return ApiResponse.<AuthenticationResponse>builder()
+                .result(authenticationService.socialLoginFacebook(request))
+                .build();
+    }
+
+    @PostMapping("/zalo")
+    public ApiResponse<AuthenticationResponse> zaloLogin(
+            @RequestBody SocialLoginRequest request
+    ) {
+        return ApiResponse.<AuthenticationResponse>builder()
+                .result(authenticationService.socialLoginZalo(request))
                 .build();
     }
 }

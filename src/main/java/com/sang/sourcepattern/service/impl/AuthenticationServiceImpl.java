@@ -14,10 +14,30 @@ import com.sang.sourcepattern.entity.User;
 import com.sang.sourcepattern.exception.AppException;
 import com.sang.sourcepattern.exception.ErrorCode;
 import com.sang.sourcepattern.repository.InvalidatedTokenRepository;
+import com.sang.sourcepattern.repository.RoleRepository;
 import com.sang.sourcepattern.repository.ShopRepository;
 import com.sang.sourcepattern.repository.UserRepository;
 import com.sang.sourcepattern.service.AuthenticationService;
 import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
+import lombok.experimental.FieldDefaults;
+import lombok.experimental.NonFinal;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestTemplate;
+import org.springframework.web.util.UriComponentsBuilder;
+
+import java.net.URI;
+import java.util.Date;
+import java.util.Map;
+import java.util.UUID;
+import java.util.Collections;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
@@ -38,8 +58,10 @@ public class AuthenticationServiceImpl implements AuthenticationService {
 
     UserRepository userRepository;
     ShopRepository shopRepository;
+    RoleRepository roleRepository;
     PasswordEncoder passwordEncoder;
     InvalidatedTokenRepository invalidatedTokenRepository;
+    RestTemplate restTemplate;
 
     @Value("${jwt.signer-key}")
     @NonFinal
@@ -52,6 +74,30 @@ public class AuthenticationServiceImpl implements AuthenticationService {
     @Value("${jwt.refreshable-duration}")
     @NonFinal
     long REFRESHABLE_DURATION;
+
+    @Value("${social.google.client-id:}")
+    @NonFinal
+    String googleClientId;
+
+    @Value("${social.zalo.app-id:}")
+    @NonFinal
+    String zaloAppId;
+
+    @Value("${social.zalo.app-secret:}")
+    @NonFinal
+    String zaloAppSecret;
+
+    @Value("${social.facebook.app-id:}")
+    @NonFinal
+    String facebookAppId;
+
+    @Value("${social.facebook.app-secret:}")
+    @NonFinal
+    String facebookAppSecret;
+
+    @Value("${social.facebook.redirect-uri:http://localhost:3000/login/facebook/callback}")
+    @NonFinal
+    String facebookRedirectUri;
 
     // ================= LOGIN =================
     @Override
@@ -233,5 +279,174 @@ public class AuthenticationServiceImpl implements AuthenticationService {
                 .token(newToken)
                 .authenticated(true)
                 .build();
+    }
+
+    // ================= SOCIAL LOGINS =================
+    @Override
+    public AuthenticationResponse socialLoginGoogle(SocialLoginRequest request) {
+        String userInfoUrl = "https://www.googleapis.com/oauth2/v3/userinfo";
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth(request.getToken());
+        HttpEntity<String> entity = new HttpEntity<>(headers);
+
+        try {
+            ResponseEntity<Map> response = restTemplate.exchange(userInfoUrl, HttpMethod.GET, entity, Map.class);
+            Map<String, Object> userInfo = response.getBody();
+            if (userInfo == null || !userInfo.containsKey("email")) {
+                throw new AppException(ErrorCode.UNAUTHENTICATED);
+            }
+
+            String email = (String) userInfo.get("email");
+            String name = (String) userInfo.get("name");
+            String picture = (String) userInfo.get("picture");
+
+            User user = findOrCreateSocialUser(email, name, picture);
+            String token = generateToken(user);
+            return AuthenticationResponse.builder().token(token).authenticated(true).build();
+        } catch (Exception e) {
+            log.error("Google login failed", e);
+            throw new AppException(ErrorCode.UNAUTHENTICATED);
+        }
+    }
+
+    @Override
+    public AuthenticationResponse socialLoginFacebook(SocialLoginRequest request) {
+        try {
+            // Defensive fallback - env var might not load correctly
+            String effectiveRedirectUri = (facebookRedirectUri != null && !facebookRedirectUri.isBlank())
+                    ? facebookRedirectUri.trim()
+                    : "http://localhost:3000/login/facebook/callback";
+
+            log.info("Facebook login - AppId: [{}], RedirectUri: [{}], Code length: {}",
+                    facebookAppId, effectiveRedirectUri,
+                    request.getCode() != null ? request.getCode().length() : 0);
+
+            // Step 1: Exchange authorization code for access_token
+            // Use UriComponentsBuilder to avoid double-encoding issues
+            URI tokenUri = UriComponentsBuilder
+                    .fromHttpUrl("https://graph.facebook.com/v19.0/oauth/access_token")
+                    .queryParam("client_id", facebookAppId)
+                    .queryParam("redirect_uri", effectiveRedirectUri)
+                    .queryParam("client_secret", facebookAppSecret)
+                    .queryParam("code", request.getCode())
+                    .build()
+                    .toUri();
+
+            log.info("Facebook token URI: {}", tokenUri.toString().replaceAll("client_secret=[^&]+", "client_secret=***"));
+            ResponseEntity<Map> tokenResponse = restTemplate.getForEntity(tokenUri, Map.class);
+            Map<String, Object> tokenData = tokenResponse.getBody();
+            if (tokenData == null || !tokenData.containsKey("access_token")) {
+                log.error("Facebook token exchange failed: {}", tokenData);
+                throw new AppException(ErrorCode.UNAUTHENTICATED);
+            }
+
+            String accessToken = (String) tokenData.get("access_token");
+
+            // Step 2: Get user info using the access_token
+            String userInfoUrl = "https://graph.facebook.com/me?fields=id,name,email,picture.type(large)&access_token=" + accessToken;
+            ResponseEntity<Map> response = restTemplate.getForEntity(userInfoUrl, Map.class);
+            Map<String, Object> userInfo = response.getBody();
+            if (userInfo == null) {
+                throw new AppException(ErrorCode.UNAUTHENTICATED);
+            }
+
+            String id = (String) userInfo.get("id");
+            String email = id + "@facebook.com"; // Facebook rarely gives email without special approval
+            String name = (String) userInfo.get("name");
+            String picture = null;
+            if (userInfo.containsKey("picture")) {
+                Map<String, Object> picData = (Map<String, Object>) userInfo.get("picture");
+                Map<String, Object> data = (Map<String, Object>) picData.get("data");
+                if (data != null && data.containsKey("url")) {
+                    picture = (String) data.get("url");
+                }
+            }
+
+            User user = findOrCreateSocialUser(email, name, picture);
+            String token = generateToken(user);
+            return AuthenticationResponse.builder().token(token).authenticated(true).build();
+        } catch (Exception e) {
+            log.error("Facebook login failed", e);
+            throw new AppException(ErrorCode.UNAUTHENTICATED);
+        }
+    }
+
+    @Override
+    public AuthenticationResponse socialLoginZalo(SocialLoginRequest request) {
+        // 1. Exchange code for access token
+        String tokenUrl = "https://oauth.zaloapp.com/v4/oa/access_token"; // We use standard oauth endpoint for login: https://oauth.zaloapp.com/v4/access_token
+        String actualTokenUrl = "https://oauth.zaloapp.com/v4/access_token";
+        
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(org.springframework.http.MediaType.APPLICATION_FORM_URLENCODED);
+        headers.set("secret_key", zaloAppSecret);
+        
+        String body = "app_id=" + zaloAppId + "&grant_type=authorization_code&code=" + request.getCode();
+        HttpEntity<String> entity = new HttpEntity<>(body, headers);
+
+        try {
+            log.info("Zalo exchange code: {}", request.getCode());
+            ResponseEntity<Map> tokenResponse = restTemplate.postForEntity(actualTokenUrl, entity, Map.class);
+            Map<String, Object> tokenData = tokenResponse.getBody();
+            log.info("Zalo token response: {}", tokenData);
+
+            if (tokenData == null || !tokenData.containsKey("access_token")) {
+                log.error("Zalo token exchange failed. Response: {}", tokenData);
+                throw new AppException(ErrorCode.UNAUTHENTICATED);
+            }
+
+            String accessToken = (String) tokenData.get("access_token");
+
+            // 2. Get user info
+            String userInfoUrl = "https://graph.zalo.me/v2.0/me?fields=id,name,picture";
+            HttpHeaders userHeaders = new HttpHeaders();
+            userHeaders.set("access_token", accessToken);
+            HttpEntity<String> userEntity = new HttpEntity<>(userHeaders);
+
+            ResponseEntity<Map> userResponse = restTemplate.exchange(userInfoUrl, HttpMethod.GET, userEntity, Map.class);
+            Map<String, Object> userInfo = userResponse.getBody();
+            log.info("Zalo user info response: {}", userInfo);
+
+            if (userInfo == null || (userInfo.containsKey("error") && !userInfo.get("error").toString().equals("0"))) {
+                log.error("Zalo get user info failed. Response: {}", userInfo);
+                throw new AppException(ErrorCode.UNAUTHENTICATED);
+            }
+
+            String id = (String) userInfo.get("id");
+            String name = (String) userInfo.get("name");
+            String email = id + "@zalo.me"; // Zalo rarely returns email easily, so we fallback to id
+            String picture = null;
+            if (userInfo.containsKey("picture")) {
+                Map<String, Object> picData = (Map<String, Object>) userInfo.get("picture");
+                Map<String, Object> data = (Map<String, Object>) picData.get("data");
+                if (data != null && data.containsKey("url")) {
+                    picture = (String) data.get("url");
+                }
+            }
+
+            User user = findOrCreateSocialUser(email, name, picture);
+            String token = generateToken(user);
+            return AuthenticationResponse.builder().token(token).authenticated(true).build();
+        } catch (Exception e) {
+            log.error("Zalo login failed", e);
+            throw new AppException(ErrorCode.UNAUTHENTICATED);
+        }
+    }
+
+    private User findOrCreateSocialUser(String email, String name, String picture) {
+        return userRepository.findByEmail(email).orElseGet(() -> {
+            Role userRole = roleRepository.findByName("USER")
+                    .orElseThrow(() -> new AppException(ErrorCode.UNCATEGORIZED_EXCEPTION));
+
+            User newUser = User.builder()
+                    .email(email)
+                    .fullName(name)
+                    .password(passwordEncoder.encode(UUID.randomUUID().toString())) // Random password for social users
+                    .avatar(picture)
+                    .active(true)
+                    .roles(Collections.singleton(userRole))
+                    .build();
+            return userRepository.save(newUser);
+        });
     }
 }

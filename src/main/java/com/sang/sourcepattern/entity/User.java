@@ -27,6 +27,7 @@ public class User {
     String fullName;
     String phone;
     String address;
+    @Column(columnDefinition = "TEXT")
     String avatar;
 
     @Builder.Default

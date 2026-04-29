@@ -14,7 +14,7 @@ spring:
   datasource:
     url: jdbc:mysql://localhost:3306/PET_EYE?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Ho_Chi_Minh&characterEncoding=utf8
     username: root
-    password: root
+    password: 123456
     driver-class-name: com.mysql.cj.jdbc.Driver
 
     hikari:
@@ -77,3 +77,17 @@ cloudinary:
   cloud-name: ${CLOUDINARY_CLOUD_NAME}
   api-key: ${CLOUDINARY_API_KEY}
   api-secret: ${CLOUDINARY_API_SECRET}
+
+# ===============================
+# SOCIAL LOGIN CONFIG (MAP FROM .env)
+# ===============================
+social:
+  google:
+    client-id: ${GOOGLE_CLIENT_ID:}
+  facebook:
+    app-id: ${FACEBOOK_APP_ID:}
+    app-secret: ${FACEBOOK_APP_SECRET:}
+    redirect-uri: ${FACEBOOK_REDIRECT_URI:http://localhost:3000/login/facebook/callback}
+  zalo:
+    app-id: ${ZALO_APP_ID:}
+    app-secret: ${ZALO_APP_SECRET:}

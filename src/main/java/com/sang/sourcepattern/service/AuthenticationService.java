@@ -5,6 +5,7 @@ import com.sang.sourcepattern.dto.request.AuthenticationRequest;
 import com.sang.sourcepattern.dto.request.IntrospectRequest;
 import com.sang.sourcepattern.dto.request.LogoutRequest;
 import com.sang.sourcepattern.dto.request.RefreshRequest;
+import com.sang.sourcepattern.dto.request.SocialLoginRequest;
 import com.sang.sourcepattern.dto.response.AuthenticationResponse;
 import com.sang.sourcepattern.dto.response.IntrospectResponse;
 
@@ -21,4 +22,8 @@ public interface AuthenticationService {
 
     AuthenticationResponse refreshToken(RefreshRequest request)
             throws ParseException, JOSEException;
+
+    AuthenticationResponse socialLoginGoogle(SocialLoginRequest request);
+    AuthenticationResponse socialLoginFacebook(SocialLoginRequest request);
+    AuthenticationResponse socialLoginZalo(SocialLoginRequest request);
 }
