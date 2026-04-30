@@ -2,6 +2,7 @@ package com.sang.sourcepattern.controller;
 
 import com.sang.sourcepattern.dto.response.ApiResponse;
 import com.sang.sourcepattern.dto.request.ShopRegistrationRequest;
+import com.sang.sourcepattern.dto.request.ShopUpdateRequest;
 import com.sang.sourcepattern.dto.response.ShopResponse;
 import com.sang.sourcepattern.service.ShopService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -11,6 +12,8 @@ import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -23,6 +26,29 @@ import java.util.List;
 public class ShopController {
 
     ShopService shopService;
+
+    // ─── Shop Owner endpoints ────────────────────────────────────────────────
+
+    @GetMapping("/my-shop")
+    @PreAuthorize("hasRole('SHOP_OWNER')")
+    @Operation(summary = "Get the authenticated shop owner's shop profile")
+    public ApiResponse<ShopResponse> getMyShop(@AuthenticationPrincipal Jwt jwt) {
+        return ApiResponse.<ShopResponse>builder()
+                .result(shopService.getMyShop(jwt.getClaim("email")))
+                .build();
+    }
+
+    @PutMapping("/my-shop")
+    @PreAuthorize("hasRole('SHOP_OWNER')")
+    @Operation(summary = "Update the authenticated shop owner's shop profile")
+    public ApiResponse<ShopResponse> updateMyShop(
+            @AuthenticationPrincipal Jwt jwt,
+            @RequestBody @Valid ShopUpdateRequest request) {
+        return ApiResponse.<ShopResponse>builder()
+                .result(shopService.updateMyShop(jwt.getClaim("email"), request))
+                .message("Shop profile updated successfully")
+                .build();
+    }
 
     // ─── Public endpoints ────────────────────────────────────────────────────
 
