@@ -41,6 +41,21 @@ spring:
     init:
       mode: embedded
 
+  # ===============================
+  # MAIL CONFIG
+  # ===============================
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    username: huyacsp3@gmail.com
+    password: wvbzarlmbtcptoar
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+
 # ===============================
 # JWT CONFIG (MAP FROM .env)
 # ===============================
@@ -86,3 +101,9 @@ payos:
   checksum-key: ${PAYOS_CHECKSUM_KEY}
   return-url: ${PAYOS_RETURN_URL}
   cancel-url: ${PAYOS_CANCEL_URL}
+
+# ===============================
+# APP CONFIG
+# ===============================
+app:
+  frontend-url: ${FRONTEND_URL:http://localhost:5173}

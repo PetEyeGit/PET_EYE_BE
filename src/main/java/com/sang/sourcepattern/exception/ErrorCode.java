@@ -60,6 +60,15 @@ public enum ErrorCode {
     PET_ID_REQUIRED(5010, "Pet ID is required", HttpStatus.BAD_REQUEST),
     APPOINTMENT_DATETIME_REQUIRED(5011, "Appointment datetime is required", HttpStatus.BAD_REQUEST),
     APPOINTMENT_MUST_BE_FUTURE(5012, "Appointment must be in the future", HttpStatus.BAD_REQUEST),
+
+//   Email verification errors
+    EMAIL_NOT_VERIFIED(6001, "Email is not verified. Please check your inbox.", HttpStatus.FORBIDDEN),
+    INVALID_VERIFICATION_TOKEN(6002, "Invalid or expired verification token", HttpStatus.BAD_REQUEST),
+    EMAIL_ALREADY_VERIFIED(6003, "Email is already verified", HttpStatus.BAD_REQUEST),
+
+//   Password reset errors
+    INVALID_RESET_TOKEN(6004, "Invalid or expired password reset token", HttpStatus.BAD_REQUEST),
+    RESET_TOKEN_USED(6005, "Password reset token has already been used", HttpStatus.BAD_REQUEST),
 ;
 
     private final int code;

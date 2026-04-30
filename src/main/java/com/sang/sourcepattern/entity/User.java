@@ -36,6 +36,9 @@ public class User {
     @Builder.Default
     boolean active = true;
 
+    @Builder.Default
+    boolean emailVerified = false;
+
     @ManyToMany
     @Builder.Default
     Set<Role> roles = new HashSet<>();
