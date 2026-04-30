@@ -32,6 +32,10 @@ public class Shop {
     String licenseNumber;
     String licenseImageUrl;
 
+    String openTime;
+    String closeTime;
+    String workingDays;
+
     @Builder.Default
     float ratingAvg = 0.0f;
 

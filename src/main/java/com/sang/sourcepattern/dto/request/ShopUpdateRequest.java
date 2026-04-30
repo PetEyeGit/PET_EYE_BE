@@ -1,4 +1,4 @@
-package com.sang.sourcepattern.dto.response;
+package com.sang.sourcepattern.dto.request;
 
 import lombok.*;
 import lombok.experimental.FieldDefaults;
@@ -8,8 +8,7 @@ import lombok.experimental.FieldDefaults;
 @NoArgsConstructor
 @AllArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE)
-public class ShopResponse {
-    int id;
+public class ShopUpdateRequest {
     String shopName;
     String shopType;
     String email;
@@ -17,12 +16,8 @@ public class ShopResponse {
     String address;
     String city;
     String description;
-    String licenseNumber;
-    String licenseImageUrl;
     String openTime;
     String closeTime;
     String workingDays;
-    boolean isVerified;
-    float ratingAvg;
-    int ownerId;
+    String licenseImageUrl;
 }

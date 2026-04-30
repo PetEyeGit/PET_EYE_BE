@@ -1,6 +1,7 @@
 package com.sang.sourcepattern.service.impl;
 
 import com.sang.sourcepattern.dto.request.ShopRegistrationRequest;
+import com.sang.sourcepattern.dto.request.ShopUpdateRequest;
 import com.sang.sourcepattern.dto.response.ShopResponse;
 import com.sang.sourcepattern.entity.Role;
 import com.sang.sourcepattern.entity.Shop;
@@ -105,6 +106,24 @@ public class ShopServiceImpl implements ShopService {
         return shopRepository.findById(id)
                 .map(shopMapper::toShopResponse)
                 .orElseThrow(() -> new AppException(ErrorCode.SHOP_NOT_FOUND));
+    }
+
+    @Override
+    public ShopResponse getMyShop(String email) {
+        Shop shop = shopRepository.findByOwnerEmail(email)
+                .orElseThrow(() -> new AppException(ErrorCode.SHOP_NOT_FOUND));
+        return shopMapper.toShopResponse(shop);
+    }
+
+    @Override
+    @Transactional
+    public ShopResponse updateMyShop(String email, ShopUpdateRequest request) {
+        Shop shop = shopRepository.findByOwnerEmail(email)
+                .orElseThrow(() -> new AppException(ErrorCode.SHOP_NOT_FOUND));
+
+        shopMapper.updateShop(shop, request);
+        
+        return shopMapper.toShopResponse(shopRepository.save(shop));
     }
 
     @Override

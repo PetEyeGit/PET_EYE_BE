@@ -14,6 +14,7 @@ public interface ShopRepository extends JpaRepository<Shop, Integer> {
     Optional<Shop> findByEmail(String email);
     boolean existsByEmail(String email);
     Optional<Shop> findByOwnerId(int ownerId);
+    Optional<Shop> findByOwnerEmail(String email);
 
     @Query("""
         SELECT s FROM Shop s
