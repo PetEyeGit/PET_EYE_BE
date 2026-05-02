@@ -12,4 +12,10 @@ public interface BookingRepository extends JpaRepository<Booking, Integer> {
     List<Booking> findByUserId(int userId);
     List<Booking> findByShopId(int shopId);
     Optional<Booking> findByPayosOrderCode(Long payosOrderCode);
+
+    /** Tasks assigned to a specific staff member */
+    List<Booking> findByStaffId(int staffId);
+
+    /** Bookings in a shop that have not been assigned to any staff */
+    List<Booking> findByShopIdAndStaffIsNull(int shopId);
 }

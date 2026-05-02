@@ -42,6 +42,10 @@ public class Shop {
     @Builder.Default
     boolean isVerified = false;
 
+    /** MANUAL | OPEN_POOL | AUTO — default: MANUAL */
+    @Builder.Default
+    String assignmentMode = "MANUAL";
+
     @OneToMany(mappedBy = "shop")
     List<Service> services;
 
