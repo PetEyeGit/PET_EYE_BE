@@ -103,7 +103,19 @@ payos:
   cancel-url: ${PAYOS_CANCEL_URL}
 
 # ===============================
+# SOCIAL CONFIG (MAP FROM .env)
+# ===============================
+social:
+  zalo:
+    app-id: ${ZALO_APP_ID}
+    app-secret: ${ZALO_APP_SECRET}
+  facebook:
+    app-id: ${FACEBOOK_APP_ID}
+    app-secret: ${FACEBOOK_APP_SECRET}
+    redirect-uri: ${FACEBOOK_REDIRECT_URI}
+
+# ===============================
 # APP CONFIG
 # ===============================
 app:
-  frontend-url: ${FRONTEND_URL:http://localhost:5173}
+  frontend-url: ${FRONTEND_URL:http://localhost:3000}
