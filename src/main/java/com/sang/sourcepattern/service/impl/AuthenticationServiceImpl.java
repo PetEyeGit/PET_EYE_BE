@@ -27,13 +27,14 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestTemplate;
-import org.springframework.web.util.UriComponentsBuilder;
 
-import java.net.URI;
 import java.text.ParseException;
 import java.util.Collections;
 import java.util.Date;
@@ -242,16 +243,23 @@ public class AuthenticationServiceImpl implements AuthenticationService {
                     ? facebookRedirectUri.trim()
                     : "http://localhost:3000/login/facebook/callback";
 
-            URI tokenUri = UriComponentsBuilder
-                    .fromHttpUrl("https://graph.facebook.com/v19.0/oauth/access_token")
-                    .queryParam("client_id", facebookAppId)
-                    .queryParam("redirect_uri", effectiveRedirectUri)
-                    .queryParam("client_secret", facebookAppSecret)
-                    .queryParam("code", request.getCode())
-                    .build().toUri();
+            // Facebook requires POST with form-urlencoded body (NOT GET with query params)
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
 
-            Map<String, Object> tokenData = restTemplate.getForEntity(tokenUri, Map.class).getBody();
+            MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
+            params.add("client_id", facebookAppId);
+            params.add("client_secret", facebookAppSecret);
+            params.add("redirect_uri", effectiveRedirectUri);
+            params.add("code", request.getCode());
+
+            Map<String, Object> tokenData = restTemplate.postForObject(
+                    "https://graph.facebook.com/v19.0/oauth/access_token",
+                    new HttpEntity<>(params, headers),
+                    Map.class);
+
             if (tokenData == null || !tokenData.containsKey("access_token")) {
+                log.error("Facebook token exchange failed: {}", tokenData);
                 throw new AppException(ErrorCode.UNAUTHENTICATED);
             }
 
@@ -280,28 +288,42 @@ public class AuthenticationServiceImpl implements AuthenticationService {
     @Override
     public AuthenticationResponse socialLoginZalo(SocialLoginRequest request) {
         HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(org.springframework.http.MediaType.APPLICATION_FORM_URLENCODED);
+        headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
         headers.set("secret_key", zaloAppSecret);
 
-        String body = "app_id=" + zaloAppId + "&grant_type=authorization_code&code=" + request.getCode();
+        // Use MultiValueMap for proper form encoding
+        MultiValueMap<String, String> body = new LinkedMultiValueMap<>();
+        body.add("app_id", zaloAppId);
+        body.add("grant_type", "authorization_code");
+        body.add("code", request.getCode());
 
         try {
-            Map<String, Object> tokenData = restTemplate.postForEntity(
-                    "https://oauth.zaloapp.com/v4/access_token",
-                    new HttpEntity<>(body, headers), Map.class).getBody();
+            log.info("Exchanging Zalo code for token. AppId: {}, Code: {}", zaloAppId, request.getCode());
+            
+            ResponseEntity<Map> response = restTemplate.postForEntity(
+                    "https://oauth.zaloapp.com/v4/access_token", // Corrected: removed /oa/ segment for social login
+                    new HttpEntity<>(body, headers), Map.class);
+            
+            Map<String, Object> tokenData = response.getBody();
+            log.info("Zalo token response status: {}", response.getStatusCode());
 
             if (tokenData == null || !tokenData.containsKey("access_token")) {
+                log.error("Zalo token exchange failed. Response body: {}", tokenData);
                 throw new AppException(ErrorCode.UNAUTHENTICATED);
             }
 
+            String accessToken = (String) tokenData.get("access_token");
+            log.info("Zalo access token obtained successfully");
+
             HttpHeaders userHeaders = new HttpHeaders();
-            userHeaders.set("access_token", (String) tokenData.get("access_token"));
+            userHeaders.set("access_token", accessToken);
 
             Map<String, Object> userInfo = restTemplate.exchange(
                     "https://graph.zalo.me/v2.0/me?fields=id,name,picture",
                     HttpMethod.GET, new HttpEntity<>(userHeaders), Map.class).getBody();
 
             if (userInfo == null || (userInfo.containsKey("error") && !userInfo.get("error").toString().equals("0"))) {
+                log.error("Zalo get user info failed. Response: {}", userInfo);
                 throw new AppException(ErrorCode.UNAUTHENTICATED);
             }
 
@@ -315,7 +337,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
             User user = findOrCreateSocialUser(id + "@zalo.me", (String) userInfo.get("name"), picture);
             return AuthenticationResponse.builder().token(generateToken(user)).authenticated(true).build();
         } catch (Exception e) {
-            log.error("Zalo login failed", e);
+            log.error("Zalo login exception: {}", e.getMessage(), e);
             throw new AppException(ErrorCode.UNAUTHENTICATED);
         }
     }
