@@ -41,6 +41,9 @@ public class DataInitializer {
             if (roleRepository.findByName("SHOP_OWNER").isEmpty()) {
                 roleRepository.save(Role.builder().name("SHOP_OWNER").description("Shop Owner").build());
             }
+            if (roleRepository.findByName("STAFF").isEmpty()) {
+                roleRepository.save(Role.builder().name("STAFF").description("Shop Staff").build());
+            }
 
             // 2. Create Default Admin if it doesn't exist
             if (userRepository.findByEmail("admin@peteye.com").isEmpty()) {

@@ -69,6 +69,14 @@ public enum ErrorCode {
 //   Password reset errors
     INVALID_RESET_TOKEN(6004, "Invalid or expired password reset token", HttpStatus.BAD_REQUEST),
     RESET_TOKEN_USED(6005, "Password reset token has already been used", HttpStatus.BAD_REQUEST),
+
+//   Staff management errors
+    STAFF_NOT_FOUND(7001, "Staff not found", HttpStatus.NOT_FOUND),
+    STAFF_ALREADY_INACTIVE(7002, "Staff account is already inactive", HttpStatus.BAD_REQUEST),
+    STAFF_EMAIL_EXISTED(7003, "Email already used by another account", HttpStatus.BAD_REQUEST),
+    BOOKING_NOT_BELONG_TO_STAFF_SHOP(7004, "Booking does not belong to your shop", HttpStatus.FORBIDDEN),
+    BOOKING_ALREADY_ASSIGNED(7005, "Booking is already assigned to a staff member", HttpStatus.BAD_REQUEST),
+    BOOKING_STATUS_INVALID(7006, "Invalid booking status transition", HttpStatus.BAD_REQUEST),
 ;
 
     private final int code;

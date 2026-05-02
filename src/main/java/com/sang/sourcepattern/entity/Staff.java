@@ -20,6 +20,11 @@ public class Staff {
     @JoinColumn(name = "shop_id")
     Shop shop;
 
+    /** Linked User account — used for login */
+    @OneToOne(cascade = CascadeType.ALL)
+    @JoinColumn(name = "user_id")
+    User user;
+
     String fullName;
     String role;
     String phone;

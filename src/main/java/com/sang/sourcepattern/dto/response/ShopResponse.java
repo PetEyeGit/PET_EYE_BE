@@ -25,4 +25,6 @@ public class ShopResponse {
     boolean isVerified;
     float ratingAvg;
     int ownerId;
+    /** MANUAL | OPEN_POOL | AUTO */
+    String assignmentMode;
 }
