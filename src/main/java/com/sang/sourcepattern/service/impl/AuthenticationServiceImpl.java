@@ -102,17 +102,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
             throw new AppException(ErrorCode.ACCOUNT_DEACTIVATED);
         }
 
-        boolean isShopOwner = user.getRoles().stream()
-                .anyMatch(role -> role.getName().equals("SHOP_OWNER"));
-
-        if (isShopOwner) {
-            boolean shopVerified = shopRepository.findByOwnerId(user.getId())
-                    .map(shop -> shop.isVerified())
-                    .orElse(false);
-            if (!shopVerified) {
-                throw new AppException(ErrorCode.ACCOUNT_NOT_VERIFIED);
-            }
-        }
+        verifyShopOwnerStatus(user);
 
         return AuthenticationResponse.builder()
                 .token(generateToken(user))
@@ -229,6 +219,8 @@ public class AuthenticationServiceImpl implements AuthenticationService {
                     (String) userInfo.get("name"),
                     (String) userInfo.get("picture"));
 
+            verifyShopOwnerStatus(user);
+
             return AuthenticationResponse.builder().token(generateToken(user)).authenticated(true).build();
         } catch (Exception e) {
             log.error("Google login failed", e);
@@ -278,6 +270,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
             }
 
             User user = findOrCreateSocialUser(id + "@facebook.com", (String) userInfo.get("name"), picture);
+            verifyShopOwnerStatus(user);
             return AuthenticationResponse.builder().token(generateToken(user)).authenticated(true).build();
         } catch (Exception e) {
             log.error("Facebook login failed", e);
@@ -335,10 +328,25 @@ public class AuthenticationServiceImpl implements AuthenticationService {
             }
 
             User user = findOrCreateSocialUser(id + "@zalo.me", (String) userInfo.get("name"), picture);
+            verifyShopOwnerStatus(user);
             return AuthenticationResponse.builder().token(generateToken(user)).authenticated(true).build();
         } catch (Exception e) {
             log.error("Zalo login exception: {}", e.getMessage(), e);
             throw new AppException(ErrorCode.UNAUTHENTICATED);
+        }
+    }
+
+    private void verifyShopOwnerStatus(User user) {
+        boolean isShopOwner = user.getRoles().stream()
+                .anyMatch(role -> role.getName().equals("SHOP_OWNER"));
+
+        if (isShopOwner) {
+            boolean shopVerified = shopRepository.findByOwnerId(user.getId())
+                    .map(shop -> shop.isVerified())
+                    .orElse(false);
+            if (!shopVerified) {
+                throw new AppException(ErrorCode.ACCOUNT_NOT_VERIFIED);
+            }
         }
     }
 

@@ -232,6 +232,14 @@ public class BookingServiceImpl implements BookingService {
                 ? staffRepository.findById(pending.getStaffId()).orElse(null)
                 : null;
 
+        // Auto-assign if mode is AUTO and no staff selected
+        if (staff == null && "AUTO".equals(shop.getAssignmentMode())) {
+            List<Staff> activeStaff = staffRepository.findByShopIdAndIsActiveTrue(shop.getId());
+            if (!activeStaff.isEmpty()) {
+                staff = activeStaff.get(ThreadLocalRandom.current().nextInt(activeStaff.size()));
+            }
+        }
+
         Booking booking = Booking.builder()
                 .user(user).shop(shop).service(service).pet(pet).staff(staff)
                 .appointmentDatetime(pending.getAppointmentDatetime())
@@ -274,6 +282,14 @@ public class BookingServiceImpl implements BookingService {
         Staff staff = request.getStaffId() != null
                 ? staffRepository.findById(request.getStaffId()).orElse(null)
                 : null;
+
+        // Auto-assign if mode is AUTO and no staff selected
+        if (staff == null && "AUTO".equals(shop.getAssignmentMode())) {
+            List<Staff> activeStaff = staffRepository.findByShopIdAndIsActiveTrue(shop.getId());
+            if (!activeStaff.isEmpty()) {
+                staff = activeStaff.get(ThreadLocalRandom.current().nextInt(activeStaff.size()));
+            }
+        }
 
         Booking booking = Booking.builder()
                 .user(user).shop(shop).service(service).pet(pet).staff(staff)
