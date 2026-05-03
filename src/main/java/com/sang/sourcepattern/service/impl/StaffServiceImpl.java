@@ -1,6 +1,7 @@
 package com.sang.sourcepattern.service.impl;
 
 import com.sang.sourcepattern.dto.request.StaffCreationRequest;
+import com.sang.sourcepattern.dto.request.StaffUpdateRequest;
 import com.sang.sourcepattern.dto.response.StaffResponse;
 import com.sang.sourcepattern.entity.Role;
 import com.sang.sourcepattern.entity.Shop;
@@ -147,6 +148,28 @@ public class StaffServiceImpl implements StaffService {
 
         staffRepository.save(staff);
         log.info("Staff {} status toggled to: {}", staff.getFullName(), newStatus ? "ACTIVE" : "INACTIVE");
+        return toResponse(staff);
+    }
+
+    @Override
+    @Transactional
+    public StaffResponse updateStaff(int staffId, StaffUpdateRequest request, String ownerEmail) {
+        Staff staff = resolveStaffInOwnerShop(staffId, ownerEmail);
+
+        staff.setFullName(request.getFullName());
+        staff.setPhone(request.getPhone());
+        staff.setRole(request.getRole());
+        staff.setSpecialization(request.getSpecialization());
+
+        // Update linked User account too
+        if (staff.getUser() != null) {
+            staff.getUser().setFullName(request.getFullName());
+            staff.getUser().setPhone(request.getPhone());
+            userRepository.save(staff.getUser());
+        }
+
+        staff = staffRepository.save(staff);
+        log.info("Staff {} updated by owner {}", staff.getFullName(), ownerEmail);
         return toResponse(staff);
     }
 }

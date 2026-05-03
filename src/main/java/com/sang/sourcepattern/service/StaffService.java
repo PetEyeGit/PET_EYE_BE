@@ -1,6 +1,7 @@
 package com.sang.sourcepattern.service;
 
 import com.sang.sourcepattern.dto.request.StaffCreationRequest;
+import com.sang.sourcepattern.dto.request.StaffUpdateRequest;
 import com.sang.sourcepattern.dto.response.StaffResponse;
 
 import java.util.List;
@@ -28,4 +29,9 @@ public interface StaffService {
      * Toggle active/inactive status of a staff member.
      */
     StaffResponse toggleStaffStatus(int staffId, String ownerEmail);
+
+    /**
+     * Update staff details.
+     */
+    StaffResponse updateStaff(int staffId, StaffUpdateRequest request, String ownerEmail);
 }

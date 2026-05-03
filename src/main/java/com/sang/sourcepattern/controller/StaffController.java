@@ -1,6 +1,7 @@
 package com.sang.sourcepattern.controller;
 
 import com.sang.sourcepattern.dto.request.StaffCreationRequest;
+import com.sang.sourcepattern.dto.request.StaffUpdateRequest;
 import com.sang.sourcepattern.dto.response.ApiResponse;
 import com.sang.sourcepattern.dto.response.StaffResponse;
 import com.sang.sourcepattern.service.StaffService;
@@ -80,6 +81,22 @@ public class StaffController {
         return ApiResponse.<StaffResponse>builder()
                 .result(staffService.toggleStaffStatus(id, jwt.getClaim("email")))
                 .message("Staff status updated")
+                .build();
+    }
+
+    /**
+     * PUT /staff/{id} — Update staff account.
+     */
+    @PutMapping("/{id}")
+    @PreAuthorize("hasRole('SHOP_OWNER')")
+    @Operation(summary = "Update a staff member's information")
+    public ApiResponse<StaffResponse> updateStaff(
+            @AuthenticationPrincipal Jwt jwt,
+            @PathVariable int id,
+            @RequestBody @Valid StaffUpdateRequest request) {
+        return ApiResponse.<StaffResponse>builder()
+                .result(staffService.updateStaff(id, request, jwt.getClaim("email")))
+                .message("Staff updated successfully")
                 .build();
     }
 }
