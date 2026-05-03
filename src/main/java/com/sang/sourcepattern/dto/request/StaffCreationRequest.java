@@ -29,4 +29,6 @@ public class StaffCreationRequest {
 
     /** Specialization/expertise of the staff */
     String specialization;
+
+    java.util.List<StaffCertificateRequest> certificates;
 }

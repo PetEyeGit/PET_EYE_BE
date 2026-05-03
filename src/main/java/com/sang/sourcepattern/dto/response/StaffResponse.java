@@ -1,5 +1,6 @@
 package com.sang.sourcepattern.dto.response;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 
@@ -17,5 +18,8 @@ public class StaffResponse {
     String role;
     String phone;
     String specialization;
+    @JsonProperty("isActive")
     boolean isActive;
+
+    java.util.List<StaffCertificateResponse> certificates;
 }

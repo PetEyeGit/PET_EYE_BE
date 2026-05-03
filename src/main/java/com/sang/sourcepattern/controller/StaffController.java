@@ -1,6 +1,7 @@
 package com.sang.sourcepattern.controller;
 
 import com.sang.sourcepattern.dto.request.StaffCreationRequest;
+import com.sang.sourcepattern.dto.request.StaffUpdateRequest;
 import com.sang.sourcepattern.dto.response.ApiResponse;
 import com.sang.sourcepattern.dto.response.StaffResponse;
 import com.sang.sourcepattern.service.StaffService;
@@ -80,6 +81,71 @@ public class StaffController {
         return ApiResponse.<StaffResponse>builder()
                 .result(staffService.toggleStaffStatus(id, jwt.getClaim("email")))
                 .message("Staff status updated")
+                .build();
+    }
+
+    /**
+     * PUT /staff/{id} — Update staff account.
+     */
+    @PutMapping("/{id}")
+    @PreAuthorize("hasRole('SHOP_OWNER')")
+    @Operation(summary = "Update a staff member's information")
+    public ApiResponse<StaffResponse> updateStaff(
+            @AuthenticationPrincipal Jwt jwt,
+            @PathVariable int id,
+            @RequestBody @Valid StaffUpdateRequest request) {
+        return ApiResponse.<StaffResponse>builder()
+                .result(staffService.updateStaff(id, request, jwt.getClaim("email")))
+                .message("Staff updated successfully")
+                .build();
+    }
+
+    @GetMapping("/my-profile")
+    @PreAuthorize("hasRole('STAFF')")
+    @Operation(summary = "Get the logged-in staff member's own profile")
+    public ApiResponse<StaffResponse> getMyProfile(@AuthenticationPrincipal Jwt jwt) {
+        return ApiResponse.<StaffResponse>builder()
+                .result(staffService.getMyProfile(jwt.getClaim("email")))
+                .build();
+    }
+
+    // ─── Certificates ──────────────────────────────────────────────────────────
+
+    @PostMapping("/{id}/certificates")
+    @PreAuthorize("hasRole('SHOP_OWNER') or hasRole('STAFF')")
+    @Operation(summary = "Add a certificate to a staff member")
+    public ApiResponse<StaffResponse> addCertificate(
+            @AuthenticationPrincipal Jwt jwt,
+            @PathVariable int id,
+            @RequestBody @Valid com.sang.sourcepattern.dto.request.StaffCertificateRequest request) {
+        return ApiResponse.<StaffResponse>builder()
+                .result(staffService.addCertificate(id, request, jwt.getClaim("email")))
+                .message("Certificate added successfully")
+                .build();
+    }
+
+    @DeleteMapping("/certificates/{certId}")
+    @PreAuthorize("hasRole('SHOP_OWNER')")
+    @Operation(summary = "Remove a certificate")
+    public ApiResponse<Void> removeCertificate(
+            @AuthenticationPrincipal Jwt jwt,
+            @PathVariable int certId) {
+        staffService.removeCertificate(certId, jwt.getClaim("email"));
+        return ApiResponse.<Void>builder()
+                .message("Certificate removed successfully")
+                .build();
+    }
+
+    @PutMapping("/certificates/{certId}/verify")
+    @PreAuthorize("hasRole('SHOP_OWNER')")
+    @Operation(summary = "Verify or Reject a certificate")
+    public ApiResponse<StaffResponse> verifyCertificate(
+            @AuthenticationPrincipal Jwt jwt,
+            @PathVariable int certId,
+            @RequestParam com.sang.sourcepattern.entity.StaffCertificate.CertificateStatus status) {
+        return ApiResponse.<StaffResponse>builder()
+                .result(staffService.verifyCertificate(certId, status, jwt.getClaim("email")))
+                .message("Certificate status updated to " + status)
                 .build();
     }
 }

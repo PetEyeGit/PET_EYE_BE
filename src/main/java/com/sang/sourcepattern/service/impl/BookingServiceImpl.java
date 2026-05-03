@@ -324,8 +324,24 @@ public class BookingServiceImpl implements BookingService {
         Booking booking = bookingRepository.findById(bookingId)
                 .orElseThrow(() -> new AppException(ErrorCode.BOOKING_NOT_FOUND));
 
-        if (booking.getUser().getId() != user.getId())
+        boolean isUser = user.getRoles().stream().anyMatch(r -> "USER".equals(r.getName()));
+        boolean isOwner = user.getRoles().stream().anyMatch(r -> "SHOP_OWNER".equals(r.getName()));
+
+        if (isUser && booking.getUser().getId() != user.getId()) {
             throw new AppException(ErrorCode.BOOKING_NOT_BELONG_TO_USER);
+        }
+
+        if (isOwner) {
+            Shop shop = shopRepository.findByOwnerEmail(userEmail)
+                    .orElseThrow(() -> new AppException(ErrorCode.SHOP_NOT_FOUND));
+            if (booking.getShop().getId() != shop.getId())
+                throw new AppException(ErrorCode.BOOKING_NOT_BELONG_TO_STAFF_SHOP);
+        }
+
+        if (!isUser && !isOwner) {
+            throw new AppException(ErrorCode.UNAUTHENTICATED);
+        }
+
         if ("COMPLETED".equals(booking.getStatus()))
             throw new AppException(ErrorCode.BOOKING_ALREADY_PAID);
 

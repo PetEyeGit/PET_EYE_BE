@@ -11,4 +11,5 @@ public interface StaffRepository extends JpaRepository<Staff, Integer> {
     List<Staff> findByShopIdAndIsActiveTrue(int shopId);
     List<Staff> findByShopId(int shopId);
     java.util.Optional<Staff> findByUserId(int userId);
+    java.util.Optional<Staff> findByUserEmail(String email);
 }

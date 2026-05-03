@@ -1,6 +1,7 @@
 package com.sang.sourcepattern.service.impl;
 
 import com.sang.sourcepattern.dto.request.StaffCreationRequest;
+import com.sang.sourcepattern.dto.request.StaffUpdateRequest;
 import com.sang.sourcepattern.dto.response.StaffResponse;
 import com.sang.sourcepattern.entity.Role;
 import com.sang.sourcepattern.entity.Shop;
@@ -10,8 +11,12 @@ import com.sang.sourcepattern.exception.AppException;
 import com.sang.sourcepattern.exception.ErrorCode;
 import com.sang.sourcepattern.repository.RoleRepository;
 import com.sang.sourcepattern.repository.ShopRepository;
+import com.sang.sourcepattern.repository.StaffCertificateRepository;
 import com.sang.sourcepattern.repository.StaffRepository;
 import com.sang.sourcepattern.repository.UserRepository;
+import com.sang.sourcepattern.entity.StaffCertificate;
+import com.sang.sourcepattern.dto.response.StaffCertificateResponse;
+import com.sang.sourcepattern.dto.request.StaffCertificateRequest;
 import com.sang.sourcepattern.service.StaffService;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
@@ -36,6 +41,7 @@ public class StaffServiceImpl implements StaffService {
     ShopRepository shopRepository;
     UserRepository userRepository;
     RoleRepository roleRepository;
+    StaffCertificateRepository staffCertificateRepository;
     PasswordEncoder passwordEncoder;
 
     // ─── helpers ──────────────────────────────────────────────────────────────
@@ -54,7 +60,26 @@ public class StaffServiceImpl implements StaffService {
         return staff;
     }
 
+    @Override
+    public StaffResponse getMyProfile(String email) {
+        Staff staff = staffRepository.findByUserEmail(email)
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
+        return toResponse(staff);
+    }
+
     private StaffResponse toResponse(Staff s) {
+        List<StaffCertificate> certs = staffCertificateRepository.findByStaffId(s.getId());
+        List<StaffCertificateResponse> certResponses = certs.stream()
+                .map(c -> StaffCertificateResponse.builder()
+                        .id(c.getId())
+                        .certificateName(c.getCertificateName())
+                        .imageUrl(c.getImageUrl())
+                        .issueDate(c.getIssueDate())
+                        .expiryDate(c.getExpiryDate())
+                        .status(c.getStatus())
+                        .build())
+                .collect(Collectors.toList());
+
         return StaffResponse.builder()
                 .id(s.getId())
                 .shopId(s.getShop().getId())
@@ -65,6 +90,7 @@ public class StaffServiceImpl implements StaffService {
                 .phone(s.getPhone())
                 .specialization(s.getSpecialization())
                 .isActive(s.isActive())
+                .certificates(certResponses)
                 .build();
     }
 
@@ -111,6 +137,22 @@ public class StaffServiceImpl implements StaffService {
                 .build();
 
         staff = staffRepository.save(staff);
+
+        // 3. Save certificates if provided
+        if (request.getCertificates() != null && !request.getCertificates().isEmpty()) {
+            for (StaffCertificateRequest certReq : request.getCertificates()) {
+                StaffCertificate cert = StaffCertificate.builder()
+                        .staff(staff)
+                        .certificateName(certReq.getCertificateName())
+                        .imageUrl(certReq.getImageUrl())
+                        .issueDate(certReq.getIssueDate())
+                        .expiryDate(certReq.getExpiryDate())
+                        .status(StaffCertificate.CertificateStatus.PENDING)
+                        .build();
+                staffCertificateRepository.save(cert);
+            }
+        }
+
         log.info("Staff created: {} for shop: {}", staff.getFullName(), shop.getShopName());
 
         return toResponse(staff);
@@ -148,5 +190,104 @@ public class StaffServiceImpl implements StaffService {
         staffRepository.save(staff);
         log.info("Staff {} status toggled to: {}", staff.getFullName(), newStatus ? "ACTIVE" : "INACTIVE");
         return toResponse(staff);
+    }
+
+    @Override
+    @Transactional
+    public StaffResponse updateStaff(int staffId, StaffUpdateRequest request, String ownerEmail) {
+        Staff staff = resolveStaffInOwnerShop(staffId, ownerEmail);
+
+        staff.setFullName(request.getFullName());
+        staff.setPhone(request.getPhone());
+        staff.setRole(request.getRole());
+        staff.setSpecialization(request.getSpecialization());
+
+        // Update linked User account too
+        if (staff.getUser() != null) {
+            staff.getUser().setFullName(request.getFullName());
+            staff.getUser().setPhone(request.getPhone());
+            userRepository.save(staff.getUser());
+        }
+
+        staff = staffRepository.save(staff);
+        log.info("Staff {} updated by owner {}", staff.getFullName(), ownerEmail);
+        return toResponse(staff);
+    }
+
+    // ─── Certificates ──────────────────────────────────────────────────────────
+
+    @Override
+    @Transactional
+    public StaffResponse addCertificate(int staffId, StaffCertificateRequest request, String userEmail) {
+        Staff staff = staffRepository.findById(staffId)
+                .orElseThrow(() -> new AppException(ErrorCode.STAFF_NOT_FOUND));
+
+        // Authorization:
+        // 1. If SHOP_OWNER: check if staff belongs to their shop
+        // 2. If STAFF: check if they are updating themselves
+        User requester = userRepository.findByEmail(userEmail)
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
+        
+        boolean isOwner = requester.getRoles().stream().anyMatch(r -> r.getName().equals("SHOP_OWNER"));
+        
+        if (isOwner) {
+            Shop shop = resolveOwnerShop(userEmail);
+            if (staff.getShop().getId() != shop.getId())
+                throw new AppException(ErrorCode.STAFF_NOT_BELONG_TO_SHOP);
+        } else {
+            // Requester is STAFF
+            if (staff.getUser() == null || !staff.getUser().getEmail().equals(userEmail))
+                throw new AppException(ErrorCode.UNAUTHORIZED);
+        }
+
+        StaffCertificate cert = StaffCertificate.builder()
+                .staff(staff)
+                .certificateName(request.getCertificateName())
+                .imageUrl(request.getImageUrl())
+                .issueDate(request.getIssueDate())
+                .expiryDate(request.getExpiryDate())
+                .status(StaffCertificate.CertificateStatus.PENDING)
+                .build();
+
+        staffCertificateRepository.save(cert);
+        return toResponse(staff);
+    }
+
+    @Override
+    @Transactional
+    public void removeCertificate(int certId, String userEmail) {
+        StaffCertificate cert = staffCertificateRepository.findById(certId)
+                .orElseThrow(() -> new AppException(ErrorCode.UNCATEGORIZED_EXCEPTION));
+        
+        Staff staff = cert.getStaff();
+        User requester = userRepository.findByEmail(userEmail)
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
+        
+        boolean isOwner = requester.getRoles().stream().anyMatch(r -> r.getName().equals("SHOP_OWNER"));
+        
+        if (isOwner) {
+            Shop shop = resolveOwnerShop(userEmail);
+            if (staff.getShop().getId() != shop.getId())
+                throw new AppException(ErrorCode.STAFF_NOT_BELONG_TO_SHOP);
+        } else {
+            if (staff.getUser() == null || !staff.getUser().getEmail().equals(userEmail))
+                throw new AppException(ErrorCode.UNAUTHORIZED);
+        }
+
+        staffCertificateRepository.delete(cert);
+    }
+
+    @Override
+    @Transactional
+    public StaffResponse verifyCertificate(int certId, StaffCertificate.CertificateStatus status, String ownerEmail) {
+        StaffCertificate cert = staffCertificateRepository.findById(certId)
+                .orElseThrow(() -> new AppException(ErrorCode.UNCATEGORIZED_EXCEPTION));
+
+        resolveStaffInOwnerShop(cert.getStaff().getId(), ownerEmail);
+
+        cert.setStatus(status);
+        staffCertificateRepository.save(cert);
+
+        return toResponse(cert.getStaff());
     }
 }
