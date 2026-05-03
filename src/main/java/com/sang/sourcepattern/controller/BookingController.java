@@ -95,7 +95,7 @@ public class BookingController {
     }
 
     @PostMapping("/{id}/cancel")
-    @PreAuthorize("hasRole('USER')")
+    @PreAuthorize("hasAnyRole('USER', 'SHOP_OWNER')")
     @Operation(summary = "Cancel a booking")
     public ApiResponse<BookingResponse> cancelBooking(
             @PathVariable int id,
