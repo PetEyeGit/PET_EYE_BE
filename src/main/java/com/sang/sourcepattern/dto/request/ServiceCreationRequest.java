@@ -29,6 +29,11 @@ public class ServiceCreationRequest {
     @Size(min = 10, message = "SERVICE_DESCRIPTION_TOO_SHORT")
     String description;
 
-    // URL returned from /files/upload (Cloudinary)
     String imageUrl;
+
+    // ── BOARDING-only camera config ──────────────────────────────────────────
+    boolean cameraEnabled;
+    /** List of supported tiers, e.g. ["BASIC","HD","AI"] */
+    java.util.List<String> cameraTiers;
+    String cameraDescription;
 }

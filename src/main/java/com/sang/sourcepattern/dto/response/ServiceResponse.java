@@ -23,4 +23,10 @@ public class ServiceResponse {
     String imageUrl;
     boolean active;
     LocalDateTime createdAt;
+
+    // BOARDING-only
+    boolean cameraEnabled;
+    /** List of supported tiers e.g. ["BASIC","HD","AI"] */
+    java.util.List<String> cameraTiers;
+    String cameraDescription;
 }

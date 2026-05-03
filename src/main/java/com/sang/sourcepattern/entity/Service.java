@@ -39,4 +39,21 @@ public class Service {
 
     @Builder.Default
     LocalDateTime createdAt = LocalDateTime.now();
+
+    // ── BOARDING-only: camera configuration ──────────────────────────────────
+
+    /** Whether this boarding service includes camera monitoring */
+    @Builder.Default
+    boolean cameraEnabled = false;
+
+    /**
+     * JSON array of supported camera tiers, e.g. ["BASIC","HD","AI"]
+     * Tiers: BASIC (720p free), HD (1080p +50k), PANORAMIC (360° +100k), AI (+150k)
+     * Staff picks which tiers the shop supports; User picks one when booking.
+     */
+    @Column(columnDefinition = "TEXT")
+    String cameraTiers; // stored as JSON: ["BASIC","HD"]
+
+    /** Camera description shown to user */
+    String cameraDescription;
 }

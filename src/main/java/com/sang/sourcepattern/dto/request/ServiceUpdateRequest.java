@@ -29,4 +29,9 @@ public class ServiceUpdateRequest {
     String imageUrl;
 
     Boolean active;
+
+    // ── BOARDING-only camera config ──────────────────────────────────────────
+    Boolean cameraEnabled;
+    java.util.List<String> cameraTiers;
+    String cameraDescription;
 }
