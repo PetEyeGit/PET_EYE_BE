@@ -19,6 +19,8 @@ public class ShopResponse {
     String description;
     String licenseNumber;
     String licenseImageUrl;
+    String logoUrl;
+    String bannerUrl;
     String openTime;
     String closeTime;
     String workingDays;

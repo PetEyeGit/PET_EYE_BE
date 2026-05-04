@@ -3,6 +3,9 @@ package com.sang.sourcepattern.controller;
 import com.sang.sourcepattern.dto.response.ApiResponse;
 import com.sang.sourcepattern.dto.request.ShopRegistrationRequest;
 import com.sang.sourcepattern.dto.request.ShopUpdateRequest;
+import com.sang.sourcepattern.dto.response.ShopDashboardResponse;
+import com.sang.sourcepattern.dto.response.CustomerDetailResponse;
+import com.sang.sourcepattern.dto.response.ShopCustomerResponse;
 import com.sang.sourcepattern.dto.response.ShopResponse;
 import com.sang.sourcepattern.service.ShopService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -35,6 +38,35 @@ public class ShopController {
     public ApiResponse<ShopResponse> getMyShop(@AuthenticationPrincipal Jwt jwt) {
         return ApiResponse.<ShopResponse>builder()
                 .result(shopService.getMyShop(jwt.getClaim("email")))
+                .build();
+    }
+
+    @GetMapping("/my-shop/customers")
+    @PreAuthorize("hasRole('SHOP_OWNER')")
+    @Operation(summary = "Get the list of customers for the authenticated shop owner")
+    public ApiResponse<ShopCustomerResponse> getShopCustomers(@AuthenticationPrincipal Jwt jwt) {
+        return ApiResponse.<ShopCustomerResponse>builder()
+                .result(shopService.getShopCustomers(jwt.getClaim("email")))
+                .build();
+    }
+
+    @GetMapping("/my-shop/dashboard")
+    @PreAuthorize("hasRole('SHOP_OWNER')")
+    @Operation(summary = "Get dashboard statistics for the authenticated shop owner")
+    public ApiResponse<ShopDashboardResponse> getShopDashboard(@AuthenticationPrincipal Jwt jwt) {
+        return ApiResponse.<ShopDashboardResponse>builder()
+                .result(shopService.getShopDashboard(jwt.getClaim("email")))
+                .build();
+    }
+
+    @GetMapping("/my-shop/customers/{customerId}")
+    @PreAuthorize("hasRole('SHOP_OWNER')")
+    @Operation(summary = "Get detailed information for a specific customer")
+    public ApiResponse<CustomerDetailResponse> getCustomerDetail(
+            @AuthenticationPrincipal Jwt jwt,
+            @PathVariable int customerId) {
+        return ApiResponse.<CustomerDetailResponse>builder()
+                .result(shopService.getCustomerDetail(jwt.getClaim("email"), customerId))
                 .build();
     }
 

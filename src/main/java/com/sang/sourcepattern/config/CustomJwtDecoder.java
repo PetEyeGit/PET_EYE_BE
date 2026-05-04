@@ -43,16 +43,22 @@ public class CustomJwtDecoder implements JwtDecoder {
             Jwt jwt = nimbusJwtDecoder.decode(token);
             
             // Security check: Verify if user account is still active in database
-            String userIdStr = jwt.getSubject();
-            if (userIdStr != null) {
-                try {
-                    int userId = Integer.parseInt(userIdStr);
-                    Optional<User> userOpt = userRepository.findById(userId);
-                    if (userOpt.isEmpty() || !userOpt.get().isActive()) {
-                        throw new JwtException("User account is deactivated or not found");
+            String identifier = jwt.getSubject();
+            if (identifier != null) {
+                Optional<User> userOpt;
+                if (identifier.contains("@")) {
+                    userOpt = userRepository.findByEmail(identifier);
+                } else {
+                    try {
+                        userOpt = userRepository.findById(Integer.parseInt(identifier));
+                    } catch (NumberFormatException e) {
+                        userOpt = Optional.empty();
                     }
-                } catch (NumberFormatException e) {
-                    // ignore or log
+                }
+
+                if (userOpt.isEmpty() || !userOpt.get().isActive()) {
+                    System.out.println(">>> JWT Debug: User not found or inactive for identifier: " + identifier);
+                    throw new JwtException("User account is deactivated or not found");
                 }
             }
 
