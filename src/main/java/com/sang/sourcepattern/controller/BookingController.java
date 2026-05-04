@@ -116,4 +116,17 @@ public class BookingController {
                 .result(bookingService.getShopStaff(shopId))
                 .build();
     }
+
+    @GetMapping("/shop")
+    @PreAuthorize("hasRole('SHOP_OWNER')")
+    @Operation(summary = "Get all bookings for the authenticated shop owner within a range")
+    public ApiResponse<List<BookingResponse>> getShopBookings(
+            @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE_TIME) java.time.LocalDateTime start,
+            @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE_TIME) java.time.LocalDateTime end,
+            @AuthenticationPrincipal Jwt jwt) {
+        
+        return ApiResponse.<List<BookingResponse>>builder()
+                .result(bookingService.getShopBookings(jwt.getClaim("email"), start, end))
+                .build();
+    }
 }

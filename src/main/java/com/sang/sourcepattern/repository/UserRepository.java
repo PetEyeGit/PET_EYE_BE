@@ -13,7 +13,16 @@ import java.util.Optional;
 public interface UserRepository extends JpaRepository<User, Integer> {
     Optional<User> findByEmail(String email);
     boolean existsByEmail(String email);
+<<<<<<< HEAD
 
     @Query("SELECT u FROM User u JOIN u.roles r WHERE r.name = :roleName")
     List<User> findByRoleName(@Param("roleName") String roleName);
+=======
+    Optional<User> findByFacebookId(String facebookId);
+    Optional<User> findByZaloId(String zaloId);
+    Optional<User> findByGoogleId(String googleId);
+
+    @org.springframework.data.jpa.repository.Query("SELECT DISTINCT b.user FROM Booking b WHERE b.shop.id = :shopId")
+    List<User> findUsersByShopId(int shopId);
+>>>>>>> 2bce3625c4c9432a8ab2789a1318ecb0783728e3
 }

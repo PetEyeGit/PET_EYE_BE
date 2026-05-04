@@ -26,4 +26,5 @@ public interface AuthenticationService {
     AuthenticationResponse socialLoginGoogle(SocialLoginRequest request);
     AuthenticationResponse socialLoginFacebook(SocialLoginRequest request);
     AuthenticationResponse socialLoginZalo(SocialLoginRequest request);
+    AuthenticationResponse updateEmail(com.sang.sourcepattern.dto.request.UpdateEmailRequest request);
 }

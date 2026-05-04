@@ -18,4 +18,6 @@ public interface BookingRepository extends JpaRepository<Booking, Integer> {
 
     /** Bookings in a shop that have not been assigned to any staff */
     List<Booking> findByShopIdAndStaffIsNull(int shopId);
+
+    List<Booking> findByShopIdAndAppointmentDatetimeBetween(int shopId, java.time.LocalDateTime start, java.time.LocalDateTime end);
 }

@@ -77,6 +77,7 @@ public enum ErrorCode {
     BOOKING_NOT_BELONG_TO_STAFF_SHOP(7004, "Booking does not belong to your shop", HttpStatus.FORBIDDEN),
     BOOKING_ALREADY_ASSIGNED(7005, "Booking is already assigned to a staff member", HttpStatus.BAD_REQUEST),
     BOOKING_STATUS_INVALID(7006, "Invalid booking status transition", HttpStatus.BAD_REQUEST),
+    MANUAL_ASSIGNMENT_ONLY(7007, "This shop only allows manual assignment by owner", HttpStatus.FORBIDDEN),
 ;
 
     private final int code;

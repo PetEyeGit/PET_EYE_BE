@@ -104,8 +104,14 @@ public class TaskServiceImpl implements TaskService {
             shop = staff.getShop();
         }
 
-        return bookingRepository.findByShopIdAndStaffIsNull(shop.getId())
-                .stream()
+        List<Booking> unassigned = bookingRepository.findByShopIdAndStaffIsNull(shop.getId());
+
+        // If requester is staff and shop is in MANUAL or AUTO mode, hide unassigned tasks
+        if (!isOwner && !"OPEN_POOL".equals(shop.getAssignmentMode())) {
+            return List.of();
+        }
+
+        return unassigned.stream()
                 .filter(b -> !List.of("CANCELLED", "COMPLETED").contains(b.getStatus()))
                 .map(this::toResponse)
                 .collect(Collectors.toList());
@@ -124,6 +130,11 @@ public class TaskServiceImpl implements TaskService {
         // Booking must belong to the staff's shop
         if (booking.getShop().getId() != staff.getShop().getId())
             throw new AppException(ErrorCode.BOOKING_NOT_BELONG_TO_STAFF_SHOP);
+
+        // Shop MUST be in OPEN_POOL mode for staff to claim
+        if (!"OPEN_POOL".equals(staff.getShop().getAssignmentMode())) {
+            throw new AppException(ErrorCode.MANUAL_ASSIGNMENT_ONLY);
+        }
 
         // Must be unassigned
         if (booking.getStaff() != null)

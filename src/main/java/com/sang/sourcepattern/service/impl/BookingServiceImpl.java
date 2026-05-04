@@ -232,6 +232,14 @@ public class BookingServiceImpl implements BookingService {
                 ? staffRepository.findById(pending.getStaffId()).orElse(null)
                 : null;
 
+        // Auto-assign if mode is AUTO and no staff selected
+        if (staff == null && "AUTO".equals(shop.getAssignmentMode())) {
+            List<Staff> activeStaff = staffRepository.findByShopIdAndIsActiveTrue(shop.getId());
+            if (!activeStaff.isEmpty()) {
+                staff = activeStaff.get(ThreadLocalRandom.current().nextInt(activeStaff.size()));
+            }
+        }
+
         Booking booking = Booking.builder()
                 .user(user).shop(shop).service(service).pet(pet).staff(staff)
                 .appointmentDatetime(pending.getAppointmentDatetime())
@@ -274,6 +282,14 @@ public class BookingServiceImpl implements BookingService {
         Staff staff = request.getStaffId() != null
                 ? staffRepository.findById(request.getStaffId()).orElse(null)
                 : null;
+
+        // Auto-assign if mode is AUTO and no staff selected
+        if (staff == null && "AUTO".equals(shop.getAssignmentMode())) {
+            List<Staff> activeStaff = staffRepository.findByShopIdAndIsActiveTrue(shop.getId());
+            if (!activeStaff.isEmpty()) {
+                staff = activeStaff.get(ThreadLocalRandom.current().nextInt(activeStaff.size()));
+            }
+        }
 
         Booking booking = Booking.builder()
                 .user(user).shop(shop).service(service).pet(pet).staff(staff)
@@ -368,6 +384,23 @@ public class BookingServiceImpl implements BookingService {
                         .fullName(s.getFullName()).role(s.getRole())
                         .phone(s.getPhone()).specialization(s.getSpecialization())
                         .isActive(s.isActive()).build())
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public List<BookingResponse> getShopBookings(String ownerEmail, LocalDateTime start, LocalDateTime end) {
+        Shop shop = shopRepository.findByOwnerEmail(ownerEmail)
+                .orElseThrow(() -> new AppException(ErrorCode.SHOP_NOT_FOUND));
+        
+        List<Booking> bookings;
+        if (start != null && end != null) {
+            bookings = bookingRepository.findByShopIdAndAppointmentDatetimeBetween(shop.getId(), start, end);
+        } else {
+            bookings = bookingRepository.findByShopId(shop.getId());
+        }
+        
+        return bookings.stream()
+                .map(this::toResponse)
                 .collect(Collectors.toList());
     }
 }

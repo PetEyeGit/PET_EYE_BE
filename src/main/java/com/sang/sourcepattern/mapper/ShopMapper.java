@@ -23,6 +23,8 @@ public interface ShopMapper {
     Shop toShop(ShopRegistrationRequest request);
 
     @Mapping(target = "ownerId", source = "owner.id")
+    @Mapping(target = "logoUrl", source = "logoUrl")
+    @Mapping(target = "bannerUrl", source = "bannerUrl")
     ShopResponse toShopResponse(Shop shop);
 
     @Mapping(target = "owner", ignore = true)
@@ -33,5 +35,7 @@ public interface ShopMapper {
     @Mapping(target = "ratingAvg", ignore = true)
     @Mapping(target = "verified", ignore = true)
     @Mapping(target = "licenseNumber", ignore = true)
+    @Mapping(target = "logoUrl", source = "logoUrl")
+    @Mapping(target = "bannerUrl", source = "bannerUrl")
     void updateShop(@MappingTarget Shop shop, ShopUpdateRequest request);
 }

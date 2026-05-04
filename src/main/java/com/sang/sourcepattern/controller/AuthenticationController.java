@@ -8,6 +8,7 @@ import com.sang.sourcepattern.dto.request.LogoutRequest;
 import com.sang.sourcepattern.dto.request.RefreshRequest;
 import com.sang.sourcepattern.dto.request.ResetPasswordRequest;
 import com.sang.sourcepattern.dto.request.SocialLoginRequest;
+import com.sang.sourcepattern.dto.request.UpdateEmailRequest;
 import com.sang.sourcepattern.dto.response.ApiResponse;
 import com.sang.sourcepattern.dto.response.AuthenticationResponse;
 import com.sang.sourcepattern.dto.response.IntrospectResponse;
@@ -114,6 +115,13 @@ public class AuthenticationController {
     public ApiResponse<AuthenticationResponse> zaloLogin(@RequestBody SocialLoginRequest request) {
         return ApiResponse.<AuthenticationResponse>builder()
                 .result(authenticationService.socialLoginZalo(request))
+                .build();
+    }
+
+    @PostMapping("/update-email")
+    public ApiResponse<AuthenticationResponse> updateEmail(@RequestBody @Valid UpdateEmailRequest request) {
+        return ApiResponse.<AuthenticationResponse>builder()
+                .result(authenticationService.updateEmail(request))
                 .build();
     }
 }

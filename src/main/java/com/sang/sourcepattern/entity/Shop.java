@@ -31,6 +31,8 @@ public class Shop {
     String description;
     String licenseNumber;
     String licenseImageUrl;
+    String logoUrl;
+    String bannerUrl;
 
     String openTime;
     String closeTime;

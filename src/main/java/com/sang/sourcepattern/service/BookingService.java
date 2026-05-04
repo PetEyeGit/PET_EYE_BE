@@ -41,4 +41,7 @@ public interface BookingService {
 
     /** Get active staff list for a shop */
     List<StaffResponse> getShopStaff(int shopId);
+
+    /** Get all bookings for a shop owner within a range */
+    List<BookingResponse> getShopBookings(String ownerEmail, java.time.LocalDateTime start, java.time.LocalDateTime end);
 }
