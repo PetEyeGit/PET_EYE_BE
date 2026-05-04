@@ -35,5 +35,9 @@ public class ServiceCreationRequest {
     boolean cameraEnabled;
     /** List of supported tiers, e.g. ["BASIC","HD","AI"] */
     java.util.List<String> cameraTiers;
+    /** Custom prices per tier (extra VND/day), e.g. {"BASIC":0,"HD":60000} */
+    java.util.Map<String, Integer> cameraTierPrices;
+    /** Custom display labels per tier, e.g. {"BASIC":"Tiêu chuẩn","HD":"Nét cao"} */
+    java.util.Map<String, String> cameraTierLabels;
     String cameraDescription;
 }

@@ -47,13 +47,25 @@ public class Service {
     boolean cameraEnabled = false;
 
     /**
-     * JSON array of supported camera tiers, e.g. ["BASIC","HD","AI"]
-     * Tiers: BASIC (720p free), HD (1080p +50k), PANORAMIC (360° +100k), AI (+150k)
-     * Staff picks which tiers the shop supports; User picks one when booking.
+     * JSON array of supported camera tier IDs, e.g. ["BASIC","HD","AI"]
      */
     @Column(columnDefinition = "TEXT")
     String cameraTiers; // stored as JSON: ["BASIC","HD"]
 
-    /** Camera description shown to user */
+    /**
+     * JSON map of custom prices per tier (VND extra/day), e.g. {"BASIC":0,"HD":60000,"AI":200000}
+     * If null/missing for a tier, falls back to default prices.
+     */
+    @Column(columnDefinition = "TEXT")
+    String cameraTierPrices; // stored as JSON: {"BASIC":0,"HD":60000}
+
+    /**
+     * JSON map of custom display labels per tier, e.g. {"BASIC":"Tiêu chuẩn","HD":"Nét cao"}
+     * If null/missing for a tier, falls back to default labels.
+     */
+    @Column(columnDefinition = "TEXT")
+    String cameraTierLabels; // stored as JSON: {"BASIC":"Tiêu chuẩn"}
+
+    /** Camera description shown to user (replaces general description in camera section) */
     String cameraDescription;
 }
