@@ -36,8 +36,8 @@ INSERT INTO role (name, description) VALUES ('SHOP_OWNER', 'Shop Owner Role');
 -- Email: admin@peteye.com
 -- Password: 12345678 (BCrypt encoded)
 -- ==========================================
-INSERT INTO user (email, password, full_name, phone, address, created_at)
-VALUES ('admin@peteye.com',  '$2a$10$9uurETzMx/LPgDYIodiRm.65/zfb7aJK5asJc.6wC1Nn26QfzNRcO', 'System Admin', '0987654321', 'District 1, HCM City', NOW());
+INSERT INTO user (email, password, full_name, phone, address, created_at, email_verified, active)
+VALUES ('admin@peteye.com', '$2a$10$9uurETzMx/LPgDYIodiRm.65/zfb7aJK5asJc.6wC1Nn26QfzNRcO', 'System Admin', '0987654321', 'District 1, HCM City', NOW(), true, true);
 
 -- Link Admin user (ID=1) to Admin role (ID=1)
 INSERT INTO user_roles (user_id, roles_id) VALUES (1, 1);

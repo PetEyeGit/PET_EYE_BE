@@ -16,6 +16,8 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 
+import com.sang.sourcepattern.dto.response.StaffResponse;
+
 import java.util.List;
 
 @RestController
@@ -90,6 +92,15 @@ public class ShopController {
                 .build();
     }
 
+    @PostMapping("/reject/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ApiResponse<Void> reject(@PathVariable int id) {
+        shopService.rejectShop(id);
+        return ApiResponse.<Void>builder()
+                .message("Shop rejected")
+                .build();
+    }
+
     @GetMapping
     @PreAuthorize("hasRole('ADMIN')")
     public ApiResponse<List<ShopResponse>> getAll() {
@@ -98,11 +109,27 @@ public class ShopController {
                 .build();
     }
 
+    @GetMapping("/pending")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ApiResponse<List<ShopResponse>> getPending() {
+        return ApiResponse.<List<ShopResponse>>builder()
+                .result(shopService.getPendingShops())
+                .build();
+    }
+
     @GetMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     public ApiResponse<ShopResponse> getById(@PathVariable int id) {
         return ApiResponse.<ShopResponse>builder()
                 .result(shopService.getShopById(id))
+                .build();
+    }
+
+    @GetMapping("/{id}/staff")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ApiResponse<List<StaffResponse>> getStaff(@PathVariable int id) {
+        return ApiResponse.<List<StaffResponse>>builder()
+                .result(shopService.getStaffByShop(id))
                 .build();
     }
 }

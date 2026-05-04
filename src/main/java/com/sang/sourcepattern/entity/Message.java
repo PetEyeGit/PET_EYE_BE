@@ -13,24 +13,27 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @AllArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE)
-public class Notification {
+public class Message {
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     int id;
 
-    @ManyToOne
-    @JoinColumn(name = "user_id")
-    User user;
+    /** ID của shop liên quan đến cuộc hội thoại */
+    int shopId;
 
-    String title;
+    /** Email người gửi */
+    String senderEmail;
+
+    /** ADMIN | SHOP_OWNER */
+    String senderRole;
+
+    @Column(columnDefinition = "TEXT")
     String content;
-
-    /** UUID dùng để group các thông báo cùng 1 đợt gửi */
-    String broadcastId;
-
-    @Builder.Default
-    boolean isRead = false;
 
     @Builder.Default
     LocalDateTime createdAt = LocalDateTime.now();
+
+    @Builder.Default
+    boolean isRead = false;
 }

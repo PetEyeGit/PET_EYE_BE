@@ -20,4 +20,13 @@ public interface ShopService {
 
     /** Public: get a single verified shop by id */
     ShopResponse getVerifiedShopById(int id);
+
+    /** Admin: reject/deactivate a shop */
+    void rejectShop(int shopId);
+
+    /** Admin: get shops pending verification */
+    List<ShopResponse> getPendingShops();
+
+    /** Admin: get staff of a shop */
+    List<com.sang.sourcepattern.dto.response.StaffResponse> getStaffByShop(int shopId);
 }
