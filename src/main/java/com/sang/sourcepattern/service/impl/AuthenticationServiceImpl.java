@@ -106,7 +106,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
             throw new AppException(ErrorCode.ACCOUNT_DEACTIVATED);
         }
 
-<<<<<<< HEAD
+
         boolean isAdmin = user.getRoles().stream()
                 .anyMatch(role -> role.getName().equals("ADMIN"));
 
@@ -124,9 +124,9 @@ public class AuthenticationServiceImpl implements AuthenticationService {
                 }
             }
         }
-=======
+
         verifyShopOwnerStatus(user);
->>>>>>> 2bce3625c4c9432a8ab2789a1318ecb0783728e3
+
 
         return AuthenticationResponse.builder()
                 .token(generateToken(user))
