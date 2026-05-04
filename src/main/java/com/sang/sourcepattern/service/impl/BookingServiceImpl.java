@@ -386,4 +386,21 @@ public class BookingServiceImpl implements BookingService {
                         .isActive(s.isActive()).build())
                 .collect(Collectors.toList());
     }
+
+    @Override
+    public List<BookingResponse> getShopBookings(String ownerEmail, LocalDateTime start, LocalDateTime end) {
+        Shop shop = shopRepository.findByOwnerEmail(ownerEmail)
+                .orElseThrow(() -> new AppException(ErrorCode.SHOP_NOT_FOUND));
+        
+        List<Booking> bookings;
+        if (start != null && end != null) {
+            bookings = bookingRepository.findByShopIdAndAppointmentDatetimeBetween(shop.getId(), start, end);
+        } else {
+            bookings = bookingRepository.findByShopId(shop.getId());
+        }
+        
+        return bookings.stream()
+                .map(this::toResponse)
+                .collect(Collectors.toList());
+    }
 }

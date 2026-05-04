@@ -9,6 +9,15 @@ import com.sang.sourcepattern.entity.User;
 import com.sang.sourcepattern.exception.AppException;
 import com.sang.sourcepattern.exception.ErrorCode;
 import com.sang.sourcepattern.mapper.ShopMapper;
+import com.sang.sourcepattern.dto.response.ShopDashboardResponse;
+import com.sang.sourcepattern.dto.response.CustomerDetailResponse;
+import com.sang.sourcepattern.dto.response.CustomerItemResponse;
+import com.sang.sourcepattern.dto.response.ShopCustomerResponse;
+import com.sang.sourcepattern.entity.Booking;
+import com.sang.sourcepattern.mapper.BookingMapper;
+import com.sang.sourcepattern.mapper.PetMapper;
+import com.sang.sourcepattern.repository.BookingRepository;
+import com.sang.sourcepattern.repository.PetRepository;
 import com.sang.sourcepattern.repository.RoleRepository;
 import com.sang.sourcepattern.repository.ShopRepository;
 import com.sang.sourcepattern.repository.UserRepository;
@@ -34,8 +43,219 @@ public class ShopServiceImpl implements ShopService {
     ShopRepository shopRepository;
     UserRepository userRepository;
     RoleRepository roleRepository;
+    BookingRepository bookingRepository;
+    PetRepository petRepository;
     ShopMapper shopMapper;
+    PetMapper petMapper;
+    BookingMapper bookingMapper;
     PasswordEncoder passwordEncoder;
+
+    @Override
+    public CustomerDetailResponse getCustomerDetail(String ownerEmail, int customerId) {
+        Shop shop = shopRepository.findByOwnerEmail(ownerEmail)
+                .orElseThrow(() -> new AppException(ErrorCode.SHOP_NOT_FOUND));
+
+        User customer = userRepository.findById(customerId)
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
+
+        List<com.sang.sourcepattern.entity.Pet> pets = petRepository.findByOwnerId(customerId);
+        List<Booking> userBookings = bookingRepository.findByShopId(shop.getId()).stream()
+                .filter(b -> b.getUser().getId() == customerId)
+                .sorted((b1, b2) -> b2.getCreatedAt().compareTo(b1.getCreatedAt()))
+                .collect(java.util.stream.Collectors.toList());
+
+        // Recalculate summary stats for this user
+        java.math.BigDecimal totalSpent = userBookings.stream()
+                .filter(b -> "COMPLETED".equals(b.getStatus()))
+                .map(b -> b.getService().getPrice())
+                .reduce(java.math.BigDecimal.ZERO, java.math.BigDecimal::add);
+
+        java.time.LocalDateTime lastVisit = userBookings.stream()
+                .map(Booking::getAppointmentDatetime)
+                .filter(java.util.Objects::nonNull)
+                .max(java.time.LocalDateTime::compareTo)
+                .orElse(null);
+
+        String tier = "NEW";
+        if (totalSpent.compareTo(new java.math.BigDecimal("5000000")) >= 0 || userBookings.size() >= 20) {
+            tier = "VIP";
+        } else if (userBookings.size() >= 10) {
+            tier = "REGULAR";
+        }
+
+        CustomerItemResponse info = CustomerItemResponse.builder()
+                .id(customer.getId())
+                .name(customer.getFullName())
+                .email(customer.getEmail())
+                .phone(customer.getPhone())
+                .avatar(customer.getAvatar())
+                .pets(pets.size())
+                .totalBookings(userBookings.size())
+                .totalSpent(String.format("%,.0fđ", totalSpent.doubleValue()))
+                .lastVisit(lastVisit != null ? lastVisit.format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy")) : "N/A")
+                .tier(tier)
+                .build();
+
+        return CustomerDetailResponse.builder()
+                .customerInfo(info)
+                .pets(pets.stream().map(petMapper::toPetResponse).collect(java.util.stream.Collectors.toList()))
+                .bookingHistory(userBookings.stream().map(bookingMapper::toBookingResponse).collect(java.util.stream.Collectors.toList()))
+                .build();
+    }
+
+    @Override
+    public ShopCustomerResponse getShopCustomers(String ownerEmail) {
+        Shop shop = shopRepository.findByOwnerEmail(ownerEmail)
+                .orElseThrow(() -> new AppException(ErrorCode.SHOP_NOT_FOUND));
+
+        List<User> customers = userRepository.findUsersByShopId(shop.getId());
+        List<Booking> allShopBookings = bookingRepository.findByShopId(shop.getId());
+
+        java.time.LocalDateTime now = java.time.LocalDateTime.now();
+        java.time.LocalDateTime startOfMonth = now.withDayOfMonth(1).withHour(0).withMinute(0).withSecond(0);
+
+        List<CustomerItemResponse> customerList = customers.stream().map(user -> {
+            List<Booking> userBookings = allShopBookings.stream()
+                    .filter(b -> b.getUser().getId() == user.getId())
+                    .collect(java.util.stream.Collectors.toList());
+
+            java.math.BigDecimal totalSpent = userBookings.stream()
+                    .filter(b -> "COMPLETED".equals(b.getStatus()))
+                    .map(b -> b.getService().getPrice())
+                    .reduce(java.math.BigDecimal.ZERO, java.math.BigDecimal::add);
+
+            long petCount = petRepository.countByOwnerId(user.getId());
+            
+            java.time.LocalDateTime lastVisit = userBookings.stream()
+                    .map(Booking::getAppointmentDatetime)
+                    .filter(java.util.Objects::nonNull)
+                    .max(java.time.LocalDateTime::compareTo)
+                    .orElse(null);
+
+            // Determine Tier logic
+            String tier = "NEW";
+            if (totalSpent.compareTo(new java.math.BigDecimal("5000000")) >= 0 || userBookings.size() >= 20) {
+                tier = "VIP";
+            } else if (userBookings.size() >= 10) {
+                tier = "REGULAR";
+            }
+
+            java.time.format.DateTimeFormatter formatter = java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy");
+
+            return CustomerItemResponse.builder()
+                    .id(user.getId())
+                    .name(user.getFullName())
+                    .email(user.getEmail())
+                    .phone(user.getPhone())
+                    .avatar(user.getAvatar())
+                    .pets((int) petCount)
+                    .totalBookings(userBookings.size())
+                    .totalSpent(String.format("%,.0fđ", totalSpent.doubleValue()))
+                    .lastVisit(lastVisit != null ? lastVisit.format(formatter) : "N/A")
+                    .tier(tier)
+                    .build();
+        }).collect(java.util.stream.Collectors.toList());
+
+        long totalCustomers = customerList.size();
+        
+        // A customer is "new" if their FIRST booking at this shop was this month
+        long newCustomers = customers.stream().filter(user -> {
+            return allShopBookings.stream()
+                    .filter(b -> b.getUser().getId() == user.getId())
+                    .map(Booking::getCreatedAt)
+                    .min(java.time.LocalDateTime::compareTo)
+                    .map(firstDate -> firstDate.isAfter(startOfMonth))
+                    .orElse(false);
+        }).count();
+
+        long loyalCustomers = customerList.stream()
+                .filter(c -> "VIP".equals(c.getTier()) || "REGULAR".equals(c.getTier()))
+                .count();
+
+        return ShopCustomerResponse.builder()
+                .totalCustomers(totalCustomers)
+                .newCustomersThisMonth(newCustomers)
+                .loyalCustomers(loyalCustomers)
+                .customers(customerList)
+                .build();
+    }
+
+    @Override
+    public ShopDashboardResponse getShopDashboard(String ownerEmail) {
+        Shop shop = shopRepository.findByOwnerEmail(ownerEmail)
+                .orElseThrow(() -> new AppException(ErrorCode.SHOP_NOT_FOUND));
+
+        List<Booking> allBookings = bookingRepository.findByShopId(shop.getId());
+        
+        // 1. KPI Stats
+        java.math.BigDecimal totalRevenue = allBookings.stream()
+                .filter(b -> "COMPLETED".equals(b.getStatus()))
+                .map(b -> b.getService().getPrice())
+                .reduce(java.math.BigDecimal.ZERO, java.math.BigDecimal::add);
+
+        java.time.LocalDateTime now = java.time.LocalDateTime.now();
+        java.time.LocalDateTime startOfMonth = now.withDayOfMonth(1).withHour(0).withMinute(0).withSecond(0);
+
+        java.math.BigDecimal revenueThisMonth = allBookings.stream()
+                .filter(b -> "COMPLETED".equals(b.getStatus()))
+                .filter(b -> b.getAppointmentDatetime().isAfter(startOfMonth))
+                .map(b -> b.getService().getPrice())
+                .reduce(java.math.BigDecimal.ZERO, java.math.BigDecimal::add);
+
+        long totalBookings = allBookings.size();
+        long pendingBookings = allBookings.stream()
+                .filter(b -> "CONFIRMED".equals(b.getStatus()) || "PENDING_PAYMENT".equals(b.getStatus()))
+                .count();
+
+        long totalCustomers = allBookings.stream()
+                .map(b -> b.getUser().getId())
+                .distinct()
+                .count();
+
+        long totalPets = allBookings.stream()
+                .map(b -> b.getPet().getId())
+                .distinct()
+                .count();
+
+        // 2. Revenue Chart (Last 7 Days)
+        java.time.format.DateTimeFormatter dayFormatter = java.time.format.DateTimeFormatter.ofPattern("dd/MM");
+        List<ShopDashboardResponse.RevenueChartData> revenueChart = new java.util.ArrayList<>();
+        
+        for (int i = 6; i >= 0; i--) {
+            java.time.LocalDate date = now.toLocalDate().minusDays(i);
+            java.math.BigDecimal dayAmount = allBookings.stream()
+                    .filter(b -> "COMPLETED".equals(b.getStatus()))
+                    .filter(b -> b.getAppointmentDatetime().toLocalDate().equals(date))
+                    .map(b -> b.getService().getPrice())
+                    .reduce(java.math.BigDecimal.ZERO, java.math.BigDecimal::add);
+            
+            revenueChart.add(new ShopDashboardResponse.RevenueChartData(date.format(dayFormatter), dayAmount));
+        }
+
+        // 3. Top Services
+        java.util.Map<String, Long> serviceCounts = allBookings.stream()
+                .collect(java.util.stream.Collectors.groupingBy(
+                        b -> b.getService().getServiceName(),
+                        java.util.stream.Collectors.counting()
+                ));
+
+        List<ShopDashboardResponse.ServiceStat> topServices = serviceCounts.entrySet().stream()
+                .map(e -> new ShopDashboardResponse.ServiceStat(e.getKey(), e.getValue()))
+                .sorted((s1, s2) -> Long.compare(s2.getCount(), s1.getCount()))
+                .limit(5)
+                .collect(java.util.stream.Collectors.toList());
+
+        return ShopDashboardResponse.builder()
+                .totalRevenue(totalRevenue)
+                .revenueThisMonth(revenueThisMonth)
+                .totalBookings(totalBookings)
+                .pendingBookings(pendingBookings)
+                .totalCustomers(totalCustomers)
+                .totalPets(totalPets)
+                .revenueChart(revenueChart)
+                .topServices(topServices)
+                .build();
+    }
 
     @Override
     @Transactional
@@ -118,10 +338,14 @@ public class ShopServiceImpl implements ShopService {
     @Override
     @Transactional
     public ShopResponse updateMyShop(String email, ShopUpdateRequest request) {
+        log.info("Updating shop profile for owner: {}", email);
+        log.info("Request data: {}", request);
+        
         Shop shop = shopRepository.findByOwnerEmail(email)
                 .orElseThrow(() -> new AppException(ErrorCode.SHOP_NOT_FOUND));
 
         shopMapper.updateShop(shop, request);
+        log.info("Shop entity after mapping: Logo={}, Banner={}", shop.getLogoUrl(), shop.getBannerUrl());
         
         return shopMapper.toShopResponse(shopRepository.save(shop));
     }

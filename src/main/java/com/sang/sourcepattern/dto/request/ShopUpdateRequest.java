@@ -20,6 +20,8 @@ public class ShopUpdateRequest {
     String closeTime;
     String workingDays;
     String licenseImageUrl;
+    String logoUrl;
+    String bannerUrl;
     /** MANUAL | OPEN_POOL | AUTO */
     String assignmentMode;
 }

@@ -4,6 +4,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 import com.sang.sourcepattern.entity.User;
 
+import java.util.List;
 import java.util.Optional;
 
 @Repository
@@ -13,4 +14,7 @@ public interface UserRepository extends JpaRepository<User, Integer> {
     Optional<User> findByFacebookId(String facebookId);
     Optional<User> findByZaloId(String zaloId);
     Optional<User> findByGoogleId(String googleId);
+
+    @org.springframework.data.jpa.repository.Query("SELECT DISTINCT b.user FROM Booking b WHERE b.shop.id = :shopId")
+    List<User> findUsersByShopId(int shopId);
 }
