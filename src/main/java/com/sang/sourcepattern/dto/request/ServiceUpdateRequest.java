@@ -29,4 +29,13 @@ public class ServiceUpdateRequest {
     String imageUrl;
 
     Boolean active;
+
+    // ── BOARDING-only camera config ──────────────────────────────────────────
+    Boolean cameraEnabled;
+    java.util.List<String> cameraTiers;
+    /** Custom prices per tier (extra VND/day), e.g. {"BASIC":0,"HD":60000} */
+    java.util.Map<String, Integer> cameraTierPrices;
+    /** Custom display labels per tier, e.g. {"BASIC":"Tiêu chuẩn","HD":"Nét cao"} */
+    java.util.Map<String, String> cameraTierLabels;
+    String cameraDescription;
 }
