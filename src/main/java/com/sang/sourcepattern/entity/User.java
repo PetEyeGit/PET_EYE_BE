@@ -23,6 +23,13 @@ public class User {
     @Column(unique = true)
     String email;
 
+    @Column(unique = true)
+    String facebookId;
+    @Column(unique = true)
+    String zaloId;
+    @Column(unique = true)
+    String googleId;
+
     String password;
     String fullName;
     String phone;
