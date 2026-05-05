@@ -90,12 +90,32 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public List<UserResponse> getAllUsers() {
-        throw new UnsupportedOperationException("Not implemented yet");
+        return userRepository.findAll().stream()
+                .map(userMapper::toUserResponse)
+                .toList();
     }
 
     @Override
     public void deleteUser(Integer userId) {
-        throw new UnsupportedOperationException("Not implemented yet");
+        userRepository.findById(userId)
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
+        userRepository.deleteById(userId);
+    }
+
+    @Override
+    public void deactivateUser(Integer userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
+        user.setActive(false);
+        userRepository.save(user);
+    }
+
+    @Override
+    public void activateUser(Integer userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
+        user.setActive(true);
+        userRepository.save(user);
     }
 
     @Override

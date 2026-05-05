@@ -1,10 +1,16 @@
 package com.sang.sourcepattern.controller;
 
+import com.sang.sourcepattern.dto.response.PageResponse;
+import com.sang.sourcepattern.entity.Notification;
+import com.sang.sourcepattern.repository.NotificationRepository;
 import jakarta.validation.Valid;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 import com.sang.sourcepattern.dto.request.UserUpdateRequest;
 import com.sang.sourcepattern.dto.request.UserCreationRequest;
@@ -13,6 +19,10 @@ import com.sang.sourcepattern.dto.response.ApiResponse;
 import com.sang.sourcepattern.dto.response.UserResponse;
 import com.sang.sourcepattern.service.UserService;
 
+import java.util.List;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+
 @RestController
 @RequestMapping("/users")
 @RequiredArgsConstructor
@@ -20,6 +30,7 @@ import com.sang.sourcepattern.service.UserService;
 @Slf4j
 public class UserController {
     UserService userService;
+    NotificationRepository notificationRepository;
 
     @PostMapping("/register")
     ApiResponse<UserResponse> createUser(@RequestBody @Valid UserCreationRequest request) {
@@ -57,5 +68,76 @@ public class UserController {
         return ApiResponse.<Void>builder()
                 .message("Password changed successfully")
                 .build();
+    }
+
+    // ─── Admin endpoints ─────────────────────────────────────────────────────
+
+    @GetMapping
+    @PreAuthorize("hasRole('ADMIN')")
+    ApiResponse<List<UserResponse>> getAllUsers() {
+        return ApiResponse.<List<UserResponse>>builder()
+                .result(userService.getAllUsers())
+                .build();
+    }
+
+    @PatchMapping("/{id}/deactivate")
+    @PreAuthorize("hasRole('ADMIN')")
+    ApiResponse<Void> deactivateUser(@PathVariable Integer id) {
+        userService.deactivateUser(id);
+        return ApiResponse.<Void>builder()
+                .message("User deactivated")
+                .build();
+    }
+
+    @PatchMapping("/{id}/activate")
+    @PreAuthorize("hasRole('ADMIN')")
+    ApiResponse<Void> activateUser(@PathVariable Integer id) {
+        userService.activateUser(id);
+        return ApiResponse.<Void>builder()
+                .message("User activated")
+                .build();
+    }
+
+    @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    ApiResponse<Void> deleteUser(@PathVariable Integer id) {
+        userService.deleteUser(id);
+        return ApiResponse.<Void>builder()
+                .message("User deleted")
+                .build();
+    }
+
+    // ─── Notification endpoints (user tự xem) ────────────────────────────────
+
+    @GetMapping("/notifications/my")
+    ApiResponse<PageResponse<Notification>> getMyNotifications(
+            @AuthenticationPrincipal Jwt jwt,
+            @RequestParam(defaultValue = "0") int page) {
+        int userId = Integer.parseInt(jwt.getSubject());
+        Page<Notification> pageResult = notificationRepository
+                .findByUserIdOrderByCreatedAtDesc(userId, PageRequest.of(page, 10));
+        return ApiResponse.<PageResponse<Notification>>builder()
+                .result(PageResponse.<Notification>builder()
+                        .content(pageResult.getContent())
+                        .page(pageResult.getNumber())
+                        .size(pageResult.getSize())
+                        .totalElements(pageResult.getTotalElements())
+                        .totalPages(pageResult.getTotalPages())
+                        .last(pageResult.isLast())
+                        .build())
+                .build();
+    }
+
+    @PatchMapping("/notifications/{id}/read")
+    ApiResponse<Void> markNotificationRead(@PathVariable int id,
+                                           @AuthenticationPrincipal Jwt jwt) {
+        int userId = Integer.parseInt(jwt.getSubject());
+        notificationRepository.findById(id).ifPresent(n -> {
+            if (n.getUser().getId() == userId) {
+                n.setRead(true);
+                notificationRepository.save(n);
+            }
+        });
+        return ApiResponse.<Void>builder().message("Marked as read").build();
     }
 }

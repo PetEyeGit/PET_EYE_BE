@@ -19,7 +19,9 @@ import com.sang.sourcepattern.mapper.PetMapper;
 import com.sang.sourcepattern.repository.BookingRepository;
 import com.sang.sourcepattern.repository.PetRepository;
 import com.sang.sourcepattern.repository.RoleRepository;
+import com.sang.sourcepattern.dto.response.StaffResponse;
 import com.sang.sourcepattern.repository.ShopRepository;
+import com.sang.sourcepattern.repository.StaffRepository;
 import com.sang.sourcepattern.repository.UserRepository;
 import com.sang.sourcepattern.service.ShopService;
 import lombok.AccessLevel;
@@ -49,6 +51,7 @@ public class ShopServiceImpl implements ShopService {
     PetMapper petMapper;
     BookingMapper bookingMapper;
     PasswordEncoder passwordEncoder;
+    StaffRepository staffRepository;
 
     @Override
     public CustomerDetailResponse getCustomerDetail(String ownerEmail, int customerId) {
@@ -366,5 +369,41 @@ public class ShopServiceImpl implements ShopService {
             throw new AppException(ErrorCode.SHOP_NOT_FOUND);
         }
         return shopMapper.toShopResponse(shop);
+    }
+
+    @Override
+    public void rejectShop(int shopId) {
+        Shop shop = shopRepository.findById(shopId)
+                .orElseThrow(() -> new AppException(ErrorCode.SHOP_NOT_FOUND));
+        shop.setVerified(false);
+        shopRepository.save(shop);
+        log.info("Shop rejected by admin: {}", shop.getShopName());
+    }
+
+    @Override
+    public List<ShopResponse> getPendingShops() {
+        return shopRepository.findAll().stream()
+                .filter(s -> !s.isVerified())
+                .map(shopMapper::toShopResponse)
+                .toList();
+    }
+
+    @Override
+    public List<StaffResponse> getStaffByShop(int shopId) {
+        shopRepository.findById(shopId)
+                .orElseThrow(() -> new AppException(ErrorCode.SHOP_NOT_FOUND));
+        return staffRepository.findByShopId(shopId).stream()
+                .map(s -> StaffResponse.builder()
+                        .id(s.getId())
+                        .shopId(shopId)
+                        .userId(s.getUser() != null ? s.getUser().getId() : null)
+                        .email(s.getUser() != null ? s.getUser().getEmail() : null)
+                        .fullName(s.getFullName())
+                        .role(s.getRole())
+                        .phone(s.getPhone())
+                        .specialization(s.getSpecialization())
+                        .isActive(s.isActive())
+                        .build())
+                .toList();
     }
 }

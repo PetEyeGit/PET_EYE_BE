@@ -79,7 +79,7 @@ public class AuthenticationController {
                 .build();
     }
 
-    /** Quên mật khẩu — gửi link reset qua email */
+    /** Quên mật khẩu — gửi OTP về email */
     @PostMapping("/forgot-password")
     public ApiResponse<Void> forgotPassword(@RequestBody @Valid ForgotPasswordRequest request) {
         userService.forgotPassword(request);

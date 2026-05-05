@@ -41,8 +41,8 @@ public class SecurityConfig {
             "/services/{id}",
             "/shops/public",
             "/shops/public/**",
-            "/bookings/staff/**"
-            // /staff/** and /tasks/** are ALL authenticated (role-secured via @PreAuthorize)
+            "/bookings/staff/**",
+            "/ws/**"
     };
 
     private final CustomJwtDecoder customJwtDecoder;

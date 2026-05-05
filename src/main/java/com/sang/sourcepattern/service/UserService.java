@@ -21,6 +21,10 @@ public interface UserService {
 
     void deleteUser(Integer userId);
 
+    void deactivateUser(Integer userId);
+
+    void activateUser(Integer userId);
+
     void deleteAvatar(Integer userId);
 
     void changePassword(Integer userId, PasswordChangeRequest request);

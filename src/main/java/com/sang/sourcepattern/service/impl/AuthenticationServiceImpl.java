@@ -106,7 +106,27 @@ public class AuthenticationServiceImpl implements AuthenticationService {
             throw new AppException(ErrorCode.ACCOUNT_DEACTIVATED);
         }
 
+
+        boolean isAdmin = user.getRoles().stream()
+                .anyMatch(role -> role.getName().equals("ADMIN"));
+
+        
+        if (!isAdmin) {
+            boolean isShopOwner = user.getRoles().stream()
+                    .anyMatch(role -> role.getName().equals("SHOP_OWNER"));
+
+            if (isShopOwner) {
+                boolean shopVerified = shopRepository.findByOwnerId(user.getId())
+                        .map(shop -> shop.isVerified())
+                        .orElse(false);
+                if (!shopVerified) {
+                    throw new AppException(ErrorCode.ACCOUNT_NOT_VERIFIED);
+                }
+            }
+        }
+
         verifyShopOwnerStatus(user);
+
 
         return AuthenticationResponse.builder()
                 .token(generateToken(user))
