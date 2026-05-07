@@ -4,6 +4,7 @@
 INSERT IGNORE INTO role (id, name, description) VALUES (1, 'ADMIN', 'Administrator Role');
 INSERT IGNORE INTO role (id, name, description) VALUES (2, 'USER', 'Regular User Role');
 INSERT IGNORE INTO role (id, name, description) VALUES (3, 'SHOP_OWNER', 'Shop Owner Role');
+INSERT IGNORE INTO role (id, name, description) VALUES (4, 'STAFF', 'Staff Role');
 
 -- ==========================================
 -- INSERT ADMIN USER
@@ -33,7 +34,7 @@ VALUES (1, 2, 'Pet Eye Test Shop', 'CLINIC', 'owner@peteye.com', '0123456789', '
 INSERT IGNORE INTO user (id, email, password, full_name, phone, address, active, email_verified, created_at)
 VALUES (3, 'staff@peteye.com', '$2a$10$9uurETzMx/LPgDYIodiRm.65/zfb7aJK5asJc.6wC1Nn26QfzNRcO', 'Staff Test', '0999888777', 'District 7, HCM City', 1, 1, NOW());
 
-INSERT IGNORE INTO user_roles (user_id, roles_id) VALUES (3, 2); -- Role USER (Staff cũng là user)
+INSERT IGNORE INTO user_roles (user_id, roles_id) VALUES (3, 4); -- Role STAFF (ID=4)
 
 INSERT IGNORE INTO staff (id, user_id, shop_id, full_name, phone, is_active)
 VALUES (1, 3, 1, 'Staff Test', '0999888777', 1);

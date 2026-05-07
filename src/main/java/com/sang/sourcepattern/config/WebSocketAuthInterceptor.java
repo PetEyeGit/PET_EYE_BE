@@ -41,7 +41,7 @@ public class WebSocketAuthInterceptor implements ChannelInterceptor {
 
                     // Set principal để dùng trong @MessageMapping
                     accessor.setUser(new WsPrincipal(email, roles));
-                    log.info("WebSocket authenticated: {}", email);
+                    log.info("WebSocket authenticated: {} with roles: {}", email, roles);
                 } catch (Exception e) {
                     log.warn("WebSocket auth failed: {}", e.getMessage());
                 }

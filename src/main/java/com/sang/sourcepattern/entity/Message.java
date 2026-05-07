@@ -22,10 +22,20 @@ public class Message {
     /** ID của shop liên quan đến cuộc hội thoại */
     int shopId;
 
+    /** Loại kênh: ADMIN_SUPPORT, INTERNAL_STAFF, DIRECT */
+    @Builder.Default
+    String channelType = "ADMIN_SUPPORT";
+
     /** Email người gửi */
     String senderEmail;
 
-    /** ADMIN | SHOP_OWNER */
+    /** Email người nhận (chỉ dùng cho loại DIRECT) */
+    String recipientEmail;
+
+    /** ID của thực thể mục tiêu (ví dụ: bookingId) */
+    Integer targetId;
+
+    /** ADMIN | SHOP_OWNER | STAFF */
     String senderRole;
 
     @Column(columnDefinition = "TEXT")

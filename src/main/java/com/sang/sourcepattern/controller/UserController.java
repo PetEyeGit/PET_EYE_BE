@@ -20,8 +20,13 @@ import com.sang.sourcepattern.dto.response.UserResponse;
 import com.sang.sourcepattern.service.UserService;
 
 import java.util.List;
+import com.sang.sourcepattern.exception.AppException;
+import com.sang.sourcepattern.exception.ErrorCode;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+
+import com.sang.sourcepattern.entity.User;
+import com.sang.sourcepattern.repository.UserRepository;
 
 @RestController
 @RequestMapping("/users")
@@ -31,6 +36,7 @@ import org.springframework.data.domain.PageRequest;
 public class UserController {
     UserService userService;
     NotificationRepository notificationRepository;
+    UserRepository userRepository;
 
     @PostMapping("/register")
     ApiResponse<UserResponse> createUser(@RequestBody @Valid UserCreationRequest request) {
@@ -113,9 +119,12 @@ public class UserController {
     ApiResponse<PageResponse<Notification>> getMyNotifications(
             @AuthenticationPrincipal Jwt jwt,
             @RequestParam(defaultValue = "0") int page) {
-        int userId = Integer.parseInt(jwt.getSubject());
+        String email = jwt.getSubject();
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
+        
         Page<Notification> pageResult = notificationRepository
-                .findByUserIdOrderByCreatedAtDesc(userId, PageRequest.of(page, 10));
+                .findByUserIdOrderByCreatedAtDesc(user.getId(), PageRequest.of(page, 10));
         return ApiResponse.<PageResponse<Notification>>builder()
                 .result(PageResponse.<Notification>builder()
                         .content(pageResult.getContent())
@@ -131,9 +140,12 @@ public class UserController {
     @PatchMapping("/notifications/{id}/read")
     ApiResponse<Void> markNotificationRead(@PathVariable int id,
                                            @AuthenticationPrincipal Jwt jwt) {
-        int userId = Integer.parseInt(jwt.getSubject());
+        String email = jwt.getSubject();
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
+        
         notificationRepository.findById(id).ifPresent(n -> {
-            if (n.getUser().getId() == userId) {
+            if (n.getUser().getId() == user.getId()) {
                 n.setRead(true);
                 notificationRepository.save(n);
             }

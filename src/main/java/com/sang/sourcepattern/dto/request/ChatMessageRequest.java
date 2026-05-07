@@ -10,5 +10,8 @@ import lombok.experimental.FieldDefaults;
 @FieldDefaults(level = AccessLevel.PRIVATE)
 public class ChatMessageRequest {
     int shopId;
+    String channelType;
+    String recipientEmail;
+    Integer targetId;
     String content;
 }
