@@ -40,20 +40,40 @@ public class TaskServiceImpl implements TaskService {
 
     // ─── helpers ──────────────────────────────────────────────────────────────
 
-    private User resolveUser(String email) {
-        return userRepository.findByEmail(email)
-                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
+    private User resolveUser(String identifier) {
+        if (identifier == null) throw new AppException(ErrorCode.USER_NOT_EXISTED);
+        if (identifier.contains("@")) {
+            return userRepository.findByEmail(identifier)
+                    .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
+        } else {
+            try {
+                return userRepository.findById(Integer.parseInt(identifier))
+                        .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
+            } catch (NumberFormatException e) {
+                throw new AppException(ErrorCode.USER_NOT_EXISTED);
+            }
+        }
     }
 
-    private Staff resolveStaffByEmail(String email) {
-        User user = resolveUser(email);
+    private Staff resolveStaffByEmail(String identifier) {
+        User user = resolveUser(identifier);
         return staffRepository.findByUserId(user.getId())
                 .orElseThrow(() -> new AppException(ErrorCode.STAFF_NOT_FOUND));
     }
 
-    private Shop resolveOwnerShop(String ownerEmail) {
-        return shopRepository.findByOwnerEmail(ownerEmail)
-                .orElseThrow(() -> new AppException(ErrorCode.SHOP_NOT_FOUND));
+    private Shop resolveOwnerShop(String identifier) {
+        if (identifier == null) throw new AppException(ErrorCode.SHOP_NOT_FOUND);
+        if (identifier.contains("@")) {
+            return shopRepository.findByOwnerEmail(identifier)
+                    .orElseThrow(() -> new AppException(ErrorCode.SHOP_NOT_FOUND));
+        } else {
+            try {
+                return shopRepository.findByOwnerId(Integer.parseInt(identifier))
+                        .orElseThrow(() -> new AppException(ErrorCode.SHOP_NOT_FOUND));
+            } catch (NumberFormatException e) {
+                throw new AppException(ErrorCode.SHOP_NOT_FOUND);
+            }
+        }
     }
 
     private TaskResponse toResponse(Booking b) {
