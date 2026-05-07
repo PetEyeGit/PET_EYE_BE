@@ -24,4 +24,9 @@ public interface UserRepository extends JpaRepository<User, Integer> {
     @org.springframework.data.jpa.repository.Query("SELECT DISTINCT b.user FROM Booking b WHERE b.shop.id = :shopId")
     List<User> findUsersByShopId(int shopId);
 
+    @Query("SELECT DISTINCT u FROM User u JOIN u.roles r WHERE r.name = 'USER' AND EXISTS (" +
+           "SELECT 1 FROM Message m WHERE m.shopId = :shopId AND m.channelType = 'CUSTOMER_CHAT' " +
+           "AND (m.senderEmail = u.email OR m.recipientEmail = u.email))")
+    List<User> findUsersByChatHistory(@Param("shopId") int shopId);
+
 }

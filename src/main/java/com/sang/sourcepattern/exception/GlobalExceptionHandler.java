@@ -20,7 +20,8 @@ public class GlobalExceptionHandler {
     private static final String MAX_ATTRIBUTE = "max";
 
     @ExceptionHandler(value = Exception.class)
-    ResponseEntity<ApiResponse> handleException(RuntimeException ex) {
+    ResponseEntity<ApiResponse> handleException(Exception ex) {
+        log.error("Uncategorized error: ", ex);
 
         ApiResponse apiResponse = new ApiResponse();
 

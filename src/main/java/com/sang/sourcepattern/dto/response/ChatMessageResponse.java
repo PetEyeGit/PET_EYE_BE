@@ -13,7 +13,10 @@ import java.time.LocalDateTime;
 public class ChatMessageResponse {
     int id;
     int shopId;
+    String channelType;
     String senderEmail;
+    String recipientEmail;
+    Integer targetId;
     String senderRole;
     String content;
     LocalDateTime createdAt;

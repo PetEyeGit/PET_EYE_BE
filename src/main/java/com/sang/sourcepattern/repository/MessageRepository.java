@@ -8,6 +8,14 @@ import java.util.List;
 
 @Repository
 public interface MessageRepository extends JpaRepository<Message, Integer> {
-    List<Message> findByShopIdOrderByCreatedAtAsc(int shopId);
-    long countByShopIdAndIsReadFalseAndSenderRoleNot(int shopId, String senderRole);
+    List<Message> findByShopIdAndChannelTypeOrderByCreatedAtAsc(int shopId, String channelType);
+    
+    // For direct messages (1-1)
+    List<Message> findByShopIdAndChannelTypeAndSenderEmailAndRecipientEmailOrderByCreatedAtAsc(
+            int shopId, String channelType, String senderEmail, String recipientEmail);
+
+    List<Message> findByShopIdAndChannelTypeAndRecipientEmailOrderByCreatedAtAsc(
+            int shopId, String channelType, String recipientEmail);
+            
+    long countByShopIdAndChannelTypeAndIsReadFalseAndSenderRoleNot(int shopId, String channelType, String senderRole);
 }

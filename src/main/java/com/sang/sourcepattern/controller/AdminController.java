@@ -20,6 +20,7 @@ import lombok.experimental.FieldDefaults;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+
 import com.sang.sourcepattern.entity.User;
 import jakarta.validation.Valid;
 import java.math.BigDecimal;
@@ -55,7 +56,7 @@ public class AdminController {
         long pendingShops = shopRepository.findAll().stream()
                 .filter(s -> !s.isVerified()).count();
         long unreadMessages = messageRepository
-                .countByShopIdAndIsReadFalseAndSenderRoleNot(0, "ADMIN");
+                .countByShopIdAndChannelTypeAndIsReadFalseAndSenderRoleNot(0, "ADMIN_SUPPORT", "ADMIN");
 
         return ApiResponse.<Map<String, Object>>builder()
                 .result(Map.of(
