@@ -164,4 +164,23 @@ public class UserController {
         });
         return ApiResponse.<Void>builder().message("Marked as read").build();
     }
+
+    @PatchMapping("/notifications/mark-all-read")
+    ApiResponse<Void> markAllNotificationsRead(@AuthenticationPrincipal Jwt jwt) {
+        String identifier = jwt.getSubject();
+        User user;
+        if (identifier.contains("@")) {
+            user = userRepository.findByEmail(identifier)
+                    .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
+        } else {
+            user = userRepository.findById(Integer.parseInt(identifier))
+                    .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
+        }
+
+        List<Notification> unread = notificationRepository.findByUserIdAndIsReadFalse(user.getId());
+        unread.forEach(n -> n.setRead(true));
+        notificationRepository.saveAll(unread);
+        
+        return ApiResponse.<Void>builder().message("All marked as read").build();
+    }
 }
