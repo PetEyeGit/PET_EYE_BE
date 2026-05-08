@@ -8,8 +8,12 @@ import com.sang.sourcepattern.dto.response.ChatMessageResponse;
 import com.sang.sourcepattern.dto.response.UserResponse;
 import com.sang.sourcepattern.entity.Message;
 import com.sang.sourcepattern.entity.User;
+import com.sang.sourcepattern.entity.Staff;
+import com.sang.sourcepattern.entity.Booking;
 import com.sang.sourcepattern.repository.MessageRepository;
 import com.sang.sourcepattern.repository.UserRepository;
+import com.sang.sourcepattern.repository.StaffRepository;
+import com.sang.sourcepattern.repository.BookingRepository;
 import com.sang.sourcepattern.exception.AppException;
 import com.sang.sourcepattern.exception.ErrorCode;
 import lombok.AccessLevel;
@@ -35,6 +39,8 @@ public class ChatController {
 
     MessageRepository messageRepository;
     UserRepository userRepository;
+    StaffRepository staffRepository;
+    BookingRepository bookingRepository;
     SimpMessagingTemplate messagingTemplate;
 
     /**
@@ -52,8 +58,8 @@ public class ChatController {
         List<String> roles = wsPrincipal.roles();
         
         String senderRole = roles.contains("ADMIN") ? "ADMIN" : 
-                           roles.contains("STAFF") ? "STAFF" : 
-                           roles.contains("USER") ? "USER" : "SHOP_OWNER";
+                           roles.contains("SHOP_OWNER") ? "SHOP_OWNER" : 
+                           roles.contains("STAFF") ? "STAFF" : "USER";
 
         String finalRecipient = request.getRecipientEmail();
         // If USER is sending to CUSTOMER_CHAT, the recipient is themselves (channel identifier)
@@ -65,6 +71,21 @@ public class ChatController {
         if ("STAFF".equals(senderRole) && "ADMIN_SUPPORT".equals(request.getChannelType())) {
             log.warn("Security Alert: STAFF {} tried to message ADMIN_SUPPORT", senderEmail);
             return;
+        }
+
+        // BA Logic: STAFF can only message CUSTOMER_CHAT if they are assigned via a Booking
+        if ("STAFF".equals(senderRole) && "CUSTOMER_CHAT".equals(request.getChannelType())) {
+            boolean isAuthorized = false;
+            Staff staff = staffRepository.findByUserEmail(senderEmail).orElse(null);
+            if (staff != null) {
+                isAuthorized = bookingRepository.findByShopId(request.getShopId()).stream()
+                    .anyMatch(b -> b.getStaff() != null && b.getStaff().getId() == staff.getId()
+                                   && b.getUser() != null && b.getUser().getEmail().equals(request.getRecipientEmail()));
+            }
+            if (!isAuthorized) {
+                log.warn("Security Alert: STAFF {} tried to message CUSTOMER {} without assignment", senderEmail, request.getRecipientEmail());
+                return;
+            }
         }
 
         log.info("Chat [{}] : {} (Role: {}) sent message to shop {}: {}", 
@@ -105,8 +126,10 @@ public class ChatController {
             @RequestParam(required = false) String recipientEmail,
             @AuthenticationPrincipal Jwt jwt) {
         
-        List<String> roles = jwt.getClaim("roles");
-        String myEmail = jwt.getClaim("email");
+        List<String> roles = jwt.getClaimAsStringList("roles");
+        final String myEmail = jwt.getClaimAsString("email") != null 
+                ? jwt.getClaimAsString("email") 
+                : jwt.getSubject();
 
         // Security check for USER role
         if (roles.contains("USER")) {
@@ -154,8 +177,10 @@ public class ChatController {
             @RequestParam(required = false) String recipientEmail,
             @AuthenticationPrincipal Jwt jwt) {
         
-        List<String> roles = jwt.getClaim("roles");
-        String myEmail = jwt.getClaim("email");
+        List<String> roles = jwt.getClaimAsStringList("roles");
+        final String myEmail = jwt.getClaimAsString("email") != null 
+                ? jwt.getClaimAsString("email") 
+                : jwt.getSubject();
 
         if (roles.contains("STAFF") && "ADMIN_SUPPORT".equals(channelType)) {
             return ApiResponse.<Void>builder().message("Access denied").build();
@@ -184,17 +209,42 @@ public class ChatController {
 
     @GetMapping("/chat/{shopId}/customers")
     @PreAuthorize("hasRole('ADMIN') or hasRole('SHOP_OWNER') or hasRole('STAFF')")
-    public ApiResponse<List<UserResponse>> getShopCustomers(@PathVariable int shopId) {
-        // Find users with bookings
-        List<User> bookingUsers = userRepository.findUsersByShopId(shopId);
-        // Find users with chat history
-        List<User> chatUsers = userRepository.findUsersByChatHistory(shopId);
+    public ApiResponse<List<UserResponse>> getShopCustomers(
+            @PathVariable int shopId, 
+            @AuthenticationPrincipal Jwt jwt) {
         
-        // Combine and distinct
-        java.util.Set<User> allUsers = new java.util.HashSet<>(bookingUsers);
-        allUsers.addAll(chatUsers);
+        final List<String> roles = jwt.getClaimAsStringList("roles");
+        final String emailIdentifier = jwt.getClaimAsString("email") != null 
+                ? jwt.getClaimAsString("email") 
+                : jwt.getSubject();
+        
+        boolean isStaff = roles != null && roles.contains("STAFF") && !roles.contains("SHOP_OWNER");
+        java.util.Set<User> allowedUsers = new java.util.HashSet<>();
 
-        List<UserResponse> response = allUsers.stream()
+        if (isStaff) {
+            java.util.Optional<Staff> staffOpt;
+            if (emailIdentifier.contains("@")) {
+                staffOpt = staffRepository.findByUserEmail(emailIdentifier);
+            } else {
+                staffOpt = staffRepository.findByUserId(Integer.parseInt(emailIdentifier));
+            }
+
+            staffOpt.ifPresent(staff -> {
+                List<Booking> staffBookings = bookingRepository.findByStaffId(staff.getId());
+                staffBookings.forEach(b -> {
+                    // Only show customers from non-cancelled bookings
+                    if (b.getUser() != null && !"CANCELLED".equals(b.getStatus())) {
+                        allowedUsers.add(b.getUser());
+                    }
+                });
+            });
+        } else {
+            // Owner/Admin sees all customers
+            allowedUsers.addAll(userRepository.findUsersByShopId(shopId));
+            allowedUsers.addAll(userRepository.findUsersByChatHistory(shopId));
+        }
+
+        List<UserResponse> response = allowedUsers.stream()
                 .map(u -> UserResponse.builder()
                         .id(u.getId())
                         .email(u.getEmail())

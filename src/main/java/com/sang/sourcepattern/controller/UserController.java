@@ -119,9 +119,15 @@ public class UserController {
     ApiResponse<PageResponse<Notification>> getMyNotifications(
             @AuthenticationPrincipal Jwt jwt,
             @RequestParam(defaultValue = "0") int page) {
-        String email = jwt.getSubject();
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
+        String identifier = jwt.getSubject();
+        User user;
+        if (identifier.contains("@")) {
+            user = userRepository.findByEmail(identifier)
+                    .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
+        } else {
+            user = userRepository.findById(Integer.parseInt(identifier))
+                    .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
+        }
         
         Page<Notification> pageResult = notificationRepository
                 .findByUserIdOrderByCreatedAtDesc(user.getId(), PageRequest.of(page, 10));
@@ -140,9 +146,15 @@ public class UserController {
     @PatchMapping("/notifications/{id}/read")
     ApiResponse<Void> markNotificationRead(@PathVariable int id,
                                            @AuthenticationPrincipal Jwt jwt) {
-        String email = jwt.getSubject();
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
+        String identifier = jwt.getSubject();
+        User user;
+        if (identifier.contains("@")) {
+            user = userRepository.findByEmail(identifier)
+                    .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
+        } else {
+            user = userRepository.findById(Integer.parseInt(identifier))
+                    .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
+        }
         
         notificationRepository.findById(id).ifPresent(n -> {
             if (n.getUser().getId() == user.getId()) {
@@ -151,5 +163,24 @@ public class UserController {
             }
         });
         return ApiResponse.<Void>builder().message("Marked as read").build();
+    }
+
+    @PatchMapping("/notifications/mark-all-read")
+    ApiResponse<Void> markAllNotificationsRead(@AuthenticationPrincipal Jwt jwt) {
+        String identifier = jwt.getSubject();
+        User user;
+        if (identifier.contains("@")) {
+            user = userRepository.findByEmail(identifier)
+                    .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
+        } else {
+            user = userRepository.findById(Integer.parseInt(identifier))
+                    .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
+        }
+
+        List<Notification> unread = notificationRepository.findByUserIdAndIsReadFalse(user.getId());
+        unread.forEach(n -> n.setRead(true));
+        notificationRepository.saveAll(unread);
+        
+        return ApiResponse.<Void>builder().message("All marked as read").build();
     }
 }

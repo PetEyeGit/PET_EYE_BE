@@ -141,7 +141,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
             Date expiry = new Date(now.getTime() + VALID_DURATION * 1000);
 
             JWTClaimsSet claimsSet = new JWTClaimsSet.Builder()
-                    .subject(user.getEmail())
+                    .subject(String.valueOf(user.getId()))
                     .claim("email", user.getEmail())
                     .claim("userId", user.getId())
                     .claim("roles", user.getRoles().stream().map(Role::getName).toList())
@@ -291,10 +291,8 @@ public class AuthenticationServiceImpl implements AuthenticationService {
 
             String id = (String) userInfo.get("id");
             String email = (String) userInfo.get("email");
-            boolean requiresEmailUpdate = false;
             if (email == null || email.isBlank()) {
                 email = id + "@facebook.com";
-                requiresEmailUpdate = true;
             }
 
             String picture = null;
@@ -304,6 +302,8 @@ public class AuthenticationServiceImpl implements AuthenticationService {
             }
 
             User user = findOrCreateSocialUser(id, "facebook", email, (String) userInfo.get("name"), picture);
+            boolean requiresEmailUpdate = user.getEmail().endsWith("@facebook.com");
+
             verifyShopOwnerStatus(user);
             return AuthenticationResponse.builder()
                     .token(generateToken(user))
@@ -362,10 +362,8 @@ public class AuthenticationServiceImpl implements AuthenticationService {
 
             String id = (String) userInfo.get("id");
             String email = (String) userInfo.get("email");
-            boolean requiresEmailUpdate = false;
             if (email == null || email.isBlank()) {
                 email = id + "@zalo.me";
-                requiresEmailUpdate = true;
             }
 
             String picture = null;
@@ -374,7 +372,13 @@ public class AuthenticationServiceImpl implements AuthenticationService {
                 if (data != null) picture = (String) data.get("url");
             }
 
+            log.info("Zalo user profile: ID={}, Name={}, Email={}", id, userInfo.get("name"), userInfo.get("email"));
+
             User user = findOrCreateSocialUser(id, "zalo", email, (String) userInfo.get("name"), picture);
+            log.info("findOrCreateSocialUser returned user with ID: {}, Email: {}", user.getId(), user.getEmail());
+            
+            boolean requiresEmailUpdate = user.getEmail().endsWith("@zalo.me");
+            log.info("User requires email update: {}", requiresEmailUpdate);
             
             // Double check existence in DB
             if (!userRepository.existsById(user.getId())) {
@@ -460,6 +464,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
     public AuthenticationResponse updateEmail(UpdateEmailRequest request) {
         var context = SecurityContextHolder.getContext();
         String identifier = context.getAuthentication().getName();
+        log.info("Updating email for identifier: {} to: {}", identifier, request.getEmail());
 
         User user;
         if (identifier.contains("@")) {
@@ -471,11 +476,14 @@ public class AuthenticationServiceImpl implements AuthenticationService {
         }
 
         if (userRepository.existsByEmail(request.getEmail())) {
+            log.warn("Email already exists: {}", request.getEmail());
             throw new AppException(ErrorCode.USER_EXISTED);
         }
 
+        String oldEmail = user.getEmail();
         user.setEmail(request.getEmail());
         userRepository.saveAndFlush(user);
+        log.info("Successfully updated email for user ID: {} from {} to {}", user.getId(), oldEmail, user.getEmail());
 
         return AuthenticationResponse.builder()
                 .token(generateToken(user))

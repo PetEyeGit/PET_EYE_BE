@@ -46,13 +46,38 @@ public class StaffServiceImpl implements StaffService {
 
     // ─── helpers ──────────────────────────────────────────────────────────────
 
-    private Shop resolveOwnerShop(String ownerEmail) {
-        return shopRepository.findByOwnerEmail(ownerEmail)
-                .orElseThrow(() -> new AppException(ErrorCode.SHOP_NOT_FOUND));
+    private User resolveUser(String identifier) {
+        if (identifier == null) throw new AppException(ErrorCode.USER_NOT_EXISTED);
+        if (identifier.contains("@")) {
+            return userRepository.findByEmail(identifier)
+                    .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
+        } else {
+            try {
+                return userRepository.findById(Integer.parseInt(identifier))
+                        .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
+            } catch (NumberFormatException e) {
+                throw new AppException(ErrorCode.USER_NOT_EXISTED);
+            }
+        }
     }
 
-    private Staff resolveStaffInOwnerShop(int staffId, String ownerEmail) {
-        Shop shop = resolveOwnerShop(ownerEmail);
+    private Shop resolveOwnerShop(String identifier) {
+        if (identifier == null) throw new AppException(ErrorCode.SHOP_NOT_FOUND);
+        if (identifier.contains("@")) {
+            return shopRepository.findByOwnerEmail(identifier)
+                    .orElseThrow(() -> new AppException(ErrorCode.SHOP_NOT_FOUND));
+        } else {
+            try {
+                return shopRepository.findByOwnerId(Integer.parseInt(identifier))
+                        .orElseThrow(() -> new AppException(ErrorCode.SHOP_NOT_FOUND));
+            } catch (NumberFormatException e) {
+                throw new AppException(ErrorCode.SHOP_NOT_FOUND);
+            }
+        }
+    }
+
+    private Staff resolveStaffInOwnerShop(int staffId, String ownerIdentifier) {
+        Shop shop = resolveOwnerShop(ownerIdentifier);
         Staff staff = staffRepository.findById(staffId)
                 .orElseThrow(() -> new AppException(ErrorCode.STAFF_NOT_FOUND));
         if (staff.getShop().getId() != shop.getId())
@@ -60,10 +85,15 @@ public class StaffServiceImpl implements StaffService {
         return staff;
     }
 
+    private Staff resolveStaffSelf(String identifier) {
+        User user = resolveUser(identifier);
+        return staffRepository.findByUserId(user.getId())
+                .orElseThrow(() -> new AppException(ErrorCode.STAFF_NOT_FOUND));
+    }
+
     @Override
-    public StaffResponse getMyProfile(String email) {
-        Staff staff = staffRepository.findByUserEmail(email)
-                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
+    public StaffResponse getMyProfile(String identifier) {
+        Staff staff = resolveStaffSelf(identifier);
         return toResponse(staff);
     }
 
