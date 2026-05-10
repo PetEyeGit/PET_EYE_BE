@@ -119,3 +119,16 @@ social:
 # ===============================
 app:
   frontend-url: ${FRONTEND_URL:http://localhost:3000}
+
+# ===============================
+# AI GATEWAY CONFIG
+# ===============================
+ai:
+  gemini:
+    # Comma-separated list of API keys for rotation
+    keys: ${GEMINI_KEY_1:},${GEMINI_KEY_2:},${GEMINI_KEY_3:}
+  memory:
+    max-turns: 10
+    max-tokens: 8000
+  safety:
+    max-input-length: 2000
