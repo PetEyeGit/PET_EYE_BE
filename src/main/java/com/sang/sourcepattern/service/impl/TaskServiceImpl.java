@@ -13,6 +13,7 @@ import com.sang.sourcepattern.repository.ShopRepository;
 import com.sang.sourcepattern.repository.StaffRepository;
 import com.sang.sourcepattern.repository.UserRepository;
 import com.sang.sourcepattern.service.TaskService;
+import com.sang.sourcepattern.service.WalletService;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
@@ -34,6 +35,7 @@ public class TaskServiceImpl implements TaskService {
     StaffRepository   staffRepository;
     UserRepository    userRepository;
     ShopRepository    shopRepository;
+    WalletService     walletService;
 
     // Valid status transition chain for Staff
     private static final Set<String> VALID_STATUSES = Set.of("CONFIRMED", "IN_PROGRESS", "COMPLETED", "CANCELLED");
@@ -236,6 +238,13 @@ public class TaskServiceImpl implements TaskService {
         booking.setStatus(newStatus);
         bookingRepository.save(booking);
         log.info("Staff {} updated booking {} status: {} → {}", staff.getFullName(), bookingId, current, newStatus);
+
+        // Cập nhật ví khi booking hoàn thành
+        if ("COMPLETED".equals(newStatus)) {
+            walletService.onBookingCompleted(bookingId);
+        }
+        // CANCELLED → không cần làm gì với ví (tiền chưa bao giờ vào ví)
+
         return toResponse(booking);
     }
 

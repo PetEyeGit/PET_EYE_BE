@@ -9,6 +9,16 @@ spring:
     import: optional:file:.env[.properties]
 
   # ===============================
+  # REDIS
+  # ===============================
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      timeout: 5000ms
+
+  # ===============================
   # DATABASE (MYSQL)
   # ===============================
   datasource:
@@ -132,3 +142,9 @@ ai:
     max-tokens: 8000
   safety:
     max-input-length: 2000
+
+# ===============================
+# WALLET CONFIG
+# ===============================
+wallet:
+  admin-fee-rate: 0.10
