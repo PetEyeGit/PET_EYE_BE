@@ -26,8 +26,6 @@ public interface BookingRepository extends JpaRepository<Booking, Integer> {
 
     /**
      * Kiểm tra pet đã có booking active (CONFIRMED / IN_PROGRESS) tại thời điểm đó chưa.
-     * Dùng để ngăn 1 pet có 2 booking cùng giờ.
-     * Window: [appointmentTime - durationMinutes, appointmentTime + durationMinutes]
      */
     @Query("""
         SELECT COUNT(b) > 0 FROM Booking b
@@ -37,6 +35,22 @@ public interface BookingRepository extends JpaRepository<Booking, Integer> {
     """)
     boolean existsConflictingBookingForPet(
             @Param("petId") int petId,
+            @Param("windowStart") LocalDateTime windowStart,
+            @Param("windowEnd") LocalDateTime windowEnd
+    );
+
+    /**
+     * Kiểm tra staff đã có booking active trong khung giờ đó chưa.
+     * Window: [appointmentTime - durationMinutes, appointmentTime + durationMinutes]
+     */
+    @Query("""
+        SELECT COUNT(b) > 0 FROM Booking b
+        WHERE b.staff.id = :staffId
+          AND b.status IN ('CONFIRMED', 'IN_PROGRESS')
+          AND b.appointmentDatetime BETWEEN :windowStart AND :windowEnd
+    """)
+    boolean existsConflictingBookingForStaff(
+            @Param("staffId") int staffId,
             @Param("windowStart") LocalDateTime windowStart,
             @Param("windowEnd") LocalDateTime windowEnd
     );

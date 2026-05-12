@@ -22,5 +22,8 @@ public class StaffResponse {
     @JsonProperty("isActive")
     boolean isActive;
 
+    /** true nếu staff rảnh tại appointmentDatetime được query (null = không query) */
+    Boolean available;
+
     java.util.List<StaffCertificateResponse> certificates;
 }

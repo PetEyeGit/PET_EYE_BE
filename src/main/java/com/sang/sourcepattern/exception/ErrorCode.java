@@ -94,6 +94,7 @@ public enum ErrorCode {
 
     //   Booking conflict
     PET_BOOKING_CONFLICT(5013, "This pet already has an active booking at the requested time", HttpStatus.CONFLICT),
+    STAFF_BOOKING_CONFLICT(5014, "This staff member is already booked at the requested time", HttpStatus.CONFLICT),
 ;
 
     private final int code;

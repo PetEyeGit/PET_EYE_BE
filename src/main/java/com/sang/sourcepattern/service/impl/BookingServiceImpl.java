@@ -56,7 +56,14 @@ public class BookingServiceImpl implements BookingService {
 
     /** TTL cho pending booking trong Redis: 30 phút */
     private static final long PENDING_TTL_MINUTES = 30;
-    private static final String REDIS_KEY_PREFIX = "pending_booking:";
+    private static final String REDIS_KEY_PREFIX   = "pending_booking:";
+
+    /**
+     * Redis lock key cho staff slot.
+     * Format: staff_slot:{staffId}:{yyyy-MM-ddTHH:mm}
+     * TTL = 30 phút (hết hạn cùng pending booking)
+     */
+    private static final String STAFF_SLOT_PREFIX  = "staff_slot:";
 
     // ─── PendingBooking DTO (lưu vào Redis) ──────────────────────────────────
 
@@ -96,6 +103,34 @@ public class BookingServiceImpl implements BookingService {
 
     private void deletePending(long orderCode) {
         redisTemplate.delete(redisKey(orderCode));
+    }
+
+    // ─── Staff slot lock (Redis) ──────────────────────────────────────────────
+
+    /**
+     * Key: staff_slot:{staffId}:{appointmentTime truncated to minute}
+     * Value: orderCode (để biết ai đang giữ slot)
+     */
+    private String staffSlotKey(int staffId, LocalDateTime appointmentTime) {
+        // Truncate to minute để tránh mismatch giây
+        String timeStr = appointmentTime.withSecond(0).withNano(0).toString();
+        return STAFF_SLOT_PREFIX + staffId + ":" + timeStr;
+    }
+
+    /**
+     * Thử giữ slot của staff bằng Redis SET NX (atomic).
+     * @return true nếu giữ thành công, false nếu slot đã bị giữ
+     */
+    private boolean tryLockStaffSlot(int staffId, LocalDateTime appointmentTime, long orderCode) {
+        String key = staffSlotKey(staffId, appointmentTime);
+        Boolean set = redisTemplate.opsForValue()
+                .setIfAbsent(key, String.valueOf(orderCode), PENDING_TTL_MINUTES, TimeUnit.MINUTES);
+        return Boolean.TRUE.equals(set);
+    }
+
+    /** Giải phóng slot của staff khi booking bị huỷ hoặc confirm xong */
+    private void releaseStaffSlot(int staffId, LocalDateTime appointmentTime) {
+        redisTemplate.delete(staffSlotKey(staffId, appointmentTime));
     }
 
     // ─── General helpers ──────────────────────────────────────────────────────
@@ -146,6 +181,29 @@ public class BookingServiceImpl implements BookingService {
         }
     }
 
+    /**
+     * Kiểm tra staff có bị trùng lịch không.
+     * Kiểm tra cả DB (booking đã xác nhận) lẫn Redis (pending booking đang chờ thanh toán).
+     */
+    private void checkStaffConflict(int staffId, LocalDateTime appointmentTime, int durationMinutes) {
+        // 1. Kiểm tra DB — booking đã CONFIRMED/IN_PROGRESS
+        LocalDateTime windowStart = appointmentTime.minusMinutes(durationMinutes);
+        LocalDateTime windowEnd   = appointmentTime.plusMinutes(durationMinutes);
+
+        boolean dbConflict = bookingRepository.existsConflictingBookingForStaff(
+                staffId, windowStart, windowEnd);
+        if (dbConflict) {
+            throw new AppException(ErrorCode.STAFF_BOOKING_CONFLICT);
+        }
+
+        // 2. Kiểm tra Redis — pending booking đang giữ slot (chưa thanh toán)
+        String slotKey = staffSlotKey(staffId, appointmentTime);
+        Boolean slotTaken = redisTemplate.hasKey(slotKey);
+        if (Boolean.TRUE.equals(slotTaken)) {
+            throw new AppException(ErrorCode.STAFF_BOOKING_CONFLICT);
+        }
+    }
+
     private void validateBookingInputs(int shopId, int serviceId, int petId,
                                         Integer staffId, int userId) {
         Shop shop = shopRepository.findById(shopId)
@@ -185,6 +243,12 @@ public class BookingServiceImpl implements BookingService {
         checkPetConflict(request.getPetId(), request.getAppointmentDatetime(),
                 service.getDurationMinutes());
 
+        // ── Kiểm tra trùng lịch staff (nếu có chọn staff) ────────────────────
+        if (request.getStaffId() != null) {
+            checkStaffConflict(request.getStaffId(), request.getAppointmentDatetime(),
+                    service.getDurationMinutes());
+        }
+
         long orderCode = ThreadLocalRandom.current().nextLong(10_000_000L, 99_999_999L);
         String description = "Booking" + orderCode % 100000;
         int rawAmount = service.getPrice().intValue();
@@ -200,18 +264,35 @@ public class BookingServiceImpl implements BookingService {
         );
         savePending(orderCode, pending);
 
+        // ── Giữ slot staff trong Redis (atomic SET NX) ────────────────────────
+        if (request.getStaffId() != null) {
+            boolean locked = tryLockStaffSlot(request.getStaffId(),
+                    request.getAppointmentDatetime(), orderCode);
+            if (!locked) {
+                // Slot vừa bị giữ bởi request khác trong khoảnh khắc này
+                deletePending(orderCode);
+                throw new AppException(ErrorCode.STAFF_BOOKING_CONFLICT);
+            }
+        }
+
         PayOSCreateResponse payosResponse;
         try {
             payosResponse = payOSService.createPaymentLink(
                     orderCode, amountVnd, description, returnUrl, cancelUrl);
         } catch (Exception e) {
             deletePending(orderCode);
+            if (request.getStaffId() != null) {
+                releaseStaffSlot(request.getStaffId(), request.getAppointmentDatetime());
+            }
             log.error("PayOS createPaymentLink failed: {}", e.getMessage(), e);
             throw new AppException(ErrorCode.PAYOS_ERROR);
         }
 
         if (payosResponse == null || !payosResponse.isSuccess() || payosResponse.getData() == null) {
             deletePending(orderCode);
+            if (request.getStaffId() != null) {
+                releaseStaffSlot(request.getStaffId(), request.getAppointmentDatetime());
+            }
             log.error("PayOS error: code={}, desc={}",
                     payosResponse != null ? payosResponse.getCode() : "null",
                     payosResponse != null ? payosResponse.getDesc() : "null");
@@ -275,6 +356,17 @@ public class BookingServiceImpl implements BookingService {
         checkPetConflict(pending.getPetId(), pending.getAppointmentDatetime(),
                 service.getDurationMinutes());
 
+        // Double-check staff conflict từ DB (slot Redis đã được giữ ở bước 1)
+        if (pending.getStaffId() != null) {
+            LocalDateTime ws = pending.getAppointmentDatetime().minusMinutes(service.getDurationMinutes());
+            LocalDateTime we = pending.getAppointmentDatetime().plusMinutes(service.getDurationMinutes());
+            if (bookingRepository.existsConflictingBookingForStaff(pending.getStaffId(), ws, we)) {
+                deletePending(orderCode);
+                releaseStaffSlot(pending.getStaffId(), pending.getAppointmentDatetime());
+                throw new AppException(ErrorCode.STAFF_BOOKING_CONFLICT);
+            }
+        }
+
         Shop shop   = shopRepository.findById(pending.getShopId()).get();
         Pet pet     = petRepository.findById(pending.getPetId()).get();
         Staff staff = pending.getStaffId() != null
@@ -326,6 +418,11 @@ public class BookingServiceImpl implements BookingService {
 
         deletePending(orderCode);
 
+        // Giải phóng Redis slot (booking đã vào DB, không cần lock nữa)
+        if (staff != null) {
+            releaseStaffSlot(staff.getId(), pending.getAppointmentDatetime());
+        }
+
         log.info("Booking {} CONFIRMED (PayOS) — orderCode={}", booking.getId(), orderCode);
         return toResponse(booking);
     }
@@ -345,6 +442,12 @@ public class BookingServiceImpl implements BookingService {
         // ── Kiểm tra trùng lịch pet ──────────────────────────────────────────
         checkPetConflict(request.getPetId(), request.getAppointmentDatetime(),
                 service.getDurationMinutes());
+
+        // ── Kiểm tra trùng lịch staff ─────────────────────────────────────────
+        if (request.getStaffId() != null) {
+            checkStaffConflict(request.getStaffId(), request.getAppointmentDatetime(),
+                    service.getDurationMinutes());
+        }
 
         Shop shop   = shopRepository.findById(request.getShopId()).get();
         Pet pet     = petRepository.findById(request.getPetId()).get();
@@ -473,6 +576,41 @@ public class BookingServiceImpl implements BookingService {
                         .fullName(s.getFullName()).role(s.getRole())
                         .phone(s.getPhone()).specialization(s.getSpecialization())
                         .isActive(s.isActive()).build())
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public List<StaffResponse> getShopStaffWithAvailability(int shopId,
+                                                             LocalDateTime appointmentDatetime,
+                                                             int durationMinutes) {
+        shopRepository.findById(shopId)
+                .orElseThrow(() -> new AppException(ErrorCode.SHOP_NOT_FOUND));
+
+        return staffRepository.findByShopIdAndIsActiveTrue(shopId).stream()
+                .map(s -> {
+                    boolean available = true;
+                    if (appointmentDatetime != null) {
+                        LocalDateTime ws = appointmentDatetime.minusMinutes(durationMinutes);
+                        LocalDateTime we = appointmentDatetime.plusMinutes(durationMinutes);
+
+                        // Check DB
+                        boolean dbBusy = bookingRepository.existsConflictingBookingForStaff(s.getId(), ws, we);
+
+                        // Check Redis slot
+                        String slotKey = STAFF_SLOT_PREFIX + s.getId() + ":"
+                                + appointmentDatetime.withSecond(0).withNano(0).toString();
+                        boolean redisBusy = Boolean.TRUE.equals(redisTemplate.hasKey(slotKey));
+
+                        available = !dbBusy && !redisBusy;
+                    }
+                    return StaffResponse.builder()
+                            .id(s.getId()).shopId(s.getShop().getId())
+                            .fullName(s.getFullName()).role(s.getRole())
+                            .phone(s.getPhone()).specialization(s.getSpecialization())
+                            .isActive(s.isActive())
+                            .available(available)
+                            .build();
+                })
                 .collect(Collectors.toList());
     }
 

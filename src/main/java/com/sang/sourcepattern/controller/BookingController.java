@@ -117,6 +117,33 @@ public class BookingController {
                 .build();
     }
 
+    @GetMapping("/staff/{shopId}/availability")
+    @Operation(summary = "Get staff list with availability for a specific time slot")
+    public ApiResponse<List<StaffResponse>> getShopStaffAvailability(
+            @PathVariable int shopId,
+            @RequestParam(required = false) String appointmentDatetime,
+            @RequestParam(defaultValue = "60") int durationMinutes) {
+
+        java.time.LocalDateTime dt = null;
+        if (appointmentDatetime != null && !appointmentDatetime.isBlank()) {
+            try {
+                dt = java.time.LocalDateTime.parse(appointmentDatetime);
+            } catch (Exception e) {
+                // Try with DateTimeFormatter for edge cases
+                try {
+                    dt = java.time.LocalDateTime.parse(appointmentDatetime,
+                            java.time.format.DateTimeFormatter.ISO_LOCAL_DATE_TIME);
+                } catch (Exception ex) {
+                    // If parsing fails, proceed without datetime filter (return all staff)
+                }
+            }
+        }
+
+        return ApiResponse.<List<StaffResponse>>builder()
+                .result(bookingService.getShopStaffWithAvailability(shopId, dt, durationMinutes))
+                .build();
+    }
+
     @GetMapping("/shop")
     @PreAuthorize("hasRole('SHOP_OWNER')")
     @Operation(summary = "Get all bookings for the authenticated shop owner within a range")
