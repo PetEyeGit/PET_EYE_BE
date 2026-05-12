@@ -247,7 +247,6 @@ public class TaskServiceImpl implements TaskService {
         booking.setStatus(newStatus);
         bookingRepository.save(booking);
         log.info("Requester {} updated booking {} status: {} → {}", requesterEmail, bookingId, current, newStatus);
-        log.info("Staff {} updated booking {} status: {} → {}", staff.getFullName(), bookingId, current, newStatus);
 
         // Cập nhật ví khi booking hoàn thành
         if ("COMPLETED".equals(newStatus)) {
