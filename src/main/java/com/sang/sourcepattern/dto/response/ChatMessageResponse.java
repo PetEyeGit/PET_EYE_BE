@@ -19,6 +19,9 @@ public class ChatMessageResponse {
     Integer targetId;
     String senderRole;
     String content;
+    String attachmentUrl;
+    String attachmentType;
+    String attachmentName;
     LocalDateTime createdAt;
     boolean isRead;
 }

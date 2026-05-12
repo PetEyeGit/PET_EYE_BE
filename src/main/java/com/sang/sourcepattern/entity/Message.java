@@ -41,6 +41,15 @@ public class Message {
     @Column(columnDefinition = "TEXT")
     String content;
 
+    /** URL of the attached file (Cloudinary, etc.) */
+    String attachmentUrl;
+
+    /** Type: IMAGE, FILE, VIDEO */
+    String attachmentType;
+
+    /** Original file name */
+    String attachmentName;
+
     @Builder.Default
     LocalDateTime createdAt = LocalDateTime.now();
 
