@@ -17,12 +17,12 @@ import org.springframework.web.multipart.MultipartFile;
 @RequestMapping("/files")
 @RequiredArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
-@Tag(name = "File Management", description = "Endpoints for uploading images to Cloudinary")
+@Tag(name = "File Management", description = "Endpoints for uploading files to Cloudinary")
 public class FileController {
     CloudinaryService cloudinaryService;
 
     @PostMapping("/upload")
-    @Operation(summary = "Upload an image to Cloudinary")
+    @Operation(summary = "Upload a file to Cloudinary")
     public ApiResponse<String> uploadImage(@RequestParam("file") MultipartFile file) {
         String url = cloudinaryService.uploadImage(file);
         return ApiResponse.<String>builder()
