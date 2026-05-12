@@ -20,4 +20,5 @@ public interface BookingRepository extends JpaRepository<Booking, Integer> {
     List<Booking> findByShopIdAndStaffIsNull(int shopId);
 
     List<Booking> findByShopIdAndAppointmentDatetimeBetween(int shopId, java.time.LocalDateTime start, java.time.LocalDateTime end);
+    boolean existsByUserIdAndShopIdAndStatus(int userId, int shopId, String status);
 }

@@ -119,6 +119,7 @@ public class StaffServiceImpl implements StaffService {
                 .role(s.getRole())
                 .phone(s.getPhone())
                 .specialization(s.getSpecialization())
+                .avatar(s.getUser() != null ? s.getUser().getAvatar() : null)
                 .isActive(s.isActive())
                 .certificates(certResponses)
                 .build();

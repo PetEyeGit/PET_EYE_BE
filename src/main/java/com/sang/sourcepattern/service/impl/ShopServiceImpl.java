@@ -299,7 +299,9 @@ public class ShopServiceImpl implements ShopService {
 
         log.info("Shop registered successfully: {} (Pending Approval)", shop.getShopName());
 
-        return shopMapper.toShopResponse(shop);
+        ShopResponse response = shopMapper.toShopResponse(shop);
+        response.setStaffs(getStaffByShop(response.getId()));
+        return response;
     }
 
     @Override
@@ -314,7 +316,9 @@ public class ShopServiceImpl implements ShopService {
         
         log.info("Shop approved by admin: {}", shop.getShopName());
 
-        return shopMapper.toShopResponse(shop);
+        ShopResponse response = shopMapper.toShopResponse(shop);
+        response.setStaffs(getStaffByShop(response.getId()));
+        return response;
     }
 
     @Override
@@ -326,16 +330,20 @@ public class ShopServiceImpl implements ShopService {
 
     @Override
     public ShopResponse getShopById(int id) {
-        return shopRepository.findById(id)
-                .map(shopMapper::toShopResponse)
+        Shop shop = shopRepository.findById(id)
                 .orElseThrow(() -> new AppException(ErrorCode.SHOP_NOT_FOUND));
+        ShopResponse response = shopMapper.toShopResponse(shop);
+        response.setStaffs(getStaffByShop(id));
+        return response;
     }
 
     @Override
     public ShopResponse getMyShop(String email) {
         Shop shop = shopRepository.findByOwnerEmail(email)
                 .orElseThrow(() -> new AppException(ErrorCode.SHOP_NOT_FOUND));
-        return shopMapper.toShopResponse(shop);
+        ShopResponse response = shopMapper.toShopResponse(shop);
+        response.setStaffs(getStaffByShop(response.getId()));
+        return response;
     }
 
     @Override
@@ -350,7 +358,10 @@ public class ShopServiceImpl implements ShopService {
         shopMapper.updateShop(shop, request);
         log.info("Shop entity after mapping: Logo={}, Banner={}", shop.getLogoUrl(), shop.getBannerUrl());
         
-        return shopMapper.toShopResponse(shopRepository.save(shop));
+        Shop saved = shopRepository.save(shop);
+        ShopResponse response = shopMapper.toShopResponse(saved);
+        response.setStaffs(getStaffByShop(response.getId()));
+        return response;
     }
 
     @Override
@@ -368,7 +379,9 @@ public class ShopServiceImpl implements ShopService {
         if (!shop.isVerified()) {
             throw new AppException(ErrorCode.SHOP_NOT_FOUND);
         }
-        return shopMapper.toShopResponse(shop);
+        ShopResponse response = shopMapper.toShopResponse(shop);
+        response.setStaffs(getStaffByShop(response.getId()));
+        return response;
     }
 
     @Override
@@ -402,6 +415,7 @@ public class ShopServiceImpl implements ShopService {
                         .role(s.getRole())
                         .phone(s.getPhone())
                         .specialization(s.getSpecialization())
+                        .avatar(s.getUser() != null ? s.getUser().getAvatar() : null)
                         .isActive(s.isActive())
                         .build())
                 .toList();

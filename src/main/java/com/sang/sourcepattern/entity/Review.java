@@ -26,9 +26,16 @@ public class Review {
     @JoinColumn(name = "user_id")
     User user;
 
+    @ManyToOne
+    @JoinColumn(name = "service_id")
+    Service service;
+
     int rating;
     String comment;
 
     @Builder.Default
     LocalDateTime createdAt = LocalDateTime.now();
+
+    String reply;
+    LocalDateTime repliedAt;
 }

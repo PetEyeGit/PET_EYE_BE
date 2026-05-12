@@ -22,6 +22,7 @@ public class ShopUpdateRequest {
     String licenseImageUrl;
     String logoUrl;
     String bannerUrl;
+    String galleryUrls;
     /** MANUAL | OPEN_POOL | AUTO */
     String assignmentMode;
 }

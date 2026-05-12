@@ -78,6 +78,10 @@ public enum ErrorCode {
     BOOKING_ALREADY_ASSIGNED(7005, "Booking is already assigned to a staff member", HttpStatus.BAD_REQUEST),
     BOOKING_STATUS_INVALID(7006, "Invalid booking status transition", HttpStatus.BAD_REQUEST),
     MANUAL_ASSIGNMENT_ONLY(7007, "This shop only allows manual assignment by owner", HttpStatus.FORBIDDEN),
+    
+    // Review errors
+    REVIEW_NOT_ALLOWED(8001, "You must complete a booking before reviewing this shop", HttpStatus.FORBIDDEN),
+    REVIEW_ALREADY_EXISTED(8002, "You have already reviewed this shop", HttpStatus.BAD_REQUEST),
 ;
 
     private final int code;
