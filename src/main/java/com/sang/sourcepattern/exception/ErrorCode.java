@@ -78,10 +78,22 @@ public enum ErrorCode {
     BOOKING_ALREADY_ASSIGNED(7005, "Booking is already assigned to a staff member", HttpStatus.BAD_REQUEST),
     BOOKING_STATUS_INVALID(7006, "Invalid booking status transition", HttpStatus.BAD_REQUEST),
     MANUAL_ASSIGNMENT_ONLY(7007, "This shop only allows manual assignment by owner", HttpStatus.FORBIDDEN),
-    
+
+
+//   Wallet errors
+    WALLET_NOT_FOUND(8001, "Wallet not found", HttpStatus.NOT_FOUND),
+    INSUFFICIENT_BALANCE(8002, "Insufficient available balance", HttpStatus.BAD_REQUEST),
+    WITHDRAWAL_NOT_FOUND(8003, "Withdrawal request not found", HttpStatus.NOT_FOUND),
+    WITHDRAWAL_ALREADY_PROCESSED(8004, "Withdrawal request has already been processed", HttpStatus.BAD_REQUEST),
+    PENDING_WITHDRAWAL_EXISTS(8005, "You already have a pending or in-progress withdrawal request", HttpStatus.BAD_REQUEST),
+
     // Review errors
-    REVIEW_NOT_ALLOWED(8001, "You must complete a booking before reviewing this shop", HttpStatus.FORBIDDEN),
-    REVIEW_ALREADY_EXISTED(8002, "You have already reviewed this shop", HttpStatus.BAD_REQUEST),
+    REVIEW_NOT_ALLOWED(9001, "You must complete a booking before reviewing this shop", HttpStatus.FORBIDDEN),
+    REVIEW_ALREADY_EXISTED(9002, "You have already reviewed this shop", HttpStatus.BAD_REQUEST),
+
+
+    //   Booking conflict
+    PET_BOOKING_CONFLICT(5013, "This pet already has an active booking at the requested time", HttpStatus.CONFLICT),
 ;
 
     private final int code;

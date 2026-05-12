@@ -1,5 +1,6 @@
 package com.sang.sourcepattern.service.impl;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.sang.sourcepattern.dto.request.BookingCreationRequest;
 import com.sang.sourcepattern.dto.request.InitiatePaymentRequest;
 import com.sang.sourcepattern.dto.response.BookingResponse;
@@ -7,31 +8,27 @@ import com.sang.sourcepattern.dto.response.InitiatePaymentResponse;
 import com.sang.sourcepattern.dto.response.PayOSCreateResponse;
 import com.sang.sourcepattern.dto.response.PayOSPaymentInfoResponse;
 import com.sang.sourcepattern.dto.response.StaffResponse;
-import com.sang.sourcepattern.entity.Booking;
-import com.sang.sourcepattern.entity.Payment;
-import com.sang.sourcepattern.entity.Pet;
-import com.sang.sourcepattern.entity.Shop;
-import com.sang.sourcepattern.entity.Staff;
-import com.sang.sourcepattern.entity.User;
-import com.sang.sourcepattern.entity.Service;
+import com.sang.sourcepattern.entity.*;
 import com.sang.sourcepattern.exception.AppException;
 import com.sang.sourcepattern.exception.ErrorCode;
 import com.sang.sourcepattern.repository.*;
 import com.sang.sourcepattern.service.BookingService;
 import com.sang.sourcepattern.service.PayOSService;
+import com.sang.sourcepattern.service.impl.WalletServiceImpl;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.io.Serializable;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 @org.springframework.stereotype.Service
@@ -40,27 +37,34 @@ import java.util.stream.Collectors;
 @Slf4j
 public class BookingServiceImpl implements BookingService {
 
-    BookingRepository  bookingRepository;
-    PaymentRepository  paymentRepository;
-    UserRepository     userRepository;
-    ShopRepository     shopRepository;
-    ServiceRepository  serviceRepository;
-    PetRepository      petRepository;
-    StaffRepository    staffRepository;
-    PayOSService       payOSService;
+    BookingRepository     bookingRepository;
+    PaymentRepository     paymentRepository;
+    TransactionRepository transactionRepository;
+    UserRepository        userRepository;
+    ShopRepository        shopRepository;
+    ServiceRepository     serviceRepository;
+    PetRepository         petRepository;
+    StaffRepository       staffRepository;
+    PayOSService          payOSService;
+    WalletServiceImpl     walletService;
+
+    /** Redis template để lưu PendingBooking thay vì in-memory */
+    RedisTemplate<String, Object> redisTemplate;
 
     @Value("${payos.return-url}") @NonFinal String returnUrl;
     @Value("${payos.cancel-url}") @NonFinal String cancelUrl;
 
-    /**
-     * Temporary in-memory store: orderCode → pending booking data.
-     * Cleared after confirmPayment succeeds or expires.
-     */
-    Map<Long, PendingBooking> pendingBookings = new ConcurrentHashMap<>();
+    /** TTL cho pending booking trong Redis: 30 phút */
+    private static final long PENDING_TTL_MINUTES = 30;
+    private static final String REDIS_KEY_PREFIX = "pending_booking:";
 
-    /** Holds all data needed to create a booking after payment confirmed */
-    @Data @AllArgsConstructor
-    static class PendingBooking {
+    // ─── PendingBooking DTO (lưu vào Redis) ──────────────────────────────────
+
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class PendingBooking implements Serializable {
         int userId;
         int shopId;
         int serviceId;
@@ -72,7 +76,29 @@ public class BookingServiceImpl implements BookingService {
         String description;
     }
 
-    // ─── helpers ─────────────────────────────────────────────────────────────
+    // ─── Redis helpers ────────────────────────────────────────────────────────
+
+    private String redisKey(long orderCode) {
+        return REDIS_KEY_PREFIX + orderCode;
+    }
+
+    private void savePending(long orderCode, PendingBooking pending) {
+        redisTemplate.opsForValue().set(redisKey(orderCode), pending, PENDING_TTL_MINUTES, TimeUnit.MINUTES);
+    }
+
+    private PendingBooking getPending(long orderCode) {
+        Object raw = redisTemplate.opsForValue().get(redisKey(orderCode));
+        if (raw == null) return null;
+        if (raw instanceof PendingBooking pb) return pb;
+        // Fallback: Jackson deserialization via RedisTemplate
+        return null;
+    }
+
+    private void deletePending(long orderCode) {
+        redisTemplate.delete(redisKey(orderCode));
+    }
+
+    // ─── General helpers ──────────────────────────────────────────────────────
 
     private User resolveUser(String email) {
         return userRepository.findByEmail(email)
@@ -103,6 +129,23 @@ public class BookingServiceImpl implements BookingService {
                 .build();
     }
 
+    /**
+     * Kiểm tra pet có booking trùng giờ không.
+     * Window = [appointmentTime - duration, appointmentTime + duration]
+     * để tránh overlap khi dịch vụ có thời lượng.
+     */
+    private void checkPetConflict(int petId, LocalDateTime appointmentTime, int durationMinutes) {
+        LocalDateTime windowStart = appointmentTime.minusMinutes(durationMinutes);
+        LocalDateTime windowEnd   = appointmentTime.plusMinutes(durationMinutes);
+
+        boolean conflict = bookingRepository.existsConflictingBookingForPet(
+                petId, windowStart, windowEnd);
+
+        if (conflict) {
+            throw new AppException(ErrorCode.PET_BOOKING_CONFLICT);
+        }
+    }
+
     private void validateBookingInputs(int shopId, int serviceId, int petId,
                                         Integer staffId, int userId) {
         Shop shop = shopRepository.findById(shopId)
@@ -127,7 +170,7 @@ public class BookingServiceImpl implements BookingService {
         }
     }
 
-    // ─── STEP 1: Initiate PayOS payment (no booking saved) ───────────────────
+    // ─── STEP 1: Initiate PayOS payment ──────────────────────────────────────
 
     @Override
     public InitiatePaymentResponse initiatePayment(InitiatePaymentRequest request, String userEmail) {
@@ -138,32 +181,37 @@ public class BookingServiceImpl implements BookingService {
 
         Service service = serviceRepository.findById(request.getServiceId()).get();
 
+        // ── Kiểm tra trùng lịch pet ──────────────────────────────────────────
+        checkPetConflict(request.getPetId(), request.getAppointmentDatetime(),
+                service.getDurationMinutes());
+
         long orderCode = ThreadLocalRandom.current().nextLong(10_000_000L, 99_999_999L);
-        String description = "Booking" + orderCode % 100000; // short, alphanumeric
+        String description = "Booking" + orderCode % 100000;
         int rawAmount = service.getPrice().intValue();
         int amountVnd = Math.max(rawAmount, 2000);
         if (amountVnd % 1000 != 0) amountVnd = ((amountVnd / 1000) + 1) * 1000;
 
-        // Store pending data — will be used in confirmPayment
-        pendingBookings.put(orderCode, new PendingBooking(
+        // ── Lưu vào Redis (TTL 30 phút) ──────────────────────────────────────
+        PendingBooking pending = new PendingBooking(
                 user.getId(), request.getShopId(), request.getServiceId(),
                 request.getPetId(), request.getStaffId(),
                 request.getAppointmentDatetime(), request.getNote(),
                 amountVnd, description
-        ));
+        );
+        savePending(orderCode, pending);
 
         PayOSCreateResponse payosResponse;
         try {
             payosResponse = payOSService.createPaymentLink(
                     orderCode, amountVnd, description, returnUrl, cancelUrl);
         } catch (Exception e) {
-            pendingBookings.remove(orderCode);
+            deletePending(orderCode);
             log.error("PayOS createPaymentLink failed: {}", e.getMessage(), e);
             throw new AppException(ErrorCode.PAYOS_ERROR);
         }
 
         if (payosResponse == null || !payosResponse.isSuccess() || payosResponse.getData() == null) {
-            pendingBookings.remove(orderCode);
+            deletePending(orderCode);
             log.error("PayOS error: code={}, desc={}",
                     payosResponse != null ? payosResponse.getCode() : "null",
                     payosResponse != null ? payosResponse.getDesc() : "null");
@@ -189,12 +237,12 @@ public class BookingServiceImpl implements BookingService {
     public BookingResponse confirmPayment(long orderCode, String userEmail) {
         User user = resolveUser(userEmail);
 
-        // Check if already confirmed (idempotent)
+        // Idempotent check
         bookingRepository.findByPayosOrderCode(orderCode).ifPresent(existing -> {
             throw new AppException(ErrorCode.BOOKING_ALREADY_PAID);
         });
 
-        // Query PayOS for real status
+        // Query PayOS
         PayOSPaymentInfoResponse info;
         try {
             info = payOSService.getPaymentInfo(orderCode);
@@ -207,16 +255,14 @@ public class BookingServiceImpl implements BookingService {
         log.info("PayOS confirmPayment — orderCode={} status={}", orderCode, payosStatus);
 
         if (!"PAID".equals(payosStatus)) {
-            // Not paid — clean up pending and return error
-            pendingBookings.remove(orderCode);
-            throw new AppException(ErrorCode.BOOKING_NOT_FOUND); // reuse as "payment not completed"
+            deletePending(orderCode);
+            throw new AppException(ErrorCode.BOOKING_NOT_FOUND);
         }
 
-        // Retrieve pending booking data
-        PendingBooking pending = pendingBookings.get(orderCode);
+        // Lấy pending từ Redis
+        PendingBooking pending = getPending(orderCode);
         if (pending == null) {
-            // Pending data expired (server restart) — still create booking from PayOS data
-            log.warn("Pending booking data not found for orderCode={}, cannot create booking", orderCode);
+            log.warn("Pending booking not found in Redis for orderCode={}", orderCode);
             throw new AppException(ErrorCode.BOOKING_NOT_FOUND);
         }
 
@@ -224,15 +270,17 @@ public class BookingServiceImpl implements BookingService {
             throw new AppException(ErrorCode.BOOKING_NOT_BELONG_TO_USER);
         }
 
-        // Create booking entities
-        Shop shop = shopRepository.findById(pending.getShopId()).get();
+        // ── Kiểm tra lại trùng lịch (double-check trước khi lưu DB) ──────────
         Service service = serviceRepository.findById(pending.getServiceId()).get();
-        Pet pet = petRepository.findById(pending.getPetId()).get();
+        checkPetConflict(pending.getPetId(), pending.getAppointmentDatetime(),
+                service.getDurationMinutes());
+
+        Shop shop   = shopRepository.findById(pending.getShopId()).get();
+        Pet pet     = petRepository.findById(pending.getPetId()).get();
         Staff staff = pending.getStaffId() != null
                 ? staffRepository.findById(pending.getStaffId()).orElse(null)
                 : null;
 
-        // Auto-assign if mode is AUTO and no staff selected
         if (staff == null && "AUTO".equals(shop.getAssignmentMode())) {
             List<Staff> activeStaff = staffRepository.findByShopIdAndIsActiveTrue(shop.getId());
             if (!activeStaff.isEmpty()) {
@@ -240,6 +288,7 @@ public class BookingServiceImpl implements BookingService {
             }
         }
 
+        // ── Tạo Booking ───────────────────────────────────────────────────────
         Booking booking = Booking.builder()
                 .user(user).shop(shop).service(service).pet(pet).staff(staff)
                 .appointmentDatetime(pending.getAppointmentDatetime())
@@ -249,6 +298,7 @@ public class BookingServiceImpl implements BookingService {
                 .build();
         booking = bookingRepository.save(booking);
 
+        // ── Tạo Payment ───────────────────────────────────────────────────────
         Payment payment = Payment.builder()
                 .booking(booking)
                 .amount(service.getPrice())
@@ -260,9 +310,23 @@ public class BookingServiceImpl implements BookingService {
                 .build();
         paymentRepository.save(payment);
 
-        pendingBookings.remove(orderCode);
+        // ── Ghi Transaction ───────────────────────────────────────────────────
+        transactionRepository.save(Transaction.builder()
+                .booking(booking)
+                .shop(shop)
+                .type("BOOKING_PAYMENT")
+                .amount(service.getPrice())
+                .paymentMethod("PAYOS")
+                .status("SUCCESS")
+                .payosOrderCode(orderCode)
+                .gatewayTransactionId(info.getData() != null ? info.getData().getId() : null)
+                .description("PayOS payment for booking #" + booking.getId())
+                .completedAt(LocalDateTime.now())
+                .build());
 
-        log.info("Booking {} CONFIRMED after PayOS payment — orderCode={}", booking.getId(), orderCode);
+        deletePending(orderCode);
+
+        log.info("Booking {} CONFIRMED (PayOS) — orderCode={}", booking.getId(), orderCode);
         return toResponse(booking);
     }
 
@@ -276,14 +340,18 @@ public class BookingServiceImpl implements BookingService {
         validateBookingInputs(request.getShopId(), request.getServiceId(),
                 request.getPetId(), request.getStaffId(), user.getId());
 
-        Shop shop = shopRepository.findById(request.getShopId()).get();
         Service service = serviceRepository.findById(request.getServiceId()).get();
-        Pet pet = petRepository.findById(request.getPetId()).get();
+
+        // ── Kiểm tra trùng lịch pet ──────────────────────────────────────────
+        checkPetConflict(request.getPetId(), request.getAppointmentDatetime(),
+                service.getDurationMinutes());
+
+        Shop shop   = shopRepository.findById(request.getShopId()).get();
+        Pet pet     = petRepository.findById(request.getPetId()).get();
         Staff staff = request.getStaffId() != null
                 ? staffRepository.findById(request.getStaffId()).orElse(null)
                 : null;
 
-        // Auto-assign if mode is AUTO and no staff selected
         if (staff == null && "AUTO".equals(shop.getAssignmentMode())) {
             List<Staff> activeStaff = staffRepository.findByShopIdAndIsActiveTrue(shop.getId());
             if (!activeStaff.isEmpty()) {
@@ -291,6 +359,7 @@ public class BookingServiceImpl implements BookingService {
             }
         }
 
+        // ── Tạo Booking ───────────────────────────────────────────────────────
         Booking booking = Booking.builder()
                 .user(user).shop(shop).service(service).pet(pet).staff(staff)
                 .appointmentDatetime(request.getAppointmentDatetime())
@@ -299,14 +368,26 @@ public class BookingServiceImpl implements BookingService {
                 .build();
         booking = bookingRepository.save(booking);
 
+        // ── Tạo Payment (PENDING — chờ thu tiền mặt) ─────────────────────────
         Payment payment = Payment.builder()
                 .booking(booking)
                 .amount(service.getPrice())
                 .method("CASH")
                 .status("PENDING")
-                .description("Cash payment for booking " + booking.getId())
+                .description("Cash payment for booking #" + booking.getId())
                 .build();
         paymentRepository.save(payment);
+
+        // ── Ghi Transaction (PENDING — chờ thu tiền) ─────────────────────────
+        transactionRepository.save(Transaction.builder()
+                .booking(booking)
+                .shop(shop)
+                .type("BOOKING_PAYMENT")
+                .amount(service.getPrice())
+                .paymentMethod("CASH")
+                .status("PENDING")
+                .description("Cash booking #" + booking.getId() + " — pending collection")
+                .build());
 
         log.info("Booking {} created (CASH) — status=CONFIRMED", booking.getId());
         return toResponse(booking);
@@ -340,12 +421,11 @@ public class BookingServiceImpl implements BookingService {
         Booking booking = bookingRepository.findById(bookingId)
                 .orElseThrow(() -> new AppException(ErrorCode.BOOKING_NOT_FOUND));
 
-        boolean isUser = user.getRoles().stream().anyMatch(r -> "USER".equals(r.getName()));
+        boolean isUser  = user.getRoles().stream().anyMatch(r -> "USER".equals(r.getName()));
         boolean isOwner = user.getRoles().stream().anyMatch(r -> "SHOP_OWNER".equals(r.getName()));
 
-        if (isUser && booking.getUser().getId() != user.getId()) {
+        if (isUser && booking.getUser().getId() != user.getId())
             throw new AppException(ErrorCode.BOOKING_NOT_BELONG_TO_USER);
-        }
 
         if (isOwner) {
             Shop shop = shopRepository.findByOwnerEmail(userEmail)
@@ -354,9 +434,8 @@ public class BookingServiceImpl implements BookingService {
                 throw new AppException(ErrorCode.BOOKING_NOT_BELONG_TO_STAFF_SHOP);
         }
 
-        if (!isUser && !isOwner) {
+        if (!isUser && !isOwner)
             throw new AppException(ErrorCode.UNAUTHENTICATED);
-        }
 
         if ("COMPLETED".equals(booking.getStatus()))
             throw new AppException(ErrorCode.BOOKING_ALREADY_PAID);
@@ -364,11 +443,21 @@ public class BookingServiceImpl implements BookingService {
         booking.setStatus("CANCELLED");
         bookingRepository.save(booking);
 
+        // Cập nhật Payment
         paymentRepository.findByBookingId(bookingId).ifPresent(p -> {
             p.setStatus("CANCELLED");
             paymentRepository.save(p);
         });
 
+        // Cập nhật Transaction
+        transactionRepository.findByBookingIdOrderByCreatedAtDesc(bookingId)
+                .stream().findFirst().ifPresent(t -> {
+                    t.setStatus("CANCELLED");
+                    t.setNote("Cancelled by " + userEmail);
+                    transactionRepository.save(t);
+                });
+
+        log.info("Booking {} CANCELLED by {}", bookingId, userEmail);
         return toResponse(booking);
     }
 
@@ -391,16 +480,11 @@ public class BookingServiceImpl implements BookingService {
     public List<BookingResponse> getShopBookings(String ownerEmail, LocalDateTime start, LocalDateTime end) {
         Shop shop = shopRepository.findByOwnerEmail(ownerEmail)
                 .orElseThrow(() -> new AppException(ErrorCode.SHOP_NOT_FOUND));
-        
-        List<Booking> bookings;
-        if (start != null && end != null) {
-            bookings = bookingRepository.findByShopIdAndAppointmentDatetimeBetween(shop.getId(), start, end);
-        } else {
-            bookings = bookingRepository.findByShopId(shop.getId());
-        }
-        
-        return bookings.stream()
-                .map(this::toResponse)
-                .collect(Collectors.toList());
+
+        List<Booking> bookings = (start != null && end != null)
+                ? bookingRepository.findByShopIdAndAppointmentDatetimeBetween(shop.getId(), start, end)
+                : bookingRepository.findByShopId(shop.getId());
+
+        return bookings.stream().map(this::toResponse).collect(Collectors.toList());
     }
 }
