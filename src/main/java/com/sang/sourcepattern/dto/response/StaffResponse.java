@@ -18,6 +18,7 @@ public class StaffResponse {
     String role;
     String phone;
     String specialization;
+    String avatar;
     @JsonProperty("isActive")
     boolean isActive;
 

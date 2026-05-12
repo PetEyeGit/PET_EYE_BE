@@ -21,6 +21,8 @@ public class ShopResponse {
     String licenseImageUrl;
     String logoUrl;
     String bannerUrl;
+    String galleryUrls;
+    java.util.List<StaffResponse> staffs;
     String openTime;
     String closeTime;
     String workingDays;

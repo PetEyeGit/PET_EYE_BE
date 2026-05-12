@@ -79,6 +79,7 @@ public enum ErrorCode {
     BOOKING_STATUS_INVALID(7006, "Invalid booking status transition", HttpStatus.BAD_REQUEST),
     MANUAL_ASSIGNMENT_ONLY(7007, "This shop only allows manual assignment by owner", HttpStatus.FORBIDDEN),
 
+
 //   Wallet errors
     WALLET_NOT_FOUND(8001, "Wallet not found", HttpStatus.NOT_FOUND),
     INSUFFICIENT_BALANCE(8002, "Insufficient available balance", HttpStatus.BAD_REQUEST),
@@ -86,7 +87,12 @@ public enum ErrorCode {
     WITHDRAWAL_ALREADY_PROCESSED(8004, "Withdrawal request has already been processed", HttpStatus.BAD_REQUEST),
     PENDING_WITHDRAWAL_EXISTS(8005, "You already have a pending or in-progress withdrawal request", HttpStatus.BAD_REQUEST),
 
-//   Booking conflict
+    // Review errors
+    REVIEW_NOT_ALLOWED(9001, "You must complete a booking before reviewing this shop", HttpStatus.FORBIDDEN),
+    REVIEW_ALREADY_EXISTED(9002, "You have already reviewed this shop", HttpStatus.BAD_REQUEST),
+
+
+    //   Booking conflict
     PET_BOOKING_CONFLICT(5013, "This pet already has an active booking at the requested time", HttpStatus.CONFLICT),
 ;
 

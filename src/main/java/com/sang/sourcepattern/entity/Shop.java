@@ -33,6 +33,7 @@ public class Shop {
     String licenseImageUrl;
     String logoUrl;
     String bannerUrl;
+    String galleryUrls;
 
     String openTime;
     String closeTime;

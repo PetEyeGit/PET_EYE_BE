@@ -216,28 +216,37 @@ public class TaskServiceImpl implements TaskService {
 
     @Override
     @Transactional
-    public TaskResponse updateTaskStatus(int bookingId, TaskStatusUpdateRequest request, String staffEmail) {
-        Staff staff = resolveStaffByEmail(staffEmail);
+    public TaskResponse updateTaskStatus(int bookingId, TaskStatusUpdateRequest request, String requesterEmail) {
+        User requester = resolveUser(requesterEmail);
+        boolean isOwner = requester.getRoles().stream().anyMatch(r -> "SHOP_OWNER".equals(r.getName()));
 
         Booking booking = bookingRepository.findById(bookingId)
                 .orElseThrow(() -> new AppException(ErrorCode.BOOKING_NOT_FOUND));
 
-        // Booking must be assigned to THIS staff
-        if (booking.getStaff() == null || booking.getStaff().getId() != staff.getId())
-            throw new AppException(ErrorCode.BOOKING_NOT_BELONG_TO_STAFF_SHOP);
+        if (isOwner) {
+            Shop shop = resolveOwnerShop(requesterEmail);
+            if (booking.getShop().getId() != shop.getId())
+                throw new AppException(ErrorCode.BOOKING_NOT_BELONG_TO_STAFF_SHOP);
+        } else {
+            Staff staff = staffRepository.findByUserId(requester.getId())
+                    .orElseThrow(() -> new AppException(ErrorCode.STAFF_NOT_FOUND));
+            // Booking must be assigned to THIS staff
+            if (booking.getStaff() == null || booking.getStaff().getId() != staff.getId())
+                throw new AppException(ErrorCode.BOOKING_NOT_BELONG_TO_STAFF_SHOP);
+        }
 
         String newStatus = request.getStatus().toUpperCase();
         if (!VALID_STATUSES.contains(newStatus))
             throw new AppException(ErrorCode.BOOKING_STATUS_INVALID);
 
-        // Enforce forward-only transitions for staff
+        // Enforce forward-only transitions
         String current = booking.getStatus();
         if (!isValidTransition(current, newStatus))
             throw new AppException(ErrorCode.BOOKING_STATUS_INVALID);
 
         booking.setStatus(newStatus);
         bookingRepository.save(booking);
-        log.info("Staff {} updated booking {} status: {} → {}", staff.getFullName(), bookingId, current, newStatus);
+        log.info("Requester {} updated booking {} status: {} → {}", requesterEmail, bookingId, current, newStatus);
 
         // Cập nhật ví khi booking hoàn thành
         if ("COMPLETED".equals(newStatus)) {
