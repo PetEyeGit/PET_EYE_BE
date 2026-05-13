@@ -144,6 +144,8 @@ public class AuthenticationServiceImpl implements AuthenticationService {
                     .subject(String.valueOf(user.getId()))
                     .claim("email", user.getEmail())
                     .claim("userId", user.getId())
+                    .claim("fullName", user.getFullName())
+                    .claim("avatar", user.getAvatar())
                     .claim("roles", user.getRoles().stream().map(Role::getName).toList())
                     .issueTime(now)
                     .expirationTime(expiry)
@@ -482,8 +484,11 @@ public class AuthenticationServiceImpl implements AuthenticationService {
 
         String oldEmail = user.getEmail();
         user.setEmail(request.getEmail());
+        if (request.getPhoneNumber() != null && !request.getPhoneNumber().isBlank()) {
+            user.setPhone(request.getPhoneNumber());
+        }
         userRepository.saveAndFlush(user);
-        log.info("Successfully updated email for user ID: {} from {} to {}", user.getId(), oldEmail, user.getEmail());
+        log.info("Successfully updated email/phone for user ID: {} from {} to {}", user.getId(), oldEmail, user.getEmail());
 
         return AuthenticationResponse.builder()
                 .token(generateToken(user))

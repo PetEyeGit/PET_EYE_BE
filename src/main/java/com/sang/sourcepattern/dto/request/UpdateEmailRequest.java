@@ -14,4 +14,6 @@ public class UpdateEmailRequest {
     @NotBlank(message = "EMAIL_REQUIRED")
     @Email(message = "INVALID_EMAIL")
     String email;
+
+    String phoneNumber;
 }
