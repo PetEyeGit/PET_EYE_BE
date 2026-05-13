@@ -15,6 +15,7 @@ public class ReviewResponse {
     String userName;
     String userAvatar;
     String serviceName;
+    String shopName;
     int rating;
     String comment;
     LocalDateTime createdAt;

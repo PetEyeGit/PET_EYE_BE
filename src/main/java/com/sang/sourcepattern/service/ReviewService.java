@@ -8,5 +8,6 @@ import java.util.List;
 public interface ReviewService {
     ReviewResponse createReview(String email, ReviewRequest request);
     List<ReviewResponse> getReviewsByShop(int shopId);
+    List<ReviewResponse> getLatestReviews(int limit);
     ReviewResponse replyToReview(int reviewId, String reply, String ownerEmail);
 }

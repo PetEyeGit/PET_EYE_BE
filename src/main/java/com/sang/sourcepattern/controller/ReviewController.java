@@ -44,6 +44,14 @@ public class ReviewController {
                 .build();
     }
 
+    @GetMapping("/latest")
+    @Operation(summary = "Get latest public reviews for homepage")
+    public ApiResponse<List<ReviewResponse>> getLatestReviews(@RequestParam(defaultValue = "10") int limit) {
+        return ApiResponse.<List<ReviewResponse>>builder()
+                .result(reviewService.getLatestReviews(limit))
+                .build();
+    }
+
     @PutMapping("/{id}/reply")
     @PreAuthorize("hasRole('SHOP_OWNER')")
     @Operation(summary = "Shop owner replies to a review")
