@@ -16,6 +16,7 @@ import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -79,6 +80,13 @@ public class ReviewServiceImpl implements ReviewService {
     }
 
     @Override
+    public List<ReviewResponse> getLatestReviews(int limit) {
+        return reviewRepository.findAllByOrderByCreatedAtDesc(PageRequest.of(0, limit)).stream()
+                .map(this::toReviewResponse)
+                .toList();
+    }
+
+    @Override
     @Transactional
     public ReviewResponse replyToReview(int reviewId, String reply, String ownerEmail) {
         Review review = reviewRepository.findById(reviewId)
@@ -115,6 +123,7 @@ public class ReviewServiceImpl implements ReviewService {
                 .userName(review.getUser().getFullName())
                 .userAvatar(review.getUser().getAvatar())
                 .serviceName(review.getService() != null ? review.getService().getServiceName() : null)
+                .shopName(review.getShop().getShopName())
                 .rating(review.getRating())
                 .comment(review.getComment())
                 .createdAt(review.getCreatedAt())
