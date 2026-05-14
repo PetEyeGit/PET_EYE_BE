@@ -7,6 +7,11 @@ import lombok.experimental.FieldDefaults;
 import java.time.LocalDateTime;
 
 @Entity
+@Table(name = "message", indexes = {
+    @Index(name = "idx_message_shop_channel", columnList = "shopId, channelType"),
+    @Index(name = "idx_message_recipient", columnList = "recipientEmail"),
+    @Index(name = "idx_message_sender", columnList = "senderEmail")
+})
 @Getter
 @Setter
 @Builder

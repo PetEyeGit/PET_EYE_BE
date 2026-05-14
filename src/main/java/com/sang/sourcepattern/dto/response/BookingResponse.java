@@ -21,6 +21,9 @@ public class BookingResponse {
     BigDecimal servicePrice;
     int petId;
     String petName;
+    String customerName;
+    String customerEmail;
+    String customerPhone;
     Integer staffId;
     String staffName;
     LocalDateTime appointmentDatetime;

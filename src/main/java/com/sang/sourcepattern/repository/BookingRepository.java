@@ -74,4 +74,7 @@ public interface BookingRepository extends JpaRepository<Booking, Integer> {
             @Param("windowStart") LocalDateTime windowStart,
             @Param("windowEnd") LocalDateTime windowEnd
     );
+
+    @Query("SELECT DISTINCT b.shop.id FROM Booking b WHERE b.user.email = :email")
+    List<Integer> findShopIdsByUserEmail(@Param("email") String email);
 }

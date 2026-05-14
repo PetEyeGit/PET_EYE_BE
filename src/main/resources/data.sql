@@ -14,6 +14,9 @@ INSERT IGNORE INTO role (id, name, description) VALUES (4, 'STAFF', 'Staff Role'
 INSERT IGNORE INTO user (id, email, password, full_name, phone, address, active, email_verified, created_at)
 VALUES (1, 'admin@peteye.com', '$2a$10$9uurETzMx/LPgDYIodiRm.65/zfb7aJK5asJc.6wC1Nn26QfzNRcO', 'Hệ Thống Admin', '0987654321', 'Quận 1, TP.HCM', 1, 1, NOW());
 INSERT IGNORE INTO user_roles (user_id, roles_id) VALUES (1, 1);
+UPDATE user
+SET password = '$2a$10$9uurETzMx/LPgDYIodiRm.65/zfb7aJK5asJc.6wC1Nn26QfzNRcO'
+WHERE id = 1;
 
 INSERT IGNORE INTO user (id, email, password, full_name, phone, address, active, email_verified, created_at)
 VALUES (2, 'owner1@peteye.com', '$2a$10$9uurETzMx/LPgDYIodiRm.65/zfb7aJK5asJc.6wC1Nn26QfzNRcO', 'Chủ Shop Pet Paradise', '0901111111', 'Quận 7, TP.HCM', 1, 1, NOW());

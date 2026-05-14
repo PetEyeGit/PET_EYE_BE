@@ -22,7 +22,9 @@ import com.sang.sourcepattern.repository.RoleRepository;
 import com.sang.sourcepattern.dto.response.StaffResponse;
 import com.sang.sourcepattern.repository.ShopRepository;
 import com.sang.sourcepattern.repository.StaffRepository;
+import com.sang.sourcepattern.repository.StaffCertificateRepository;
 import com.sang.sourcepattern.repository.UserRepository;
+import com.sang.sourcepattern.dto.response.StaffCertificateResponse;
 import com.sang.sourcepattern.service.ShopService;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
@@ -52,6 +54,8 @@ public class ShopServiceImpl implements ShopService {
     BookingMapper bookingMapper;
     PasswordEncoder passwordEncoder;
     StaffRepository staffRepository;
+    StaffCertificateRepository staffCertificateRepository;
+
 
     @Override
     public CustomerDetailResponse getCustomerDetail(String ownerEmail, int customerId) {
@@ -406,18 +410,32 @@ public class ShopServiceImpl implements ShopService {
         shopRepository.findById(shopId)
                 .orElseThrow(() -> new AppException(ErrorCode.SHOP_NOT_FOUND));
         return staffRepository.findByShopId(shopId).stream()
-                .map(s -> StaffResponse.builder()
-                        .id(s.getId())
-                        .shopId(shopId)
-                        .userId(s.getUser() != null ? s.getUser().getId() : null)
-                        .email(s.getUser() != null ? s.getUser().getEmail() : null)
-                        .fullName(s.getFullName())
-                        .role(s.getRole())
-                        .phone(s.getPhone())
-                        .specialization(s.getSpecialization())
-                        .avatar(s.getUser() != null ? s.getUser().getAvatar() : null)
-                        .isActive(s.isActive())
-                        .build())
+                .map(s -> {
+                    List<StaffCertificateResponse> certs = staffCertificateRepository.findByStaffId(s.getId()).stream()
+                            .map(c -> StaffCertificateResponse.builder()
+                                    .id(c.getId())
+                                    .certificateName(c.getCertificateName())
+                                    .imageUrl(c.getImageUrl())
+                                    .issueDate(c.getIssueDate())
+                                    .expiryDate(c.getExpiryDate())
+                                    .status(c.getStatus())
+                                    .build())
+                            .toList();
+
+                    return StaffResponse.builder()
+                            .id(s.getId())
+                            .shopId(shopId)
+                            .userId(s.getUser() != null ? s.getUser().getId() : null)
+                            .email(s.getUser() != null ? s.getUser().getEmail() : null)
+                            .fullName(s.getFullName())
+                            .role(s.getRole())
+                            .phone(s.getPhone())
+                            .specialization(s.getSpecialization())
+                            .avatar(s.getUser() != null ? s.getUser().getAvatar() : null)
+                            .isActive(s.isActive())
+                            .certificates(certs)
+                            .build();
+                })
                 .toList();
     }
 }

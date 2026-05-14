@@ -112,7 +112,7 @@ public class StaffController {
     // ─── Certificates ──────────────────────────────────────────────────────────
 
     @PostMapping("/{id}/certificates")
-    @PreAuthorize("hasRole('SHOP_OWNER') or hasRole('STAFF')")
+    @PreAuthorize("hasRole('STAFF')")
     @Operation(summary = "Add a certificate to a staff member")
     public ApiResponse<StaffResponse> addCertificate(
             @AuthenticationPrincipal Jwt jwt,
@@ -125,7 +125,7 @@ public class StaffController {
     }
 
     @DeleteMapping("/certificates/{certId}")
-    @PreAuthorize("hasRole('SHOP_OWNER')")
+    @PreAuthorize("hasRole('STAFF')")
     @Operation(summary = "Remove a certificate")
     public ApiResponse<Void> removeCertificate(
             @AuthenticationPrincipal Jwt jwt,

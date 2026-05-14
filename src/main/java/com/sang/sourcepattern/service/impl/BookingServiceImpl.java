@@ -376,7 +376,22 @@ public class BookingServiceImpl implements BookingService {
         if (staff == null && "AUTO".equals(shop.getAssignmentMode())) {
             List<Staff> activeStaff = staffRepository.findByShopIdAndIsActiveTrue(shop.getId());
             if (!activeStaff.isEmpty()) {
-                staff = activeStaff.get(ThreadLocalRandom.current().nextInt(activeStaff.size()));
+                LocalDateTime ws = pending.getAppointmentDatetime().minusMinutes(service.getDurationMinutes());
+                LocalDateTime we = pending.getAppointmentDatetime().plusMinutes(service.getDurationMinutes());
+                
+                List<Staff> availableStaff = activeStaff.stream().filter(s -> {
+                    boolean dbBusy = bookingRepository.existsConflictingBookingForStaff(s.getId(), ws, we);
+                    String slotKey = STAFF_SLOT_PREFIX + s.getId() + ":"
+                                 + pending.getAppointmentDatetime().withSecond(0).withNano(0).toString();
+                    boolean redisBusy = Boolean.TRUE.equals(redisTemplate.hasKey(slotKey));
+                    return !dbBusy && !redisBusy;
+                }).collect(Collectors.toList());
+
+                if (!availableStaff.isEmpty()) {
+                    staff = availableStaff.get(ThreadLocalRandom.current().nextInt(availableStaff.size()));
+                } else {
+                    staff = activeStaff.get(ThreadLocalRandom.current().nextInt(activeStaff.size()));
+                }
             }
         }
 
@@ -458,7 +473,22 @@ public class BookingServiceImpl implements BookingService {
         if (staff == null && "AUTO".equals(shop.getAssignmentMode())) {
             List<Staff> activeStaff = staffRepository.findByShopIdAndIsActiveTrue(shop.getId());
             if (!activeStaff.isEmpty()) {
-                staff = activeStaff.get(ThreadLocalRandom.current().nextInt(activeStaff.size()));
+                LocalDateTime ws = request.getAppointmentDatetime().minusMinutes(service.getDurationMinutes());
+                LocalDateTime we = request.getAppointmentDatetime().plusMinutes(service.getDurationMinutes());
+                
+                List<Staff> availableStaff = activeStaff.stream().filter(s -> {
+                    boolean dbBusy = bookingRepository.existsConflictingBookingForStaff(s.getId(), ws, we);
+                    String slotKey = STAFF_SLOT_PREFIX + s.getId() + ":"
+                                 + request.getAppointmentDatetime().withSecond(0).withNano(0).toString();
+                    boolean redisBusy = Boolean.TRUE.equals(redisTemplate.hasKey(slotKey));
+                    return !dbBusy && !redisBusy;
+                }).collect(Collectors.toList());
+
+                if (!availableStaff.isEmpty()) {
+                    staff = availableStaff.get(ThreadLocalRandom.current().nextInt(availableStaff.size()));
+                } else {
+                    staff = activeStaff.get(ThreadLocalRandom.current().nextInt(activeStaff.size()));
+                }
             }
         }
 
