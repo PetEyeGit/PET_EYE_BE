@@ -87,6 +87,8 @@ public class TaskServiceImpl implements TaskService {
                 .petName(b.getPet().getName())
                 .customerId(b.getUser().getId())
                 .customerName(b.getUser().getFullName())
+                .customerEmail(b.getUser().getEmail())
+                .customerPhone(b.getUser().getPhone())
                 .serviceId(b.getService().getId())
                 .serviceName(b.getService().getServiceName())
                 .staffId(b.getStaff() != null ? b.getStaff().getId() : null)

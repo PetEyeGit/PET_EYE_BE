@@ -186,6 +186,11 @@ public class WalletServiceImpl implements WalletService {
         wallet.setUpdatedAt(LocalDateTime.now());
         walletRepository.save(wallet);
 
+        if (transactionRepository.existsByBookingIdAndType(bookingId, "WALLET_CREDIT")) {
+            log.warn("Wallet credit transaction already exists for booking {}, skipping creation.", bookingId);
+            return;
+        }
+
         // Ghi Transaction WALLET_CREDIT
         transactionRepository.save(Transaction.builder()
                 .booking(booking)

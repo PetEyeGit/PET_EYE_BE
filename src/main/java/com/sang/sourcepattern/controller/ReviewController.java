@@ -44,6 +44,14 @@ public class ReviewController {
                 .build();
     }
 
+    @GetMapping("/shop/{shopId}/count")
+    @Operation(summary = "Count total reviews for a specific shop")
+    public ApiResponse<Long> getReviewCount(@PathVariable int shopId) {
+        return ApiResponse.<Long>builder()
+                .result(reviewService.countReviewsByShop(shopId))
+                .build();
+    }
+
     @GetMapping("/latest")
     @Operation(summary = "Get latest public reviews for homepage")
     public ApiResponse<List<ReviewResponse>> getLatestReviews(@RequestParam(defaultValue = "10") int limit) {

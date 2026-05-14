@@ -12,6 +12,7 @@ import com.sang.sourcepattern.entity.Staff;
 import com.sang.sourcepattern.entity.Booking;
 import com.sang.sourcepattern.repository.MessageRepository;
 import com.sang.sourcepattern.repository.UserRepository;
+import com.sang.sourcepattern.repository.ShopRepository;
 import com.sang.sourcepattern.repository.StaffRepository;
 import com.sang.sourcepattern.repository.BookingRepository;
 import com.sang.sourcepattern.exception.AppException;
@@ -39,6 +40,7 @@ public class ChatController {
 
     MessageRepository messageRepository;
     UserRepository userRepository;
+    ShopRepository shopRepository;
     StaffRepository staffRepository;
     BookingRepository bookingRepository;
     SimpMessagingTemplate messagingTemplate;
@@ -136,7 +138,7 @@ public class ChatController {
 
         // Security check for USER role
         if (roles.contains("USER")) {
-            if (!"CUSTOMER_CHAT".equals(channelType)) {
+            if (!"CUSTOMER_CHAT".equals(channelType) && !(shopId == 0 && "ADMIN_SUPPORT".equals(channelType))) {
                 throw new AppException(ErrorCode.UNAUTHORIZED);
             }
             // User can only see their own chat
@@ -171,6 +173,36 @@ public class ChatController {
                 .build();
     }
 
+    @GetMapping("/chat/my-conversations")
+    @PreAuthorize("hasRole('USER')")
+    public ApiResponse<List<com.sang.sourcepattern.dto.response.ShopResponse>> getMyConversations(@AuthenticationPrincipal Jwt jwt) {
+        final String myEmail = jwt.getClaimAsString("email") != null 
+                ? jwt.getClaimAsString("email") 
+                : jwt.getSubject();
+
+        // Find unique shop IDs where user sent or received messages
+        java.util.Set<Integer> shopIds = new java.util.HashSet<>();
+        List<Integer> msgShopIds = messageRepository.findShopIdsByParticipantEmail(myEmail);
+        List<Integer> bookingShopIds = bookingRepository.findShopIdsByUserEmail(myEmail);
+        
+        if (msgShopIds != null) shopIds.addAll(msgShopIds);
+        if (bookingShopIds != null) shopIds.addAll(bookingShopIds);
+
+        List<com.sang.sourcepattern.dto.response.ShopResponse> shops = shopIds.stream()
+                .map(id -> {
+                    com.sang.sourcepattern.entity.Shop shop = shopRepository.findById(id).orElse(null);
+                    if (shop == null) return null;
+                    return com.sang.sourcepattern.dto.response.ShopResponse.builder()
+                            .id(shop.getId())
+                            .shopName(shop.getShopName())
+                            .build();
+                })
+                .filter(java.util.Objects::nonNull)
+                .toList();
+
+        return ApiResponse.<List<com.sang.sourcepattern.dto.response.ShopResponse>>builder().result(shops).build();
+    }
+
     /** REST — đánh dấu đã đọc */
     @PatchMapping("/chat/{shopId}/read")
     @PreAuthorize("hasRole('ADMIN') or hasRole('SHOP_OWNER') or hasRole('STAFF') or hasRole('USER')")
@@ -193,20 +225,12 @@ public class ChatController {
                            roles.contains("STAFF") ? "STAFF" : 
                            roles.contains("USER") ? "USER" : "SHOP_OWNER";
 
-        List<Message> messages;
-        if ("CUSTOMER_CHAT".equals(channelType)) {
+        if ("CUSTOMER_CHAT".equals(channelType) || (shopId == 0 && "ADMIN_SUPPORT".equals(channelType))) {
             String targetCustomer = roles.contains("USER") ? myEmail : recipientEmail;
-            messages = messageRepository.findByShopIdAndChannelTypeAndRecipientEmailOrderByCreatedAtAsc(shopId, channelType, targetCustomer);
+            messageRepository.markRecipientAllAsRead(shopId, channelType, targetCustomer, readerRole);
         } else {
-            messages = messageRepository.findByShopIdAndChannelTypeOrderByCreatedAtAsc(shopId, channelType);
+            messageRepository.markAllAsRead(shopId, channelType, readerRole);
         }
-
-        messages.stream()
-                .filter(m -> !m.getSenderRole().equals(readerRole) && !m.isRead())
-                .forEach(m -> {
-                    m.setRead(true);
-                    messageRepository.save(m);
-                });
         return ApiResponse.<Void>builder().message("Marked as read").build();
     }
 

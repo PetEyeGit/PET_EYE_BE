@@ -15,6 +15,7 @@ public interface TransactionRepository extends JpaRepository<Transaction, Intege
     List<Transaction> findByShopIdOrderByCreatedAtDesc(int shopId);
 
     List<Transaction> findByBookingIdOrderByCreatedAtDesc(int bookingId);
+    boolean existsByBookingIdAndType(int bookingId, String type);
 
     Optional<Transaction> findByPayosOrderCode(Long payosOrderCode);
 

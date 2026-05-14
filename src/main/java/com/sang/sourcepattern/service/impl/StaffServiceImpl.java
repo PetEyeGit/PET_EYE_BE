@@ -253,23 +253,13 @@ public class StaffServiceImpl implements StaffService {
         Staff staff = staffRepository.findById(staffId)
                 .orElseThrow(() -> new AppException(ErrorCode.STAFF_NOT_FOUND));
 
-        // Authorization:
-        // 1. If SHOP_OWNER: check if staff belongs to their shop
-        // 2. If STAFF: check if they are updating themselves
         User requester = userRepository.findByEmail(userEmail)
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
         
-        boolean isOwner = requester.getRoles().stream().anyMatch(r -> r.getName().equals("SHOP_OWNER"));
-        
-        if (isOwner) {
-            Shop shop = resolveOwnerShop(userEmail);
-            if (staff.getShop().getId() != shop.getId())
-                throw new AppException(ErrorCode.STAFF_NOT_BELONG_TO_SHOP);
-        } else {
-            // Requester is STAFF
-            if (staff.getUser() == null || !staff.getUser().getEmail().equals(userEmail))
-                throw new AppException(ErrorCode.UNAUTHORIZED);
-        }
+        // Requester must be the staff member themselves
+        if (staff.getUser() == null || !staff.getUser().getEmail().equals(userEmail))
+            throw new AppException(ErrorCode.UNAUTHORIZED);
+
 
         StaffCertificate cert = StaffCertificate.builder()
                 .staff(staff)
@@ -294,16 +284,10 @@ public class StaffServiceImpl implements StaffService {
         User requester = userRepository.findByEmail(userEmail)
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
         
-        boolean isOwner = requester.getRoles().stream().anyMatch(r -> r.getName().equals("SHOP_OWNER"));
-        
-        if (isOwner) {
-            Shop shop = resolveOwnerShop(userEmail);
-            if (staff.getShop().getId() != shop.getId())
-                throw new AppException(ErrorCode.STAFF_NOT_BELONG_TO_SHOP);
-        } else {
-            if (staff.getUser() == null || !staff.getUser().getEmail().equals(userEmail))
-                throw new AppException(ErrorCode.UNAUTHORIZED);
-        }
+        // Requester must be the staff member themselves
+        if (staff.getUser() == null || !staff.getUser().getEmail().equals(userEmail))
+            throw new AppException(ErrorCode.UNAUTHORIZED);
+
 
         staffCertificateRepository.delete(cert);
     }

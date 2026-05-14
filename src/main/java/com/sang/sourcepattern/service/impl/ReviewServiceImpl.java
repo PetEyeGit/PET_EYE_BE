@@ -78,6 +78,11 @@ public class ReviewServiceImpl implements ReviewService {
                 .map(this::toReviewResponse)
                 .toList();
     }
+    
+    @Override
+    public long countReviewsByShop(int shopId) {
+        return reviewRepository.countByShopId(shopId);
+    }
 
     @Override
     public List<ReviewResponse> getLatestReviews(int limit) {
