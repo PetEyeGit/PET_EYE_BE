@@ -413,19 +413,19 @@ INSERT INTO shop_wallet (id, shop_id, frozen_balance, available_balance, total_e
 -- ============================================================
 -- NOTIFICATIONS
 -- ============================================================
-INSERT INTO notification (user_id, title, content, broadcast_id, is_read, created_at) VALUES
-(7,  'Chào mừng đến Peteye! 🐾', 'Cảm ơn bạn đã đăng ký. Khám phá dịch vụ ngay hôm nay!', 'welcome-001', false, DATE_SUB(NOW(), INTERVAL 30 DAY)),
-(8,  'Chào mừng đến Peteye! 🐾', 'Cảm ơn bạn đã đăng ký. Khám phá dịch vụ ngay hôm nay!', 'welcome-001', true,  DATE_SUB(NOW(), INTERVAL 30 DAY)),
-(9,  'Chào mừng đến Peteye! 🐾', 'Cảm ơn bạn đã đăng ký. Khám phá dịch vụ ngay hôm nay!', 'welcome-001', true,  DATE_SUB(NOW(), INTERVAL 30 DAY)),
-(7,  'Dịch vụ hoàn thành ✅', 'Dịch vụ Tắm & Sấy cho Pet 1 tại Shop 1 đã hoàn thành!', NULL, true,  DATE_SUB(NOW(), INTERVAL 30 DAY)),
-(8,  'Dịch vụ hoàn thành ✅', 'Dịch vụ Khám tổng quát cho Pet 3 tại Shop 2 đã hoàn thành!', NULL, true,  DATE_SUB(NOW(), INTERVAL 20 DAY)),
-(9,  'Dịch vụ hoàn thành ✅', 'Pet 5 đã hoàn thành kỳ lưu trú tại Shop 3!', NULL, true,  DATE_SUB(NOW(), INTERVAL 15 DAY)),
-(7,  'Nhắc lịch hẹn 📅', 'Bạn có lịch hẹn tại Shop 1 vào ngày mai. Đừng quên nhé!', NULL, false, DATE_SUB(NOW(), INTERVAL 1  DAY)),
-(8,  'Nhắc lịch hẹn 📅', 'Bạn có lịch khám tại Shop 2 sau 3 ngày nữa.', NULL, false, DATE_SUB(NOW(), INTERVAL 1  DAY)),
-(7,  'Ưu đãi đặc biệt 🎉', 'Giảm 20% dịch vụ Spa tháng này tại Shop 1!', 'promo-001', false, DATE_SUB(NOW(), INTERVAL 5  DAY)),
-(8,  'Ưu đãi đặc biệt 🎉', 'Giảm 20% dịch vụ Spa tháng này tại Shop 1!', 'promo-001', false, DATE_SUB(NOW(), INTERVAL 5  DAY)),
-(2,  'Đơn hàng mới 🛎️', 'Có lịch đặt mới từ User 1 cho dịch vụ Tắm & Sấy.', NULL, true,  DATE_SUB(NOW(), INTERVAL 1  DAY)),
-(3,  'Đơn hàng mới 🛎️', 'Có lịch đặt mới từ User 2 cho dịch vụ Khám tổng quát.', NULL, false, DATE_SUB(NOW(), INTERVAL 1  DAY));
+INSERT INTO notification (user_id, title, content, broadcast_id, is_read, notification_type, created_at) VALUES
+(7,  'Chào mừng đến Peteye! 🐾', 'Cảm ơn bạn đã đăng ký. Khám phá dịch vụ ngay hôm nay!', 'welcome-001', false, 'GENERAL',   DATE_SUB(NOW(), INTERVAL 30 DAY)),
+(8,  'Chào mừng đến Peteye! 🐾', 'Cảm ơn bạn đã đăng ký. Khám phá dịch vụ ngay hôm nay!', 'welcome-001', true,  'GENERAL',   DATE_SUB(NOW(), INTERVAL 30 DAY)),
+(9,  'Chào mừng đến Peteye! 🐾', 'Cảm ơn bạn đã đăng ký. Khám phá dịch vụ ngay hôm nay!', 'welcome-001', true,  'GENERAL',   DATE_SUB(NOW(), INTERVAL 30 DAY)),
+(7,  'Dịch vụ hoàn thành ✅', 'Dịch vụ Tắm & Sấy cho Pet 1 tại Shop 1 đã hoàn thành!', NULL, true,  'BOOKING',   DATE_SUB(NOW(), INTERVAL 30 DAY)),
+(8,  'Dịch vụ hoàn thành ✅', 'Dịch vụ Khám tổng quát cho Pet 3 tại Shop 2 đã hoàn thành!', NULL, true,  'BOOKING',   DATE_SUB(NOW(), INTERVAL 20 DAY)),
+(9,  'Dịch vụ hoàn thành ✅', 'Pet 5 đã hoàn thành kỳ lưu trú tại Shop 3!', NULL, true,  'BOOKING',   DATE_SUB(NOW(), INTERVAL 15 DAY)),
+(7,  'Nhắc lịch hẹn 📅', 'Bạn có lịch hẹn tại Shop 1 vào ngày mai. Đừng quên nhé!', NULL, false, 'REMINDER',  DATE_SUB(NOW(), INTERVAL 1  DAY)),
+(8,  'Nhắc lịch hẹn 📅', 'Bạn có lịch khám tại Shop 2 sau 3 ngày nữa.', NULL, false, 'REMINDER',  DATE_SUB(NOW(), INTERVAL 1  DAY)),
+(7,  'Ưu đãi đặc biệt 🎉', 'Giảm 20% dịch vụ Spa tháng này tại Shop 1!', 'promo-001', false, 'PROMOTION', DATE_SUB(NOW(), INTERVAL 5  DAY)),
+(8,  'Ưu đãi đặc biệt 🎉', 'Giảm 20% dịch vụ Spa tháng này tại Shop 1!', 'promo-001', false, 'PROMOTION', DATE_SUB(NOW(), INTERVAL 5  DAY)),
+(2,  'Đơn hàng mới 🛎️', 'Có lịch đặt mới từ User 1 cho dịch vụ Tắm & Sấy.', NULL, true,  'BOOKING',   DATE_SUB(NOW(), INTERVAL 1  DAY)),
+(3,  'Đơn hàng mới 🛎️', 'Có lịch đặt mới từ User 2 cho dịch vụ Khám tổng quát.', NULL, false, 'BOOKING',   DATE_SUB(NOW(), INTERVAL 1  DAY));
 
 -- ============================================================
 -- VERIFY

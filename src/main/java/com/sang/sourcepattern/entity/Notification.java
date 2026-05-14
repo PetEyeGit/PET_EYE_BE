@@ -28,6 +28,18 @@ public class Notification {
     /** UUID dùng để group các thông báo cùng 1 đợt gửi */
     String broadcastId;
 
+    /**
+     * Loại thông báo:
+     * GENERAL, PROMOTION, REMINDER, SYSTEM, BOOKING
+     */
+    @Enumerated(EnumType.STRING)
+    @Builder.Default
+    NotificationType notificationType = NotificationType.GENERAL;
+
+    public enum NotificationType {
+        GENERAL, PROMOTION, REMINDER, SYSTEM, BOOKING
+    }
+
     @Builder.Default
     boolean isRead = false;
 

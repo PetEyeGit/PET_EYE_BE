@@ -31,7 +31,15 @@ public class SendNotificationRequest {
     /** Chỉ cần khi targetType = SINGLE */
     Integer userId;
 
+    /** Loại thông báo, mặc định là GENERAL nếu không truyền */
+    @Builder.Default
+    NotificationType notificationType = NotificationType.GENERAL;
+
     public enum TargetType {
         SINGLE, ALL_USERS, ALL_SHOPS, ALL
+    }
+
+    public enum NotificationType {
+        GENERAL, PROMOTION, REMINDER, SYSTEM, BOOKING
     }
 }
