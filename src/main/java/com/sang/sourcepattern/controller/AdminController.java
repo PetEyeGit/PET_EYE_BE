@@ -1,6 +1,8 @@
 package com.sang.sourcepattern.controller;
 
 import com.sang.sourcepattern.dto.request.SendNotificationRequest;
+import com.sang.sourcepattern.dto.response.DailyBookingResponse;
+import com.sang.sourcepattern.dto.response.MonthlyRevenueResponse;
 import com.sang.sourcepattern.dto.response.ApiResponse;
 import com.sang.sourcepattern.dto.response.NotificationBroadcastResponse;
 import com.sang.sourcepattern.dto.response.PageResponse;
@@ -24,6 +26,10 @@ import org.springframework.web.bind.annotation.*;
 import com.sang.sourcepattern.entity.User;
 import jakarta.validation.Valid;
 import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.Year;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -70,9 +76,63 @@ public class AdminController {
                 .build();
     }
 
-    // ─── Notifications ───────────────────────────────────────────────────────
+    // ─── Dashboard charts ─────────────────────────────────────────────────────
 
-    /** Admin xem danh sách thông báo đã gửi — group theo đợt gửi, phân trang */
+    @GetMapping("/dashboard/revenue-monthly")
+    public ApiResponse<List<MonthlyRevenueResponse>> getMonthlyRevenue(
+            @RequestParam(required = false) Integer year) {
+
+        int targetYear = (year != null) ? year : Year.now().getValue();
+
+        // Build map month -> revenue từ query
+        Map<Integer, BigDecimal> revenueMap = new java.util.HashMap<>();
+        for (Object[] row : bookingRepository.revenueByMonth(targetYear)) {
+            int month = ((Number) row[0]).intValue();
+            BigDecimal revenue = new BigDecimal(row[1].toString());
+            revenueMap.put(month, revenue);
+        }
+
+        // Trả đủ 12 tháng, tháng không có thì 0
+        List<MonthlyRevenueResponse> result = new java.util.ArrayList<>();
+        for (int m = 1; m <= 12; m++) {
+            result.add(MonthlyRevenueResponse.builder()
+                    .month(m)
+                    .revenue(revenueMap.getOrDefault(m, BigDecimal.ZERO))
+                    .build());
+        }
+
+        return ApiResponse.<List<MonthlyRevenueResponse>>builder().result(result).build();
+    }
+
+    @GetMapping("/dashboard/bookings-weekly")
+    public ApiResponse<List<DailyBookingResponse>> getWeeklyBookings() {
+
+        LocalDate today = LocalDate.now();
+        LocalDateTime from = today.minusDays(6).atStartOfDay();
+        DateTimeFormatter fmt = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+
+        // Build map date -> count từ query
+        Map<String, Long> countMap = new java.util.HashMap<>();
+        for (Object[] row : bookingRepository.bookingCountByDate(from)) {
+            String date = row[0].toString().substring(0, 10); // đảm bảo format yyyy-MM-dd
+            long count = ((Number) row[1]).longValue();
+            countMap.put(date, count);
+        }
+
+        // Trả đủ 7 ngày, ngày không có thì 0
+        List<DailyBookingResponse> result = new java.util.ArrayList<>();
+        for (int i = 6; i >= 0; i--) {
+            String date = today.minusDays(i).format(fmt);
+            result.add(DailyBookingResponse.builder()
+                    .date(date)
+                    .count(countMap.getOrDefault(date, 0L))
+                    .build());
+        }
+
+        return ApiResponse.<List<DailyBookingResponse>>builder().result(result).build();
+    }
+
+    // ─── Notifications ───────────────────────────────────────────────────────    /** Admin xem danh sách thông báo đã gửi — group theo đợt gửi, phân trang */
     @GetMapping("/notifications")
     public ApiResponse<PageResponse<NotificationBroadcastResponse>> getAllNotifications(
             @RequestParam(defaultValue = "0") int page) {
@@ -85,6 +145,7 @@ public class AdminController {
                         .broadcastId(n.getBroadcastId())
                         .title(n.getTitle())
                         .content(n.getContent())
+                        .notificationType(n.getNotificationType() != null ? n.getNotificationType().name() : null)
                         .totalSent(notificationRepository.countByBroadcastId(n.getBroadcastId()))
                         .totalRead(notificationRepository.countByBroadcastIdAndIsReadTrue(n.getBroadcastId()))
                         .createdAt(n.getCreatedAt())
@@ -127,6 +188,9 @@ public class AdminController {
                         .title(request.getTitle())
                         .content(request.getContent())
                         .broadcastId(broadcastId)
+                        .notificationType(request.getNotificationType() != null
+                                ? Notification.NotificationType.valueOf(request.getNotificationType().name())
+                                : Notification.NotificationType.GENERAL)
                         .build())
                 .toList();
 

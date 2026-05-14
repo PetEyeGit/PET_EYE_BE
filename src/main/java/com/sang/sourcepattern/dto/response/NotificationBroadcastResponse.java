@@ -15,6 +15,7 @@ public class NotificationBroadcastResponse {
     String title;
     String content;
     String targetType;
+    String notificationType;
     long totalSent;
     long totalRead;
     LocalDateTime createdAt;

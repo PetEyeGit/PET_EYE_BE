@@ -24,6 +24,26 @@ public interface BookingRepository extends JpaRepository<Booking, Integer> {
 
     List<Booking> findByShopIdAndAppointmentDatetimeBetween(int shopId, LocalDateTime start, LocalDateTime end);
 
+    /** Doanh thu theo tháng trong năm: SUM(service.price * 0.9) cho booking COMPLETED */
+    @Query("""
+        SELECT MONTH(b.appointmentDatetime), COALESCE(SUM(b.service.price * 0.9), 0)
+        FROM Booking b
+        WHERE b.status = 'COMPLETED'
+          AND YEAR(b.appointmentDatetime) = :year
+        GROUP BY MONTH(b.appointmentDatetime)
+    """)
+    List<Object[]> revenueByMonth(@Param("year") int year);
+
+    /** Số booking theo ngày trong khoảng thời gian, bỏ CANCELLED */
+    @Query("""
+        SELECT DATE(b.appointmentDatetime), COUNT(b)
+        FROM Booking b
+        WHERE b.appointmentDatetime >= :from
+          AND b.status != 'CANCELLED'
+        GROUP BY DATE(b.appointmentDatetime)
+    """)
+    List<Object[]> bookingCountByDate(@Param("from") LocalDateTime from);
+
     /**
      * Kiểm tra pet đã có booking active (CONFIRMED / IN_PROGRESS) tại thời điểm đó chưa.
      */
