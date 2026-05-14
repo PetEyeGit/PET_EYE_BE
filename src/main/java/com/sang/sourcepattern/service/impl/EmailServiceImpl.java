@@ -38,6 +38,42 @@ public class EmailServiceImpl implements EmailService {
         sendHtmlEmail(toEmail, subject, buildOtpEmailHtml(fullName, otp, "đặt lại mật khẩu", 15));
     }
 
+    @Override
+    public void sendShopApprovedEmail(String toEmail, String shopName) {
+        String subject = "[PET EYE] Cửa hàng của bạn đã được duyệt";
+        String html = """
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 24px; border: 1px solid #e0e0e0; border-radius: 8px;">
+                    <h2 style="color: #4CAF50;">🎉 Chúc mừng! Cửa hàng đã được duyệt</h2>
+                    <p>Xin chào <strong>%s</strong>,</p>
+                    <p>Cửa hàng <strong>%s</strong> của bạn đã được Admin <strong>phê duyệt</strong> thành công.</p>
+                    <p>Bạn có thể đăng nhập và bắt đầu sử dụng hệ thống ngay bây giờ.</p>
+                    <hr style="border: none; border-top: 1px solid #eee; margin: 24px 0;">
+                    <p style="color: #aaa; font-size: 12px;">PET EYE — Nền tảng chăm sóc thú cưng</p>
+                </div>
+                """.formatted(shopName, shopName);
+        sendHtmlEmail(toEmail, subject, html);
+    }
+
+    @Override
+    public void sendShopRejectedEmail(String toEmail, String shopName, String reason) {
+        String subject = "[PET EYE] Đơn đăng ký cửa hàng bị từ chối";
+        String reasonHtml = (reason != null && !reason.isBlank())
+                ? "<p><strong>Lý do:</strong> " + reason + "</p>"
+                : "";
+        String html = """
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 24px; border: 1px solid #e0e0e0; border-radius: 8px;">
+                    <h2 style="color: #e53935;">❌ Đơn đăng ký cửa hàng bị từ chối</h2>
+                    <p>Xin chào <strong>%s</strong>,</p>
+                    <p>Rất tiếc, đơn đăng ký cửa hàng <strong>%s</strong> của bạn đã bị <strong>từ chối</strong>.</p>
+                    %s
+                    <p>Nếu bạn có thắc mắc, vui lòng liên hệ đội ngũ hỗ trợ của chúng tôi.</p>
+                    <hr style="border: none; border-top: 1px solid #eee; margin: 24px 0;">
+                    <p style="color: #aaa; font-size: 12px;">PET EYE — Nền tảng chăm sóc thú cưng</p>
+                </div>
+                """.formatted(shopName, shopName, reasonHtml);
+        sendHtmlEmail(toEmail, subject, html);
+    }
+
     private void sendHtmlEmail(String to, String subject, String htmlContent) {
         try {
             MimeMessage message = mailSender.createMimeMessage();

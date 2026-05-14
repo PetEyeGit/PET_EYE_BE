@@ -1,5 +1,6 @@
 package com.sang.sourcepattern.service.impl;
 
+import com.sang.sourcepattern.enums.ShopStatus;
 import com.sang.sourcepattern.dto.request.ShopRegistrationRequest;
 import com.sang.sourcepattern.dto.request.ShopUpdateRequest;
 import com.sang.sourcepattern.dto.response.ShopResponse;
@@ -52,6 +53,7 @@ public class ShopServiceImpl implements ShopService {
     BookingMapper bookingMapper;
     PasswordEncoder passwordEncoder;
     StaffRepository staffRepository;
+    com.sang.sourcepattern.service.EmailService emailService;
 
     @Override
     public CustomerDetailResponse getCustomerDetail(String ownerEmail, int customerId) {
@@ -281,11 +283,11 @@ public class ShopServiceImpl implements ShopService {
         User owner = User.builder()
                 .email(request.getEmail())
                 .password(passwordEncoder.encode(request.getPassword()))
-                .fullName(request.getShopName()) // Use shop name as full name for now
+                .fullName(request.getShopName())
                 .phone(request.getPhone())
                 .address(request.getAddress())
                 .roles(roles)
-                .active(true) // Account is active, but shop needs verification
+                .active(false) // Chưa active — chờ admin duyệt
                 .build();
 
         owner = userRepository.save(owner);
@@ -293,7 +295,8 @@ public class ShopServiceImpl implements ShopService {
         // 2. Create Shop record
         Shop shop = shopMapper.toShop(request);
         shop.setOwner(owner);
-        shop.setVerified(false); // Needs Admin approval
+        shop.setVerified(false);
+        shop.setStatus(ShopStatus.PENDING);
 
         shop = shopRepository.save(shop);
 
@@ -311,9 +314,17 @@ public class ShopServiceImpl implements ShopService {
                 .orElseThrow(() -> new AppException(ErrorCode.SHOP_NOT_FOUND));
 
         shop.setVerified(true);
-        
+        shop.setStatus(ShopStatus.APPROVED);
         shopRepository.save(shop);
-        
+
+        // Kích hoạt tài khoản owner
+        User owner = shop.getOwner();
+        owner.setActive(true);
+        userRepository.save(owner);
+
+        // Gửi email thông báo duyệt
+        emailService.sendShopApprovedEmail(shop.getEmail(), shop.getShopName());
+
         log.info("Shop approved by admin: {}", shop.getShopName());
 
         ShopResponse response = shopMapper.toShopResponse(shop);
@@ -385,18 +396,31 @@ public class ShopServiceImpl implements ShopService {
     }
 
     @Override
-    public void rejectShop(int shopId) {
+    @Transactional
+    public void rejectShop(int shopId, String reason) {
         Shop shop = shopRepository.findById(shopId)
                 .orElseThrow(() -> new AppException(ErrorCode.SHOP_NOT_FOUND));
+
         shop.setVerified(false);
+        shop.setStatus(ShopStatus.REJECTED);
         shopRepository.save(shop);
+
+        // Gửi email từ chối
+        emailService.sendShopRejectedEmail(shop.getEmail(), shop.getShopName(), reason);
+
+        // Xóa tài khoản owner (chưa active)
+        User owner = shop.getOwner();
+        if (owner != null && !owner.isActive()) {
+            userRepository.delete(owner);
+        }
+
         log.info("Shop rejected by admin: {}", shop.getShopName());
     }
 
     @Override
     public List<ShopResponse> getPendingShops() {
         return shopRepository.findAll().stream()
-                .filter(s -> !s.isVerified())
+                .filter(s -> s.getStatus() == ShopStatus.PENDING)
                 .map(shopMapper::toShopResponse)
                 .toList();
     }

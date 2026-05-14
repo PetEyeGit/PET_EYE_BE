@@ -8,6 +8,7 @@ import org.mapstruct.*;
 
 @Mapper(componentModel = "spring", nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
 public interface ShopMapper {
+
     @Mapping(target = "owner", ignore = true)
     @Mapping(target = "id", ignore = true)
     @Mapping(target = "services", ignore = true)
@@ -15,6 +16,7 @@ public interface ShopMapper {
     @Mapping(target = "cages", ignore = true)
     @Mapping(target = "ratingAvg", ignore = true)
     @Mapping(target = "isVerified", ignore = true)
+    @Mapping(target = "status", ignore = true)
     @Mapping(target = "openTime", ignore = true)
     @Mapping(target = "closeTime", ignore = true)
     @Mapping(target = "workingDays", ignore = true)
@@ -23,8 +25,8 @@ public interface ShopMapper {
     Shop toShop(ShopRegistrationRequest request);
 
     @Mapping(target = "ownerId", source = "owner.id")
-    @Mapping(target = "logoUrl", source = "logoUrl")
-    @Mapping(target = "bannerUrl", source = "bannerUrl")
+    @Mapping(target = "isVerified", source = "verified")
+    @Mapping(target = "status", expression = "java(shop.getStatus() != null ? shop.getStatus().name() : null)")
     ShopResponse toShopResponse(Shop shop);
 
     @Mapping(target = "owner", ignore = true)
@@ -34,8 +36,7 @@ public interface ShopMapper {
     @Mapping(target = "cages", ignore = true)
     @Mapping(target = "ratingAvg", ignore = true)
     @Mapping(target = "verified", ignore = true)
+    @Mapping(target = "status", ignore = true)
     @Mapping(target = "licenseNumber", ignore = true)
-    @Mapping(target = "logoUrl", source = "logoUrl")
-    @Mapping(target = "bannerUrl", source = "bannerUrl")
     void updateShop(@MappingTarget Shop shop, ShopUpdateRequest request);
 }

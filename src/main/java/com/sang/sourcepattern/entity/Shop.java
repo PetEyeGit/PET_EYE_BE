@@ -1,5 +1,6 @@
 package com.sang.sourcepattern.entity;
 
+import com.sang.sourcepattern.enums.ShopStatus;
 import jakarta.persistence.*;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
@@ -14,6 +15,7 @@ import java.util.List;
 @AllArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE)
 public class Shop {
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     int id;
@@ -42,8 +44,14 @@ public class Shop {
     @Builder.Default
     float ratingAvg = 0.0f;
 
+    /** Giữ lại để tương thích — true khi status = APPROVED */
     @Builder.Default
     boolean isVerified = false;
+
+    /** PENDING | APPROVED | REJECTED */
+    @Enumerated(EnumType.STRING)
+    @Builder.Default
+    ShopStatus status = ShopStatus.PENDING;
 
     /** MANUAL | OPEN_POOL | AUTO — default: MANUAL */
     @Builder.Default

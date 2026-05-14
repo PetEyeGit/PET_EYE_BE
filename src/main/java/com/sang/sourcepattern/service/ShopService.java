@@ -28,7 +28,7 @@ public interface ShopService {
     ShopResponse getVerifiedShopById(int id);
 
     /** Admin: reject/deactivate a shop */
-    void rejectShop(int shopId);
+    void rejectShop(int shopId, String reason);
 
     /** Admin: get shops pending verification */
     List<ShopResponse> getPendingShops();

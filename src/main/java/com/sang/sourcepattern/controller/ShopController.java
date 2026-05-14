@@ -126,8 +126,9 @@ public class ShopController {
 
     @PostMapping("/reject/{id}")
     @PreAuthorize("hasRole('ADMIN')")
-    public ApiResponse<Void> reject(@PathVariable int id) {
-        shopService.rejectShop(id);
+    public ApiResponse<Void> reject(@PathVariable int id,
+                                    @RequestParam(required = false) String reason) {
+        shopService.rejectShop(id, reason);
         return ApiResponse.<Void>builder()
                 .message("Shop rejected")
                 .build();
