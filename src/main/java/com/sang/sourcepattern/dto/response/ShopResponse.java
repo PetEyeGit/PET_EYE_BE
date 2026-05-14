@@ -31,4 +31,6 @@ public class ShopResponse {
     int ownerId;
     /** MANUAL | OPEN_POOL | AUTO */
     String assignmentMode;
+    /** PENDING | APPROVED | REJECTED */
+    String status;
 }

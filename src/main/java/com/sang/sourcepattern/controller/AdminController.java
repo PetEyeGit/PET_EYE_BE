@@ -60,7 +60,7 @@ public class AdminController {
         long totalShops = shopRepository.count();
         long totalBookings = bookingRepository.count();
         long pendingShops = shopRepository.findAll().stream()
-                .filter(s -> !s.isVerified()).count();
+                .filter(s -> s.getStatus() == com.sang.sourcepattern.enums.ShopStatus.PENDING).count();
         long unreadMessages = messageRepository
                 .countByShopIdAndChannelTypeAndIsReadFalseAndSenderRoleNot(0, "ADMIN_SUPPORT", "ADMIN");
 
