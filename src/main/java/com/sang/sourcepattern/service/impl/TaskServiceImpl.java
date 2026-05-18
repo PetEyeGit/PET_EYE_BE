@@ -8,8 +8,12 @@ import com.sang.sourcepattern.entity.Staff;
 import com.sang.sourcepattern.entity.User;
 import com.sang.sourcepattern.exception.AppException;
 import com.sang.sourcepattern.exception.ErrorCode;
+import com.sang.sourcepattern.entity.Notification;
+import com.sang.sourcepattern.entity.StaffChangeRequest;
 import com.sang.sourcepattern.repository.BookingRepository;
+import com.sang.sourcepattern.repository.NotificationRepository;
 import com.sang.sourcepattern.repository.ShopRepository;
+import com.sang.sourcepattern.repository.StaffChangeRequestRepository;
 import com.sang.sourcepattern.repository.StaffRepository;
 import com.sang.sourcepattern.repository.UserRepository;
 import com.sang.sourcepattern.service.TaskService;
@@ -36,6 +40,8 @@ public class TaskServiceImpl implements TaskService {
     UserRepository    userRepository;
     ShopRepository    shopRepository;
     WalletService     walletService;
+    StaffChangeRequestRepository staffChangeRequestRepository;
+    NotificationRepository notificationRepository;
 
     // Valid status transition chain for Staff
     private static final Set<String> VALID_STATUSES = Set.of("CONFIRMED", "IN_PROGRESS", "COMPLETED", "CANCELLED");
@@ -91,6 +97,7 @@ public class TaskServiceImpl implements TaskService {
                 .customerPhone(b.getUser().getPhone())
                 .serviceId(b.getService().getId())
                 .serviceName(b.getService().getServiceName())
+                .servicePrice(b.getService().getPrice())
                 .staffId(b.getStaff() != null ? b.getStaff().getId() : null)
                 .staffName(b.getStaff() != null ? b.getStaff().getFullName() : null)
                 .appointmentDatetime(b.getAppointmentDatetime())
@@ -165,8 +172,9 @@ public class TaskServiceImpl implements TaskService {
             throw new AppException(ErrorCode.BOOKING_ALREADY_ASSIGNED);
 
         booking.setStaff(staff);
+        booking.setStatus("WAITING_SHOP_APPROVAL");
         bookingRepository.save(booking);
-        log.info("Staff {} claimed booking {}", staff.getFullName(), bookingId);
+        log.info("Staff {} claimed booking {} (waiting for shop approval)", staff.getFullName(), bookingId);
         return toResponse(booking);
     }
 
@@ -188,6 +196,10 @@ public class TaskServiceImpl implements TaskService {
 
         if (staff.getShop().getId() != shop.getId())
             throw new AppException(ErrorCode.STAFF_NOT_BELONG_TO_SHOP);
+
+        if (booking.getStaff() != null && booking.getStaff().getId() != staffId) {
+            throw new AppException(ErrorCode.CANNOT_CHANGE_STAFF_DIRECTLY);
+        }
 
         booking.setStaff(staff);
         bookingRepository.save(booking);
@@ -237,6 +249,12 @@ public class TaskServiceImpl implements TaskService {
                 throw new AppException(ErrorCode.BOOKING_NOT_BELONG_TO_STAFF_SHOP);
         }
 
+        // Prevent status updates if a staff change request is pending
+        List<StaffChangeRequest> pendingRequests = staffChangeRequestRepository.findByBookingIdAndStatus(bookingId, "PENDING");
+        if (!pendingRequests.isEmpty()) {
+            throw new AppException(ErrorCode.CANNOT_UPDATE_STATUS_WHILE_REQUEST_PENDING);
+        }
+
         String newStatus = request.getStatus().toUpperCase();
         if (!VALID_STATUSES.contains(newStatus))
             throw new AppException(ErrorCode.BOOKING_STATUS_INVALID);
@@ -268,11 +286,118 @@ public class TaskServiceImpl implements TaskService {
                 .stream().map(this::toResponse).collect(Collectors.toList());
     }
 
+    @Override
+    public List<StaffChangeRequest> getPendingStaffChangeRequest(int bookingId) {
+        return staffChangeRequestRepository.findByBookingIdAndStatus(bookingId, "PENDING");
+    }
+
+    // ─── Owner: request to change staff for a booking ──────────────────────────
+
+    @Override
+    @Transactional
+    public void requestStaffChange(int bookingId, int proposedStaffId, String reason, String ownerEmail) {
+        Shop shop = resolveOwnerShop(ownerEmail);
+        
+        Booking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new AppException(ErrorCode.BOOKING_NOT_FOUND));
+                
+        if (booking.getShop().getId() != shop.getId())
+            throw new AppException(ErrorCode.BOOKING_NOT_BELONG_TO_STAFF_SHOP);
+            
+        Staff proposedStaff = staffRepository.findById(proposedStaffId)
+                .orElseThrow(() -> new AppException(ErrorCode.STAFF_NOT_FOUND));
+                
+        if (proposedStaff.getShop().getId() != shop.getId())
+            throw new AppException(ErrorCode.STAFF_NOT_BELONG_TO_SHOP);
+
+        // Check if there is already a pending request for this booking
+        List<StaffChangeRequest> pendingRequests = staffChangeRequestRepository.findByBookingIdAndStatus(bookingId, "PENDING");
+        if (!pendingRequests.isEmpty()) {
+            throw new AppException(ErrorCode.STAFF_CHANGE_REQUEST_ALREADY_EXISTS);
+        }
+
+        StaffChangeRequest request = StaffChangeRequest.builder()
+                .booking(booking)
+                .oldStaff(booking.getStaff())
+                .proposedStaff(proposedStaff)
+                .reason(reason)
+                .status("PENDING")
+                .build();
+                
+        staffChangeRequestRepository.save(request);
+
+        // Notify user
+        Notification notification = Notification.builder()
+                .user(booking.getUser())
+                .title("Yêu cầu đổi nhân viên")
+                .content(String.format("Shop %s muốn đổi nhân viên cho lịch hẹn #%d của bạn. Lý do: %s", shop.getShopName(), bookingId, reason))
+                .notificationType(Notification.NotificationType.BOOKING)
+                .build();
+                
+        notificationRepository.save(notification);
+        
+        log.info("Owner requested staff change for booking {} to staff {}", bookingId, proposedStaff.getFullName());
+    }
+
+    // ─── Customer: respond to a staff change request ────────────────────────────
+
+    @Override
+    @Transactional
+    public TaskResponse respondToStaffChange(int requestId, String status, String userEmail) {
+        User user = resolveUser(userEmail);
+        
+        StaffChangeRequest request = staffChangeRequestRepository.findById(requestId)
+                .orElseThrow(() -> new AppException(ErrorCode.REQUEST_NOT_FOUND));
+                
+        if (request.getBooking().getUser().getId() != user.getId())
+            throw new AppException(ErrorCode.UNAUTHORIZED);
+
+        if (!"PENDING".equals(request.getStatus())) {
+            throw new AppException(ErrorCode.REQUEST_ALREADY_PROCESSED);
+        }
+
+        request.setStatus(status.toUpperCase());
+        request.setProcessedAt(java.time.LocalDateTime.now());
+
+        if ("ACCEPTED".equals(status.toUpperCase())) {
+            Booking booking = request.getBooking();
+            booking.setStaff(request.getProposedStaff());
+            bookingRepository.save(booking);
+            log.info("User accepted staff change for booking {}", booking.getId());
+
+            // Notify shop owner
+            Notification notification = Notification.builder()
+                    .user(booking.getShop().getOwner())
+                    .title("Khách hàng đã đồng ý đổi nhân viên")
+                    .content(String.format("Khách hàng %s đã đồng ý đổi nhân viên cho lịch hẹn #%d.", booking.getUser().getFullName(), booking.getId()))
+                    .notificationType(Notification.NotificationType.BOOKING)
+                    .build();
+            notificationRepository.save(notification);
+        } else if ("REJECTED".equals(status.toUpperCase())) {
+            log.info("User rejected staff change for booking {}", request.getBooking().getId());
+
+            // Notify shop owner
+            Notification notification = Notification.builder()
+                    .user(request.getBooking().getShop().getOwner())
+                    .title("Khách hàng từ chối đổi nhân viên")
+                    .content(String.format("Khách hàng %s đã từ chối đổi nhân viên cho lịch hẹn #%d.", request.getBooking().getUser().getFullName(), request.getBooking().getId()))
+                    .notificationType(Notification.NotificationType.BOOKING)
+                    .build();
+            notificationRepository.save(notification);
+        } else {
+            throw new AppException(ErrorCode.BOOKING_STATUS_INVALID);
+        }
+
+        staffChangeRequestRepository.save(request);
+        return toResponse(request.getBooking());
+    }
+
     // ─── Status transition validation ─────────────────────────────────────────
 
     private boolean isValidTransition(String current, String next) {
         return switch (current) {
             case "PENDING_PAYMENT" -> false; // Still waiting for payment
+            case "WAITING_SHOP_APPROVAL" -> Set.of("CONFIRMED", "CANCELLED").contains(next);
             case "CONFIRMED"       -> Set.of("IN_PROGRESS", "CANCELLED").contains(next);
             case "IN_PROGRESS"     -> Set.of("COMPLETED", "CANCELLED").contains(next);
             case "COMPLETED", "CANCELLED" -> false; // Terminal states

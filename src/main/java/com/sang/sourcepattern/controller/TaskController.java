@@ -1,8 +1,11 @@
 package com.sang.sourcepattern.controller;
 
+import com.sang.sourcepattern.dto.request.StaffChangeRequestCreate;
+import com.sang.sourcepattern.dto.request.StaffChangeResponseDto;
 import com.sang.sourcepattern.dto.request.TaskStatusUpdateRequest;
 import com.sang.sourcepattern.dto.response.ApiResponse;
 import com.sang.sourcepattern.dto.response.TaskResponse;
+import com.sang.sourcepattern.entity.StaffChangeRequest;
 import com.sang.sourcepattern.service.TaskService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -75,7 +78,7 @@ public class TaskController {
      * Staff: Update the task status (CONFIRMED → IN_PROGRESS → COMPLETED).
      */
     @PutMapping("/{bookingId}/status")
-    @PreAuthorize("hasRole('STAFF')")
+    @PreAuthorize("hasAnyRole('STAFF', 'SHOP_OWNER')")
     @Operation(summary = "Staff: update status of an assigned task")
     public ApiResponse<TaskResponse> updateStatus(
             @AuthenticationPrincipal Jwt jwt,
@@ -132,6 +135,80 @@ public class TaskController {
         return ApiResponse.<TaskResponse>builder()
                 .result(taskService.unassignTask(bookingId, jwt.getClaim("email")))
                 .message("Staff unassigned from booking")
+                .build();
+    }
+
+    /**
+     * GET /tasks/{bookingId}/staff-change-request
+     * Customer/Owner: Get pending staff change request for a booking.
+     */
+    @GetMapping("/{bookingId}/staff-change-request")
+    @PreAuthorize("hasAnyRole('USER', 'SHOP_OWNER')")
+    @Operation(summary = "Get pending staff change request for a booking")
+    public ApiResponse<com.sang.sourcepattern.dto.response.StaffChangeRequestResponse> getPendingRequest(@PathVariable int bookingId) {
+        List<StaffChangeRequest> requests = taskService.getPendingStaffChangeRequest(bookingId);
+        
+        if (requests.isEmpty()) {
+            return ApiResponse.<com.sang.sourcepattern.dto.response.StaffChangeRequestResponse>builder()
+                    .result(null)
+                    .build();
+        }
+
+        StaffChangeRequest req = requests.get(0);
+        com.sang.sourcepattern.dto.response.StaffChangeRequestResponse dto = com.sang.sourcepattern.dto.response.StaffChangeRequestResponse.builder()
+                .id(req.getId())
+                .bookingId(req.getBooking().getId())
+                .reason(req.getReason())
+                .status(req.getStatus())
+                .oldStaff(req.getOldStaff() != null ? 
+                        com.sang.sourcepattern.dto.response.StaffChangeRequestResponse.StaffDto.builder()
+                            .id(req.getOldStaff().getId())
+                            .fullName(req.getOldStaff().getFullName())
+                            .build() : null)
+                .proposedStaff(req.getProposedStaff() != null ? 
+                        com.sang.sourcepattern.dto.response.StaffChangeRequestResponse.StaffDto.builder()
+                            .id(req.getProposedStaff().getId())
+                            .fullName(req.getProposedStaff().getFullName())
+                            .build() : null)
+                .build();
+
+        return ApiResponse.<com.sang.sourcepattern.dto.response.StaffChangeRequestResponse>builder()
+                .result(dto)
+                .build();
+    }
+
+    /**
+     * POST /tasks/{bookingId}/request-change/{staffId}
+     * Owner: Request to change staff for a booking (requires customer approval).
+     */
+    @PostMapping("/{bookingId}/request-change/{staffId}")
+    @PreAuthorize("hasRole('SHOP_OWNER')")
+    @Operation(summary = "Owner: request to change staff for a booking")
+    public ApiResponse<Void> requestStaffChange(
+            @AuthenticationPrincipal Jwt jwt,
+            @PathVariable int bookingId,
+            @PathVariable int staffId,
+            @RequestBody @Valid StaffChangeRequestCreate request) {
+        taskService.requestStaffChange(bookingId, staffId, request.getReason(), jwt.getClaim("email"));
+        return ApiResponse.<Void>builder()
+                .message("Staff change request created successfully")
+                .build();
+    }
+
+    /**
+     * PUT /tasks/staff-change/{requestId}/respond
+     * Customer: Respond to a staff change request.
+     */
+    @PutMapping("/staff-change/{requestId}/respond")
+    @PreAuthorize("hasRole('USER')")
+    @Operation(summary = "Customer: respond to a staff change request")
+    public ApiResponse<TaskResponse> respondToStaffChange(
+            @AuthenticationPrincipal Jwt jwt,
+            @PathVariable int requestId,
+            @RequestBody @Valid StaffChangeResponseDto request) {
+        return ApiResponse.<TaskResponse>builder()
+                .result(taskService.respondToStaffChange(requestId, request.getStatus(), jwt.getClaim("email")))
+                .message("Responded to staff change request")
                 .build();
     }
 }

@@ -380,7 +380,7 @@ public class BookingServiceImpl implements BookingService {
                 ? staffRepository.findById(pending.getStaffId()).orElse(null)
                 : null;
 
-        if (staff == null && "AUTO".equals(shop.getAssignmentMode())) {
+        if (staff == null) {
             List<Staff> activeStaff = staffRepository.findByShopIdAndIsActiveTrue(shop.getId());
             if (!activeStaff.isEmpty()) {
                 LocalDateTime ws = pending.getAppointmentDatetime().minusMinutes(service.getDurationMinutes());
@@ -407,7 +407,7 @@ public class BookingServiceImpl implements BookingService {
                 .user(user).shop(shop).service(service).pet(pet).staff(staff)
                 .appointmentDatetime(pending.getAppointmentDatetime())
                 .note(pending.getNote())
-                .status("CONFIRMED")
+                .status((staff != null && !"AUTO".equals(shop.getAssignmentMode())) ? "WAITING_SHOP_APPROVAL" : "CONFIRMED")
                 .payosOrderCode(orderCode)
                 .build();
         booking = bookingRepository.save(booking);
@@ -508,6 +508,8 @@ public class BookingServiceImpl implements BookingService {
             }
         }
 
+
+
         PayOSCreateResponse payosResponse;
         try {
             payosResponse = payOSService.createPaymentLink(
@@ -556,16 +558,19 @@ public class BookingServiceImpl implements BookingService {
             throw new AppException(ErrorCode.BOOKING_ALREADY_PAID);
         });
 
-        // Query PayOS
-        PayOSPaymentInfoResponse info;
+        // Query PayOS (Bypass if deposit rate is 0)
+        BigDecimal depositRate = walletService.getAdminFeeRate();
+        PayOSPaymentInfoResponse info = null;
+        String payosStatus = "PAID";
+
         try {
             info = payOSService.getPaymentInfo(orderCode);
+            payosStatus = info.getPaymentStatus();
         } catch (Exception e) {
             log.error("PayOS getPaymentInfo (cash deposit) failed: {}", e.getMessage(), e);
             throw new AppException(ErrorCode.PAYOS_ERROR);
         }
 
-        String payosStatus = info.getPaymentStatus();
         log.info("PayOS confirmCashDeposit — orderCode={} status={}", orderCode, payosStatus);
 
         if (!"PAID".equals(payosStatus)) {
@@ -607,7 +612,7 @@ public class BookingServiceImpl implements BookingService {
                 ? staffRepository.findById(pending.getStaffId()).orElse(null)
                 : null;
 
-        if (staff == null && "AUTO".equals(shop.getAssignmentMode())) {
+        if (staff == null) {
             List<Staff> activeStaff = staffRepository.findByShopIdAndIsActiveTrue(shop.getId());
             if (!activeStaff.isEmpty()) {
                 LocalDateTime ws = pending.getAppointmentDatetime().minusMinutes(service.getDurationMinutes());
@@ -632,7 +637,7 @@ public class BookingServiceImpl implements BookingService {
                 .user(user).shop(shop).service(service).pet(pet).staff(staff)
                 .appointmentDatetime(pending.getAppointmentDatetime())
                 .note(pending.getNote())
-                .status("CONFIRMED")
+                .status((staff != null && !"AUTO".equals(shop.getAssignmentMode())) ? "WAITING_SHOP_APPROVAL" : "CONFIRMED")
                 .payosOrderCode(orderCode)
                 .build();
         booking = bookingRepository.save(booking);
@@ -648,7 +653,7 @@ public class BookingServiceImpl implements BookingService {
                 .description(String.format(
                         "10%% deposit (PayOS) for cash booking #%d — full price: %s VND",
                         booking.getId(), service.getPrice().toPlainString()))
-                .gatewayTransactionId(info.getData() != null ? info.getData().getId() : null)
+                .gatewayTransactionId(info.getData().getId())
                 .build();
         paymentRepository.save(payment);
 
@@ -661,7 +666,7 @@ public class BookingServiceImpl implements BookingService {
                 .paymentMethod("CASH_DEPOSIT")
                 .status("SUCCESS")
                 .payosOrderCode(orderCode)
-                .gatewayTransactionId(info.getData() != null ? info.getData().getId() : null)
+                .gatewayTransactionId(info.getData().getId())
                 .description(String.format(
                         "10%% deposit paid (PayOS) for cash booking #%d", booking.getId()))
                 .completedAt(LocalDateTime.now())

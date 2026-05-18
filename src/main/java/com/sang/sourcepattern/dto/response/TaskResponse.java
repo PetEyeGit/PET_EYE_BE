@@ -28,6 +28,7 @@ public class TaskResponse {
     // Service info
     int serviceId;
     String serviceName;
+    java.math.BigDecimal servicePrice;
 
     // Assigned staff
     Integer staffId;
