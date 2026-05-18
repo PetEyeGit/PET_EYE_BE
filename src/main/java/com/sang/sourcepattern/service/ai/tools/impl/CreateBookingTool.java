@@ -95,7 +95,7 @@ public class CreateBookingTool implements AITool {
                     .build();
         }
 
-        // Create cash booking
+        // Create cash booking — initiate 10% deposit via PayOS
         BookingCreationRequest request = BookingCreationRequest.builder()
                 .shopId(shopId)
                 .serviceId(serviceId)
@@ -105,22 +105,27 @@ public class CreateBookingTool implements AITool {
                 .paymentMethod("CASH")
                 .build();
 
-        BookingResponse booking = bookingService.createCashBooking(request, email);
+        com.sang.sourcepattern.dto.response.InitiatePaymentResponse depositResponse =
+                bookingService.initiateCashDeposit(request, email);
 
         Map<String, Object> successData = new LinkedHashMap<>();
-        successData.put("bookingId", booking.getId());
-        successData.put("shopName", booking.getShopName());
-        successData.put("serviceName", booking.getServiceName());
+        successData.put("orderCode", depositResponse.getOrderCode());
+        successData.put("checkoutUrl", depositResponse.getCheckoutUrl());
+        successData.put("depositAmount", depositResponse.getAmount());
+        successData.put("shopId", shopId);
+        successData.put("serviceId", serviceId);
+        successData.put("petId", petId);
         successData.put("datetime", datetimeStr);
+        successData.put("message", "Vui lòng thanh toán tiền cọc 10% qua link bên dưới để xác nhận lịch hẹn.");
 
         return ToolResult.builder()
-                .type("booking_success")
+                .type("cash_deposit_required")
                 .data(successData)
                 .geminiSummary(Map.of(
                         "success", true,
-                        "bookingId", booking.getId(),
-                        "shopName", booking.getShopName(),
-                        "serviceName", booking.getServiceName(),
+                        "requiresDeposit", true,
+                        "depositAmount", depositResponse.getAmount(),
+                        "checkoutUrl", depositResponse.getCheckoutUrl(),
                         "datetime", datetimeStr
                 ))
                 .build();

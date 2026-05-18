@@ -18,6 +18,9 @@ public interface WalletService {
     /** Lấy tổng số dư ví admin (tổng tiền phí đã thu) */
     BigDecimal getAdminBalance();
 
+    /** Lấy tỷ lệ phí hoa hồng admin (mặc định 10%) */
+    BigDecimal getAdminFeeRate();
+
     /**
      * Khi booking COMPLETED: chuyển tiền từ frozen → available (90%) và ghi nhận phí admin (10%).
      * Gọi từ TaskServiceImpl khi status → COMPLETED.

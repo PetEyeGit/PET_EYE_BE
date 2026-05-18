@@ -26,9 +26,19 @@ public interface BookingService {
     BookingResponse confirmPayment(long orderCode, String userEmail);
 
     /**
-     * CASH flow: create booking immediately, status = CONFIRMED.
+     * CASH flow — STEP 1:
+     * Validate inputs, create PayOS payment link for 10% deposit (= admin commission).
+     * NO booking is saved to DB yet.
      */
-    BookingResponse createCashBooking(BookingCreationRequest request, String userEmail);
+    InitiatePaymentResponse initiateCashDeposit(BookingCreationRequest request, String userEmail);
+
+    /**
+     * CASH flow — STEP 2:
+     * Called after user pays the 10% deposit via PayOS.
+     * Queries PayOS API; if PAID → creates Booking + Payment in DB → CONFIRMED.
+     * Remaining 90% is collected in cash at the venue.
+     */
+    BookingResponse confirmCashDeposit(long orderCode, String userEmail);
 
     /** Get all bookings of the authenticated user */
     List<BookingResponse> getMyBookings(String userEmail);

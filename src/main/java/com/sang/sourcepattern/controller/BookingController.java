@@ -56,18 +56,31 @@ public class BookingController {
                 .build();
     }
 
-    // ─── Cash flow ────────────────────────────────────────────────────────────
+    // ─── Cash flow (2-step: 10% deposit via PayOS + 90% cash at venue) ─────────
 
-    @PostMapping("/cash")
+    @PostMapping("/cash/initiate")
     @PreAuthorize("hasRole('USER')")
-    @Operation(summary = "Create a cash booking immediately (no online payment).")
-    public ApiResponse<BookingResponse> createCashBooking(
+    @Operation(summary = "Cash Step 1: Validate inputs + create PayOS link for 10% deposit (= admin commission). No booking saved yet.")
+    public ApiResponse<InitiatePaymentResponse> initiateCashDeposit(
             @RequestBody @Valid BookingCreationRequest request,
             @AuthenticationPrincipal Jwt jwt) {
 
+        return ApiResponse.<InitiatePaymentResponse>builder()
+                .result(bookingService.initiateCashDeposit(request, jwt.getClaim("email")))
+                .message("Please pay the 10% deposit via the checkoutUrl. Remaining 90% is paid in cash at the venue.")
+                .build();
+    }
+
+    @PostMapping("/cash/confirm")
+    @PreAuthorize("hasRole('USER')")
+    @Operation(summary = "Cash Step 2: Verify 10% deposit payment → create booking if PAID.")
+    public ApiResponse<BookingResponse> confirmCashDeposit(
+            @RequestParam long orderCode,
+            @AuthenticationPrincipal Jwt jwt) {
+
         return ApiResponse.<BookingResponse>builder()
-                .result(bookingService.createCashBooking(request, jwt.getClaim("email")))
-                .message("Booking confirmed. Please pay at the venue.")
+                .result(bookingService.confirmCashDeposit(orderCode, jwt.getClaim("email")))
+                .message("Booking confirmed. Please pay the remaining 90% in cash at the venue.")
                 .build();
     }
 

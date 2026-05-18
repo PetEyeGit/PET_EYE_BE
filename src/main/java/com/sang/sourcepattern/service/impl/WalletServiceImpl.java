@@ -138,6 +138,11 @@ public class WalletServiceImpl implements WalletService {
         return totalRevenue.multiply(adminFeeRate).setScale(0, RoundingMode.DOWN);
     }
 
+    @Override
+    public BigDecimal getAdminFeeRate() {
+        return adminFeeRate;
+    }
+
     // ─── Booking lifecycle hooks ───────────────────────────────────────────────
 
     @Override
@@ -148,20 +153,40 @@ public class WalletServiceImpl implements WalletService {
 
         Payment payment = paymentRepository.findByBookingId(bookingId).orElse(null);
 
-        BigDecimal amount;
+        BigDecimal fullPrice = booking.getService().getPrice();
         String paymentMethod;
-        if (payment == null || !"SUCCESS".equals(payment.getStatus())) {
-            // Cash booking: dùng service price, đánh dấu payment SUCCESS
-            amount = booking.getService().getPrice();
+
+        if (payment != null && "CASH_DEPOSIT".equals(payment.getMethod())
+                && "SUCCESS".equals(payment.getStatus())) {
+            // ── Cash-deposit booking: cọc 10% đã thu qua PayOS ──────────────
+            // Admin đã nhận 10% (deposit). Shop nhận 90% từ tiền mặt thu tại chỗ.
+            // Ghi thêm 1 transaction BOOKING_PAYMENT CASH cho phần 90% còn lại.
+            paymentMethod = "CASH_DEPOSIT";
+            BigDecimal cashPart = fullPrice.multiply(BigDecimal.ONE.subtract(adminFeeRate))
+                    .setScale(0, RoundingMode.DOWN);
+
+            transactionRepository.save(Transaction.builder()
+                    .booking(booking)
+                    .shop(booking.getShop())
+                    .type("BOOKING_PAYMENT")
+                    .amount(cashPart)
+                    .paymentMethod("CASH")
+                    .status("SUCCESS")
+                    .description(String.format(
+                            "Cash collected at venue for booking #%d (90%% of %s VND)",
+                            bookingId, fullPrice.toPlainString()))
+                    .completedAt(LocalDateTime.now())
+                    .build());
+
+        } else if (payment == null || !"SUCCESS".equals(payment.getStatus())) {
+            // ── Legacy cash booking (không có cọc) ───────────────────────────
             paymentMethod = "CASH";
 
-            // Cập nhật Payment PENDING → SUCCESS
             if (payment != null) {
                 payment.setStatus("SUCCESS");
                 paymentRepository.save(payment);
             }
 
-            // Cập nhật Transaction BOOKING_PAYMENT PENDING → SUCCESS
             transactionRepository.findByBookingIdOrderByCreatedAtDesc(bookingId)
                     .stream().findFirst().ifPresent(t -> {
                         t.setStatus("SUCCESS");
@@ -170,12 +195,12 @@ public class WalletServiceImpl implements WalletService {
                         transactionRepository.save(t);
                     });
         } else {
-            amount = payment.getAmount();
+            // ── PayOS booking ─────────────────────────────────────────────────
             paymentMethod = payment.getMethod();
         }
 
-        // Tính phần shop nhận (90%)
-        BigDecimal shopShare = amount
+        // Tính phần shop nhận (90% của full price)
+        BigDecimal shopShare = fullPrice
                 .multiply(BigDecimal.ONE.subtract(adminFeeRate))
                 .setScale(0, RoundingMode.DOWN);
 
@@ -199,13 +224,13 @@ public class WalletServiceImpl implements WalletService {
                 .amount(shopShare)
                 .paymentMethod(paymentMethod)
                 .status("SUCCESS")
-                .description(String.format("Wallet credit for booking #%d (90%% of %s)",
-                        bookingId, amount.toPlainString()))
+                .description(String.format("Wallet credit for booking #%d (90%% of %s VND)",
+                        bookingId, fullPrice.toPlainString()))
                 .completedAt(LocalDateTime.now())
                 .build());
 
         log.info("Wallet credited for COMPLETED booking {} — shopShare={} (90% of {})",
-                bookingId, shopShare, amount);
+                bookingId, shopShare, fullPrice);
     }
 
     @Override

@@ -25,6 +25,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.io.Serializable;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
@@ -57,6 +58,12 @@ public class BookingServiceImpl implements BookingService {
     /** TTL cho pending booking trong Redis: 30 phút */
     private static final long PENDING_TTL_MINUTES = 30;
     private static final String REDIS_KEY_PREFIX   = "pending_booking:";
+
+    /**
+     * Redis key prefix cho cash deposit pending booking.
+     * Format: cash_pending:{orderCode}
+     */
+    private static final String CASH_PENDING_PREFIX = "cash_pending:";
 
     /**
      * Redis lock key cho staff slot.
@@ -442,11 +449,15 @@ public class BookingServiceImpl implements BookingService {
         return toResponse(booking);
     }
 
-    // ─── CASH booking ─────────────────────────────────────────────────────────
+    // ─── CASH booking (2-step: 10% deposit via PayOS + 90% cash at venue) ────
 
+    /**
+     * CASH STEP 1: Validate inputs, create PayOS link for 10% deposit (= admin commission).
+     * Pending booking is stored in Redis (same as PayOS flow).
+     * NO booking saved to DB yet.
+     */
     @Override
-    @Transactional
-    public BookingResponse createCashBooking(BookingCreationRequest request, String userEmail) {
+    public InitiatePaymentResponse initiateCashDeposit(BookingCreationRequest request, String userEmail) {
         User user = resolveUser(userEmail);
 
         validateBookingInputs(request.getShopId(), request.getServiceId(),
@@ -464,26 +475,150 @@ public class BookingServiceImpl implements BookingService {
                     service.getDurationMinutes());
         }
 
-        Shop shop   = shopRepository.findById(request.getShopId()).get();
-        Pet pet     = petRepository.findById(request.getPetId()).get();
-        Staff staff = request.getStaffId() != null
-                ? staffRepository.findById(request.getStaffId()).orElse(null)
+        // ── Tính tiền cọc = 10% giá dịch vụ (= phí hoa hồng admin) ──────────
+        BigDecimal depositRate = walletService.getAdminFeeRate();
+        BigDecimal rawDeposit  = service.getPrice().multiply(depositRate);
+        int depositVnd = rawDeposit.setScale(0, java.math.RoundingMode.CEILING).intValue();
+        // PayOS yêu cầu tối thiểu 2000 VND và chia hết 1000
+        depositVnd = Math.max(depositVnd, 2000);
+        if (depositVnd % 1000 != 0) depositVnd = ((depositVnd / 1000) + 1) * 1000;
+
+        long orderCode  = ThreadLocalRandom.current().nextLong(10_000_000L, 99_999_999L);
+        String description = "Deposit" + orderCode % 100000;
+
+        // ── Lưu vào Redis (TTL 30 phút) — tái dùng PendingBooking ────────────
+        PendingBooking pending = new PendingBooking(
+                user.getId(), request.getShopId(), request.getServiceId(),
+                request.getPetId(), request.getStaffId(),
+                request.getAppointmentDatetime(), request.getNote(),
+                depositVnd, description
+        );
+        // Đánh dấu đây là cash booking bằng cách prefix key
+        redisTemplate.opsForValue().set(
+                CASH_PENDING_PREFIX + orderCode, pending,
+                PENDING_TTL_MINUTES, java.util.concurrent.TimeUnit.MINUTES);
+
+        // ── Giữ slot staff trong Redis (atomic SET NX) ────────────────────────
+        if (request.getStaffId() != null) {
+            boolean locked = tryLockStaffSlot(request.getStaffId(),
+                    request.getAppointmentDatetime(), orderCode);
+            if (!locked) {
+                redisTemplate.delete(CASH_PENDING_PREFIX + orderCode);
+                throw new AppException(ErrorCode.STAFF_BOOKING_CONFLICT);
+            }
+        }
+
+        PayOSCreateResponse payosResponse;
+        try {
+            payosResponse = payOSService.createPaymentLink(
+                    orderCode, depositVnd, description, returnUrl, cancelUrl);
+        } catch (Exception e) {
+            redisTemplate.delete(CASH_PENDING_PREFIX + orderCode);
+            if (request.getStaffId() != null) {
+                releaseStaffSlot(request.getStaffId(), request.getAppointmentDatetime());
+            }
+            log.error("PayOS createPaymentLink (cash deposit) failed: {}", e.getMessage(), e);
+            throw new AppException(ErrorCode.PAYOS_ERROR);
+        }
+
+        if (payosResponse == null || !payosResponse.isSuccess() || payosResponse.getData() == null) {
+            redisTemplate.delete(CASH_PENDING_PREFIX + orderCode);
+            if (request.getStaffId() != null) {
+                releaseStaffSlot(request.getStaffId(), request.getAppointmentDatetime());
+            }
+            throw new AppException(ErrorCode.PAYOS_ERROR);
+        }
+
+        log.info("Cash deposit PayOS link created — orderCode={} deposit={}VND (10% of {})",
+                orderCode, depositVnd, service.getPrice());
+
+        return InitiatePaymentResponse.builder()
+                .orderCode(orderCode)
+                .checkoutUrl(payosResponse.getData().getCheckoutUrl())
+                .qrCode(payosResponse.getData().getQrCode())
+                .amount(depositVnd)
+                .description(description)
+                .build();
+    }
+
+    /**
+     * CASH STEP 2: Verify 10% deposit paid via PayOS → create booking.
+     * Booking status = CONFIRMED. Remaining 90% collected in cash at venue.
+     * On COMPLETED: wallet credits shop with 90% of full service price.
+     */
+    @Override
+    @Transactional
+    public BookingResponse confirmCashDeposit(long orderCode, String userEmail) {
+        User user = resolveUser(userEmail);
+
+        // Idempotent check
+        bookingRepository.findByPayosOrderCode(orderCode).ifPresent(existing -> {
+            throw new AppException(ErrorCode.BOOKING_ALREADY_PAID);
+        });
+
+        // Query PayOS
+        PayOSPaymentInfoResponse info;
+        try {
+            info = payOSService.getPaymentInfo(orderCode);
+        } catch (Exception e) {
+            log.error("PayOS getPaymentInfo (cash deposit) failed: {}", e.getMessage(), e);
+            throw new AppException(ErrorCode.PAYOS_ERROR);
+        }
+
+        String payosStatus = info.getPaymentStatus();
+        log.info("PayOS confirmCashDeposit — orderCode={} status={}", orderCode, payosStatus);
+
+        if (!"PAID".equals(payosStatus)) {
+            redisTemplate.delete(CASH_PENDING_PREFIX + orderCode);
+            throw new AppException(ErrorCode.BOOKING_NOT_FOUND);
+        }
+
+        // Lấy pending từ Redis
+        Object raw = redisTemplate.opsForValue().get(CASH_PENDING_PREFIX + orderCode);
+        if (raw == null) {
+            log.warn("Cash pending booking not found in Redis for orderCode={}", orderCode);
+            throw new AppException(ErrorCode.BOOKING_NOT_FOUND);
+        }
+        PendingBooking pending = (raw instanceof PendingBooking pb) ? pb : null;
+        if (pending == null) throw new AppException(ErrorCode.BOOKING_NOT_FOUND);
+
+        if (pending.getUserId() != user.getId()) {
+            throw new AppException(ErrorCode.BOOKING_NOT_BELONG_TO_USER);
+        }
+
+        // ── Kiểm tra lại trùng lịch ───────────────────────────────────────────
+        Service service = serviceRepository.findById(pending.getServiceId()).get();
+        checkPetConflict(pending.getPetId(), pending.getAppointmentDatetime(),
+                service.getDurationMinutes());
+
+        if (pending.getStaffId() != null) {
+            LocalDateTime ws = pending.getAppointmentDatetime().minusMinutes(service.getDurationMinutes());
+            LocalDateTime we = pending.getAppointmentDatetime().plusMinutes(service.getDurationMinutes());
+            if (bookingRepository.existsConflictingBookingForStaff(pending.getStaffId(), ws, we)) {
+                redisTemplate.delete(CASH_PENDING_PREFIX + orderCode);
+                releaseStaffSlot(pending.getStaffId(), pending.getAppointmentDatetime());
+                throw new AppException(ErrorCode.STAFF_BOOKING_CONFLICT);
+            }
+        }
+
+        Shop  shop = shopRepository.findById(pending.getShopId()).get();
+        Pet   pet  = petRepository.findById(pending.getPetId()).get();
+        Staff staff = pending.getStaffId() != null
+                ? staffRepository.findById(pending.getStaffId()).orElse(null)
                 : null;
 
         if (staff == null && "AUTO".equals(shop.getAssignmentMode())) {
             List<Staff> activeStaff = staffRepository.findByShopIdAndIsActiveTrue(shop.getId());
             if (!activeStaff.isEmpty()) {
-                LocalDateTime ws = request.getAppointmentDatetime().minusMinutes(service.getDurationMinutes());
-                LocalDateTime we = request.getAppointmentDatetime().plusMinutes(service.getDurationMinutes());
-                
+                LocalDateTime ws = pending.getAppointmentDatetime().minusMinutes(service.getDurationMinutes());
+                LocalDateTime we = pending.getAppointmentDatetime().plusMinutes(service.getDurationMinutes());
                 List<Staff> availableStaff = activeStaff.stream().filter(s -> {
                     boolean dbBusy = bookingRepository.existsConflictingBookingForStaff(s.getId(), ws, we);
                     String slotKey = STAFF_SLOT_PREFIX + s.getId() + ":"
-                                 + request.getAppointmentDatetime().withSecond(0).withNano(0).toString();
+                            + pending.getAppointmentDatetime().withSecond(0).withNano(0).toString();
                     boolean redisBusy = Boolean.TRUE.equals(redisTemplate.hasKey(slotKey));
                     return !dbBusy && !redisBusy;
                 }).collect(Collectors.toList());
-
                 if (!availableStaff.isEmpty()) {
                     staff = availableStaff.get(ThreadLocalRandom.current().nextInt(availableStaff.size()));
                 } else {
@@ -495,34 +630,50 @@ public class BookingServiceImpl implements BookingService {
         // ── Tạo Booking ───────────────────────────────────────────────────────
         Booking booking = Booking.builder()
                 .user(user).shop(shop).service(service).pet(pet).staff(staff)
-                .appointmentDatetime(request.getAppointmentDatetime())
-                .note(request.getNote())
+                .appointmentDatetime(pending.getAppointmentDatetime())
+                .note(pending.getNote())
                 .status("CONFIRMED")
+                .payosOrderCode(orderCode)
                 .build();
         booking = bookingRepository.save(booking);
 
-        // ── Tạo Payment (PENDING — chờ thu tiền mặt) ─────────────────────────
+        // ── Tạo Payment: ghi nhận tiền cọc 10% đã thanh toán qua PayOS ───────
+        BigDecimal depositAmount = new BigDecimal(pending.getAmountVnd());
         Payment payment = Payment.builder()
                 .booking(booking)
-                .amount(service.getPrice())
-                .method("CASH")
-                .status("PENDING")
-                .description("Cash payment for booking #" + booking.getId())
+                .amount(depositAmount)
+                .method("CASH_DEPOSIT")
+                .status("SUCCESS")
+                .payosOrderCode(orderCode)
+                .description(String.format(
+                        "10%% deposit (PayOS) for cash booking #%d — full price: %s VND",
+                        booking.getId(), service.getPrice().toPlainString()))
+                .gatewayTransactionId(info.getData() != null ? info.getData().getId() : null)
                 .build();
         paymentRepository.save(payment);
 
-        // ── Ghi Transaction (PENDING — chờ thu tiền) ─────────────────────────
+        // ── Ghi Transaction: tiền cọc 10% ─────────────────────────────────────
         transactionRepository.save(Transaction.builder()
                 .booking(booking)
                 .shop(shop)
                 .type("BOOKING_PAYMENT")
-                .amount(service.getPrice())
-                .paymentMethod("CASH")
-                .status("PENDING")
-                .description("Cash booking #" + booking.getId() + " — pending collection")
+                .amount(depositAmount)
+                .paymentMethod("CASH_DEPOSIT")
+                .status("SUCCESS")
+                .payosOrderCode(orderCode)
+                .gatewayTransactionId(info.getData() != null ? info.getData().getId() : null)
+                .description(String.format(
+                        "10%% deposit paid (PayOS) for cash booking #%d", booking.getId()))
+                .completedAt(LocalDateTime.now())
                 .build());
 
-        log.info("Booking {} created (CASH) — status=CONFIRMED", booking.getId());
+        redisTemplate.delete(CASH_PENDING_PREFIX + orderCode);
+        if (staff != null) {
+            releaseStaffSlot(staff.getId(), pending.getAppointmentDatetime());
+        }
+
+        log.info("Cash booking {} CONFIRMED — deposit={}VND (10%), remaining {}VND (90%) to be collected in cash",
+                booking.getId(), depositAmount, service.getPrice().subtract(depositAmount));
         return toResponse(booking);
     }
 
