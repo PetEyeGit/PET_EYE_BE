@@ -2,6 +2,7 @@ package com.sang.sourcepattern.service;
 
 import com.sang.sourcepattern.dto.request.TaskStatusUpdateRequest;
 import com.sang.sourcepattern.dto.response.TaskResponse;
+import com.sang.sourcepattern.entity.StaffChangeRequest;
 
 import java.util.List;
 
@@ -27,4 +28,13 @@ public interface TaskService {
 
     /** Owner: get all bookings for the shop (with and without staff) */
     List<TaskResponse> getAllShopTasks(String ownerEmail);
+
+    /** Get pending staff change request for a booking */
+    List<StaffChangeRequest> getPendingStaffChangeRequest(int bookingId);
+
+    /** Owner: request to change staff for a booking (requires customer approval) */
+    void requestStaffChange(int bookingId, int proposedStaffId, String reason, String ownerEmail);
+
+    /** Customer: respond to a staff change request */
+    TaskResponse respondToStaffChange(int requestId, String status, String userEmail);
 }
