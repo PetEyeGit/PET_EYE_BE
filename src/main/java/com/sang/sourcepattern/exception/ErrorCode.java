@@ -95,6 +95,7 @@ public enum ErrorCode {
     //   Booking conflict
     PET_BOOKING_CONFLICT(5013, "This pet already has an active booking at the requested time", HttpStatus.CONFLICT),
     STAFF_BOOKING_CONFLICT(5014, "This staff member is already booked at the requested time", HttpStatus.CONFLICT),
+    NO_STAFF_AVAILABLE(5015, "No staff available for the selected time slot. Please choose a different time.", HttpStatus.CONFLICT),
 
     // Request errors
     REQUEST_NOT_FOUND(10001, "Request not found", HttpStatus.NOT_FOUND),
@@ -102,7 +103,8 @@ public enum ErrorCode {
     STAFF_CHANGE_REQUEST_ALREADY_EXISTS(10003, "A pending staff change request already exists for this booking", HttpStatus.BAD_REQUEST),
     CANNOT_UPDATE_STATUS_WHILE_REQUEST_PENDING(10004, "Cannot update status while a staff change request is pending", HttpStatus.BAD_REQUEST),
     CANNOT_CHANGE_STAFF_DIRECTLY(10005, "Cannot change staff directly when a staff is already assigned. Please use the request flow.", HttpStatus.BAD_REQUEST),
-;
+    INVALID_REQUEST(10006,"Invalid request",HttpStatus.BAD_REQUEST),
+    ;
 
     private final int code;
     private final String message;

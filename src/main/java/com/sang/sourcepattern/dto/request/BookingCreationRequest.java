@@ -6,6 +6,7 @@ import lombok.*;
 import lombok.experimental.FieldDefaults;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Data
 @Builder
@@ -17,8 +18,19 @@ public class BookingCreationRequest {
     @NotNull(message = "SHOP_ID_REQUIRED")
     Integer shopId;
 
+    /**
+     * serviceId chính (service đầu tiên / duy nhất).
+     * Vẫn giữ để tương thích ngược.
+     */
     @NotNull(message = "SERVICE_ID_REQUIRED")
     Integer serviceId;
+
+    /**
+     * Danh sách tất cả service IDs khi user chọn nhiều dịch vụ.
+     * Nếu null/empty → chỉ dùng serviceId.
+     * Nếu có → serviceId = serviceIds[0], tổng price = sum(services).
+     */
+    List<Integer> serviceIds;
 
     @NotNull(message = "PET_ID_REQUIRED")
     Integer petId;

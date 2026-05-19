@@ -6,6 +6,8 @@ import com.sang.sourcepattern.dto.response.ApiResponse;
 import com.sang.sourcepattern.dto.response.BookingResponse;
 import com.sang.sourcepattern.dto.response.InitiatePaymentResponse;
 import com.sang.sourcepattern.dto.response.StaffResponse;
+import com.sang.sourcepattern.exception.AppException;
+import com.sang.sourcepattern.exception.ErrorCode;
 import com.sang.sourcepattern.service.BookingService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -13,11 +15,15 @@ import jakarta.validation.Valid;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 
 @RestController
@@ -137,15 +143,13 @@ public class BookingController {
             @RequestParam(required = false) String appointmentDatetime,
             @RequestParam(defaultValue = "60") int durationMinutes) {
 
-        java.time.LocalDateTime dt = null;
+        LocalDateTime dt = null;
         if (appointmentDatetime != null && !appointmentDatetime.isBlank()) {
             try {
-                dt = java.time.LocalDateTime.parse(appointmentDatetime);
+                dt = LocalDateTime.parse(appointmentDatetime);
             } catch (Exception e) {
-                // Try with DateTimeFormatter for edge cases
                 try {
-                    dt = java.time.LocalDateTime.parse(appointmentDatetime,
-                            java.time.format.DateTimeFormatter.ISO_LOCAL_DATE_TIME);
+                    dt = LocalDateTime.parse(appointmentDatetime, DateTimeFormatter.ISO_LOCAL_DATE_TIME);
                 } catch (Exception ex) {
                     // If parsing fails, proceed without datetime filter (return all staff)
                 }
@@ -157,14 +161,74 @@ public class BookingController {
                 .build();
     }
 
+    @GetMapping("/pet/{petId}/availability")
+    @Operation(summary = "Check if pet is available for booking at a specific time")
+    public ApiResponse<Boolean> checkPetAvailability(
+            @PathVariable int petId,
+            @RequestParam String appointmentDatetime,
+            @RequestParam(defaultValue = "60") int durationMinutes) {
+
+        LocalDateTime dt;
+        try {
+            dt = LocalDateTime.parse(appointmentDatetime);
+        } catch (Exception e) {
+            dt = LocalDateTime.parse(appointmentDatetime, DateTimeFormatter.ISO_LOCAL_DATE_TIME);
+        }
+
+        return ApiResponse.<Boolean>builder()
+                .result(bookingService.checkPetAvailability(petId, dt, durationMinutes))
+                .build();
+    }
+
+    @GetMapping("/shop/{shopId}/available-slots")
+    @Operation(summary = "Get available time slots for a shop on a specific date. "
+            + "Only slots where at least one staff member is free are returned.")
+    public ApiResponse<List<LocalDateTime>> getAvailableTimeSlots(
+            @PathVariable int shopId,
+            @RequestParam String date,
+            @RequestParam(defaultValue = "60") int durationMinutes) {
+
+        LocalDate localDate;
+        try {
+            localDate = LocalDate.parse(date);
+        } catch (Exception e) {
+            throw new AppException(ErrorCode.INVALID_REQUEST);
+        }
+
+        return ApiResponse.<List<LocalDateTime>>builder()
+                .result(bookingService.getAvailableTimeSlots(shopId, localDate, durationMinutes))
+                .build();
+    }
+
+    @GetMapping("/shop/{shopId}/available-slots-by-services")
+    @Operation(summary = "Get available time slots for a shop given a list of service IDs. "
+            + "Total duration = sum of all selected services. Slots step = 60 min. "
+            + "A slot is available if at least one staff is free for the full total duration.")
+    public ApiResponse<List<LocalDateTime>> getAvailableTimeSlotsForServices(
+            @PathVariable int shopId,
+            @RequestParam String date,
+            @RequestParam List<Integer> serviceIds) {
+
+        LocalDate localDate;
+        try {
+            localDate = LocalDate.parse(date);
+        } catch (Exception e) {
+            throw new AppException(ErrorCode.INVALID_REQUEST);
+        }
+
+        return ApiResponse.<List<LocalDateTime>>builder()
+                .result(bookingService.getAvailableTimeSlotsForServices(shopId, localDate, serviceIds))
+                .build();
+    }
+
     @GetMapping("/shop")
     @PreAuthorize("hasRole('SHOP_OWNER')")
     @Operation(summary = "Get all bookings for the authenticated shop owner within a range")
     public ApiResponse<List<BookingResponse>> getShopBookings(
-            @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE_TIME) java.time.LocalDateTime start,
-            @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE_TIME) java.time.LocalDateTime end,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime start,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime end,
             @AuthenticationPrincipal Jwt jwt) {
-        
+
         return ApiResponse.<List<BookingResponse>>builder()
                 .result(bookingService.getShopBookings(jwt.getClaim("email"), start, end))
                 .build();

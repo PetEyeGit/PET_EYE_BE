@@ -45,15 +45,22 @@ public interface BookingRepository extends JpaRepository<Booking, Integer> {
     List<Object[]> bookingCountByDate(@Param("from") LocalDateTime from);
 
     /**
-     * Kiểm tra pet đã có booking active (CONFIRMED / IN_PROGRESS) tại thời điểm đó chưa.
+     * Kiểm tra pet đã có booking active (CONFIRMED / IN_PROGRESS) bị overlap không.
+     * Overlap: existingStart < newEnd AND existingStart + duration > newStart
+     * Truyền vào: windowStart = newStart, windowEnd = newStart + newDuration
+     * existingEnd được tính bằng cách truyền thêm param để JPQL so sánh.
+     *
+     * Vì JPQL không hỗ trợ DATE_ADD, dùng native query nhưng trả về Integer (0/1).
      */
-    @Query("""
-        SELECT COUNT(b) > 0 FROM Booking b
-        WHERE b.pet.id = :petId
-          AND b.status IN ('CONFIRMED', 'IN_PROGRESS')
-          AND b.appointmentDatetime BETWEEN :windowStart AND :windowEnd
-    """)
-    boolean existsConflictingBookingForPet(
+    @Query(value = """
+        SELECT COUNT(*) FROM booking b
+        JOIN pet_service s ON b.service_id = s.id
+        WHERE b.pet_id = :petId
+          AND b.status IN ('WAITING_SHOP_APPROVAL', 'CONFIRMED', 'IN_PROGRESS')
+          AND b.appointment_datetime < :windowEnd
+          AND DATE_ADD(b.appointment_datetime, INTERVAL s.duration_minutes MINUTE) > :windowStart
+    """, nativeQuery = true)
+    int countConflictingBookingForPet(
             @Param("petId") int petId,
             @Param("windowStart") LocalDateTime windowStart,
             @Param("windowEnd") LocalDateTime windowEnd
@@ -61,15 +68,16 @@ public interface BookingRepository extends JpaRepository<Booking, Integer> {
 
     /**
      * Kiểm tra staff đã có booking active trong khung giờ đó chưa.
-     * Window: [appointmentTime - durationMinutes, appointmentTime + durationMinutes]
      */
-    @Query("""
-        SELECT COUNT(b) > 0 FROM Booking b
-        WHERE b.staff.id = :staffId
-          AND b.status IN ('CONFIRMED', 'IN_PROGRESS')
-          AND b.appointmentDatetime BETWEEN :windowStart AND :windowEnd
-    """)
-    boolean existsConflictingBookingForStaff(
+    @Query(value = """
+        SELECT COUNT(*) FROM booking b
+        JOIN pet_service s ON b.service_id = s.id
+        WHERE b.staff_id = :staffId
+          AND b.status IN ('WAITING_SHOP_APPROVAL', 'CONFIRMED', 'IN_PROGRESS')
+          AND b.appointment_datetime < :windowEnd
+          AND DATE_ADD(b.appointment_datetime, INTERVAL s.duration_minutes MINUTE) > :windowStart
+    """, nativeQuery = true)
+    int countConflictingBookingForStaff(
             @Param("staffId") int staffId,
             @Param("windowStart") LocalDateTime windowStart,
             @Param("windowEnd") LocalDateTime windowEnd

@@ -190,3 +190,25 @@ INSERT INTO shop_wallet (id, shop_id, frozen_balance, available_balance, total_e
 --   SELECT * FROM pet;
 --   SELECT * FROM shop_wallet;
 -- ============================================================
+-- ============================================================
+-- BỔ SUNG THÊM STAFF 3 (Dev Staff 3)
+-- ============================================================
+
+-- Bước 1: Khởi tạo USER (ID = 6)
+INSERT INTO user (id, email, password, full_name, phone, address, created_at, email_verified, active) VALUES
+    (6, 'staffdev3@peteye.com',
+     '$2a$10$9uurETzMx/LPgDYIodiRm.65/zfb7aJK5asJc.6wC1Nn26QfzNRcO', -- Mật khẩu vẫn là 12345678
+     'Dev Staff 3', '0922000003', 'TP.HCM', NOW(), true, true);
+
+-- Bước 2: Gán ROLE STAFF (roles_id = 4) cho user_id = 6
+INSERT INTO user_roles (user_id, roles_id) VALUES
+    (6, 4);  -- staffdev3 → STAFF
+
+-- Bước 3: Tạo thông tin chi tiết trong bảng STAFF (ID = 3, liên kết với shop_id = 1)
+INSERT INTO staff (id, shop_id, user_id, full_name, role, phone, specialization, is_active) VALUES
+    (3, 1, 6,
+     'Dev Staff 3',
+     'GROOMER',
+     '0922000003',
+     'Điều trị da liễu, cắt tỉa chuyên sâu, tạo kiểu',
+     true);

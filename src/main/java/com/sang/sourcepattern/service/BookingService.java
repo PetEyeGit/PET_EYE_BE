@@ -6,6 +6,7 @@ import com.sang.sourcepattern.dto.response.BookingResponse;
 import com.sang.sourcepattern.dto.response.InitiatePaymentResponse;
 import com.sang.sourcepattern.dto.response.StaffResponse;
 
+import java.time.LocalDate;
 import java.util.List;
 
 public interface BookingService {
@@ -60,4 +61,35 @@ public interface BookingService {
 
     /** Get all bookings for a shop owner within a range */
     List<BookingResponse> getShopBookings(String ownerEmail, java.time.LocalDateTime start, java.time.LocalDateTime end);
+
+    /** Check if pet is available for booking at a specific time */
+    boolean checkPetAvailability(int petId, java.time.LocalDateTime appointmentDatetime, int durationMinutes);
+
+    /**
+     * Get available time slots for a shop on a specific date.
+     * A slot is "available" if at least one active staff member is free during that slot.
+     * Slots are generated from shop's openTime to closeTime with the given step (durationMinutes).
+     *
+     * @param shopId          shop to check
+     * @param date            the date to check (yyyy-MM-dd)
+     * @param durationMinutes duration of the service (used for conflict window + slot step)
+     * @return list of LocalDateTime representing available slot start times
+     */
+    List<java.time.LocalDateTime> getAvailableTimeSlots(int shopId, LocalDate date, int durationMinutes);
+
+    /**
+     * Get available time slots for a shop on a specific date, given a list of service IDs.
+     *
+     * Logic:
+     * - Tổng duration = sum(durationMinutes) của tất cả services được chọn.
+     * - Slots được sinh theo bước 60 phút (cố định) từ openTime đến closeTime.
+     * - Một slot available khi có ít nhất 1 staff rảnh trong khoảng
+     *   [slotStart, slotStart + totalDuration].
+     *
+     * @param shopId     shop to check
+     * @param date       the date to check (yyyy-MM-dd)
+     * @param serviceIds list of service IDs the user wants to book
+     * @return list of LocalDateTime representing available slot start times
+     */
+    List<java.time.LocalDateTime> getAvailableTimeSlotsForServices(int shopId, LocalDate date, List<Integer> serviceIds);
 }

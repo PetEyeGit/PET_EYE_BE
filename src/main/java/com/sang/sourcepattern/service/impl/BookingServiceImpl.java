@@ -82,6 +82,8 @@ public class BookingServiceImpl implements BookingService {
         int userId;
         int shopId;
         int serviceId;
+        /** Danh sách tất cả service IDs (multi-service support) */
+        java.util.List<Integer> serviceIds;
         int petId;
         Integer staffId;
         LocalDateTime appointmentDatetime;
@@ -173,15 +175,16 @@ public class BookingServiceImpl implements BookingService {
 
     /**
      * Kiểm tra pet có booking trùng giờ không.
-     * Window = [appointmentTime - duration, appointmentTime + duration]
-     * để tránh overlap khi dịch vụ có thời lượng.
+     * Dùng interval overlap: newStart < existingEnd AND existingStart < newEnd
+     * windowStart = appointmentTime (bắt đầu booking mới)
+     * windowEnd   = appointmentTime + durationMinutes (kết thúc booking mới)
      */
     private void checkPetConflict(int petId, LocalDateTime appointmentTime, int durationMinutes) {
-        LocalDateTime windowStart = appointmentTime.minusMinutes(durationMinutes);
+        LocalDateTime windowStart = appointmentTime;
         LocalDateTime windowEnd   = appointmentTime.plusMinutes(durationMinutes);
 
-        boolean conflict = bookingRepository.existsConflictingBookingForPet(
-                petId, windowStart, windowEnd);
+        boolean conflict = bookingRepository.countConflictingBookingForPet(
+                petId, windowStart, windowEnd) > 0;
 
         if (conflict) {
             throw new AppException(ErrorCode.PET_BOOKING_CONFLICT);
@@ -190,25 +193,86 @@ public class BookingServiceImpl implements BookingService {
 
     /**
      * Kiểm tra staff có bị trùng lịch không.
-     * Kiểm tra cả DB (booking đã xác nhận) lẫn Redis (pending booking đang chờ thanh toán).
+     * Dùng interval overlap: newStart < existingEnd AND existingStart < newEnd
      */
     private void checkStaffConflict(int staffId, LocalDateTime appointmentTime, int durationMinutes) {
-        // 1. Kiểm tra DB — booking đã CONFIRMED/IN_PROGRESS
-        LocalDateTime windowStart = appointmentTime.minusMinutes(durationMinutes);
+        LocalDateTime windowStart = appointmentTime;
         LocalDateTime windowEnd   = appointmentTime.plusMinutes(durationMinutes);
 
-        boolean dbConflict = bookingRepository.existsConflictingBookingForStaff(
-                staffId, windowStart, windowEnd);
+        boolean dbConflict = bookingRepository.countConflictingBookingForStaff(
+                staffId, windowStart, windowEnd) > 0;
         if (dbConflict) {
             throw new AppException(ErrorCode.STAFF_BOOKING_CONFLICT);
         }
 
-        // 2. Kiểm tra Redis — pending booking đang giữ slot (chưa thanh toán)
+        // Kiểm tra Redis — pending booking đang giữ slot (chưa thanh toán)
         String slotKey = staffSlotKey(staffId, appointmentTime);
         Boolean slotTaken = redisTemplate.hasKey(slotKey);
         if (Boolean.TRUE.equals(slotTaken)) {
             throw new AppException(ErrorCode.STAFF_BOOKING_CONFLICT);
         }
+    }
+
+    /**
+     * Kiểm tra shop có ít nhất 1 staff active còn rảnh trong khung giờ đó không.
+     * Nếu không có ai rảnh → throw NO_STAFF_AVAILABLE.
+     * Chỉ gọi khi user KHÔNG chọn staff cụ thể (staffId == null).
+     */
+    private void checkShopHasAvailableStaff(int shopId, LocalDateTime appointmentTime, int durationMinutes) {
+        List<Staff> activeStaff = staffRepository.findByShopIdAndIsActiveTrue(shopId);
+        if (activeStaff.isEmpty()) {
+            throw new AppException(ErrorCode.NO_STAFF_AVAILABLE);
+        }
+
+        LocalDateTime windowStart = appointmentTime;
+        LocalDateTime windowEnd   = appointmentTime.plusMinutes(durationMinutes);
+
+        boolean anyFree = activeStaff.stream().anyMatch(s -> {
+            boolean dbBusy = bookingRepository.countConflictingBookingForStaff(
+                    s.getId(), windowStart, windowEnd) > 0;
+            if (dbBusy) return false;
+            String slotKey = staffSlotKey(s.getId(), appointmentTime);
+            return !Boolean.TRUE.equals(redisTemplate.hasKey(slotKey));
+        });
+
+        if (!anyFree) {
+            throw new AppException(ErrorCode.NO_STAFF_AVAILABLE);
+        }
+    }
+
+    // ─── Multi-service helpers ────────────────────────────────────────────────
+
+    /**
+     * Trả về danh sách serviceIds hiệu quả:
+     * - Nếu serviceIds không null/empty → dùng serviceIds
+     * - Ngược lại → dùng [serviceId]
+     */
+    private List<Integer> resolveServiceIds(Integer serviceId, List<Integer> serviceIds) {
+        if (serviceIds != null && !serviceIds.isEmpty()) return serviceIds;
+        return java.util.Collections.singletonList(serviceId);
+    }
+
+    /**
+     * Tính tổng giá của danh sách services.
+     */
+    private java.math.BigDecimal resolveTotalPrice(List<Integer> ids) {
+        return ids.stream()
+                .map(id -> serviceRepository.findById(id)
+                        .map(Service::getPrice)
+                        .orElse(java.math.BigDecimal.ZERO))
+                .reduce(java.math.BigDecimal.ZERO, java.math.BigDecimal::add);
+    }
+
+    /**
+     * Tính tổng duration (phút) của danh sách services.
+     */
+    private int resolveTotalDuration(List<Integer> ids) {
+        int total = ids.stream()
+                .mapToInt(id -> serviceRepository.findById(id)
+                        .map(Service::getDurationMinutes)
+                        .orElse(0))
+                .sum();
+        return total > 0 ? total : 60;
     }
 
     private void validateBookingInputs(int shopId, int serviceId, int petId,
@@ -241,30 +305,37 @@ public class BookingServiceImpl implements BookingService {
     public InitiatePaymentResponse initiatePayment(InitiatePaymentRequest request, String userEmail) {
         User user = resolveUser(userEmail);
 
+        // Resolve danh sách services (hỗ trợ multi-service)
+        List<Integer> effectiveServiceIds = resolveServiceIds(request.getServiceId(), request.getServiceIds());
+
         validateBookingInputs(request.getShopId(), request.getServiceId(),
                 request.getPetId(), request.getStaffId(), user.getId());
 
-        Service service = serviceRepository.findById(request.getServiceId()).get();
+        // Tổng duration để check conflict
+        int totalDuration = resolveTotalDuration(effectiveServiceIds);
 
         // ── Kiểm tra trùng lịch pet ──────────────────────────────────────────
-        checkPetConflict(request.getPetId(), request.getAppointmentDatetime(),
-                service.getDurationMinutes());
+        checkPetConflict(request.getPetId(), request.getAppointmentDatetime(), totalDuration);
 
         // ── Kiểm tra trùng lịch staff (nếu có chọn staff) ────────────────────
         if (request.getStaffId() != null) {
-            checkStaffConflict(request.getStaffId(), request.getAppointmentDatetime(),
-                    service.getDurationMinutes());
+            checkStaffConflict(request.getStaffId(), request.getAppointmentDatetime(), totalDuration);
+        } else {
+            // Không chọn staff cụ thể → kiểm tra shop còn nhân viên rảnh không
+            checkShopHasAvailableStaff(request.getShopId(), request.getAppointmentDatetime(), totalDuration);
         }
 
         long orderCode = ThreadLocalRandom.current().nextLong(10_000_000L, 99_999_999L);
         String description = "Booking" + orderCode % 100000;
-        int rawAmount = service.getPrice().intValue();
+        // Tổng giá tất cả services
+        int rawAmount = resolveTotalPrice(effectiveServiceIds).intValue();
         int amountVnd = Math.max(rawAmount, 2000);
         if (amountVnd % 1000 != 0) amountVnd = ((amountVnd / 1000) + 1) * 1000;
 
         // ── Lưu vào Redis (TTL 30 phút) ──────────────────────────────────────
         PendingBooking pending = new PendingBooking(
                 user.getId(), request.getShopId(), request.getServiceId(),
+                effectiveServiceIds,
                 request.getPetId(), request.getStaffId(),
                 request.getAppointmentDatetime(), request.getNote(),
                 amountVnd, description
@@ -359,15 +430,17 @@ public class BookingServiceImpl implements BookingService {
         }
 
         // ── Kiểm tra lại trùng lịch (double-check trước khi lưu DB) ──────────
+        List<Integer> pendingServiceIds = resolveServiceIds(pending.getServiceId(), pending.getServiceIds());
+        int pendingTotalDuration = resolveTotalDuration(pendingServiceIds);
         Service service = serviceRepository.findById(pending.getServiceId()).get();
-        checkPetConflict(pending.getPetId(), pending.getAppointmentDatetime(),
-                service.getDurationMinutes());
+
+        checkPetConflict(pending.getPetId(), pending.getAppointmentDatetime(), pendingTotalDuration);
 
         // Double-check staff conflict từ DB (slot Redis đã được giữ ở bước 1)
         if (pending.getStaffId() != null) {
-            LocalDateTime ws = pending.getAppointmentDatetime().minusMinutes(service.getDurationMinutes());
-            LocalDateTime we = pending.getAppointmentDatetime().plusMinutes(service.getDurationMinutes());
-            if (bookingRepository.existsConflictingBookingForStaff(pending.getStaffId(), ws, we)) {
+            LocalDateTime ws = pending.getAppointmentDatetime();
+            LocalDateTime we = pending.getAppointmentDatetime().plusMinutes(pendingTotalDuration);
+            if (bookingRepository.countConflictingBookingForStaff(pending.getStaffId(), ws, we) > 0) {
                 deletePending(orderCode);
                 releaseStaffSlot(pending.getStaffId(), pending.getAppointmentDatetime());
                 throw new AppException(ErrorCode.STAFF_BOOKING_CONFLICT);
@@ -383,11 +456,11 @@ public class BookingServiceImpl implements BookingService {
         if (staff == null) {
             List<Staff> activeStaff = staffRepository.findByShopIdAndIsActiveTrue(shop.getId());
             if (!activeStaff.isEmpty()) {
-                LocalDateTime ws = pending.getAppointmentDatetime().minusMinutes(service.getDurationMinutes());
-                LocalDateTime we = pending.getAppointmentDatetime().plusMinutes(service.getDurationMinutes());
+                LocalDateTime ws = pending.getAppointmentDatetime();
+                LocalDateTime we = pending.getAppointmentDatetime().plusMinutes(pendingTotalDuration);
                 
                 List<Staff> availableStaff = activeStaff.stream().filter(s -> {
-                    boolean dbBusy = bookingRepository.existsConflictingBookingForStaff(s.getId(), ws, we);
+                    boolean dbBusy = bookingRepository.countConflictingBookingForStaff(s.getId(), ws, we) > 0;
                     String slotKey = STAFF_SLOT_PREFIX + s.getId() + ":"
                                  + pending.getAppointmentDatetime().withSecond(0).withNano(0).toString();
                     boolean redisBusy = Boolean.TRUE.equals(redisTemplate.hasKey(slotKey));
@@ -460,26 +533,31 @@ public class BookingServiceImpl implements BookingService {
     public InitiatePaymentResponse initiateCashDeposit(BookingCreationRequest request, String userEmail) {
         User user = resolveUser(userEmail);
 
+        // Resolve danh sách services (hỗ trợ multi-service)
+        List<Integer> effectiveServiceIds = resolveServiceIds(request.getServiceId(), request.getServiceIds());
+
         validateBookingInputs(request.getShopId(), request.getServiceId(),
                 request.getPetId(), request.getStaffId(), user.getId());
 
-        Service service = serviceRepository.findById(request.getServiceId()).get();
+        // Tổng duration để check conflict
+        int totalDuration = resolveTotalDuration(effectiveServiceIds);
 
         // ── Kiểm tra trùng lịch pet ──────────────────────────────────────────
-        checkPetConflict(request.getPetId(), request.getAppointmentDatetime(),
-                service.getDurationMinutes());
+        checkPetConflict(request.getPetId(), request.getAppointmentDatetime(), totalDuration);
 
         // ── Kiểm tra trùng lịch staff ─────────────────────────────────────────
         if (request.getStaffId() != null) {
-            checkStaffConflict(request.getStaffId(), request.getAppointmentDatetime(),
-                    service.getDurationMinutes());
+            checkStaffConflict(request.getStaffId(), request.getAppointmentDatetime(), totalDuration);
+        } else {
+            // Không chọn staff cụ thể → kiểm tra shop còn nhân viên rảnh không
+            checkShopHasAvailableStaff(request.getShopId(), request.getAppointmentDatetime(), totalDuration);
         }
 
-        // ── Tính tiền cọc = 10% giá dịch vụ (= phí hoa hồng admin) ──────────
+        // ── Tính tiền cọc = 10% tổng giá dịch vụ ────────────────────────────
         BigDecimal depositRate = walletService.getAdminFeeRate();
-        BigDecimal rawDeposit  = service.getPrice().multiply(depositRate);
+        BigDecimal totalPrice  = resolveTotalPrice(effectiveServiceIds);
+        BigDecimal rawDeposit  = totalPrice.multiply(depositRate);
         int depositVnd = rawDeposit.setScale(0, java.math.RoundingMode.CEILING).intValue();
-        // PayOS yêu cầu tối thiểu 2000 VND và chia hết 1000
         depositVnd = Math.max(depositVnd, 2000);
         if (depositVnd % 1000 != 0) depositVnd = ((depositVnd / 1000) + 1) * 1000;
 
@@ -489,11 +567,11 @@ public class BookingServiceImpl implements BookingService {
         // ── Lưu vào Redis (TTL 30 phút) — tái dùng PendingBooking ────────────
         PendingBooking pending = new PendingBooking(
                 user.getId(), request.getShopId(), request.getServiceId(),
+                effectiveServiceIds,
                 request.getPetId(), request.getStaffId(),
                 request.getAppointmentDatetime(), request.getNote(),
                 depositVnd, description
         );
-        // Đánh dấu đây là cash booking bằng cách prefix key
         redisTemplate.opsForValue().set(
                 CASH_PENDING_PREFIX + orderCode, pending,
                 PENDING_TTL_MINUTES, java.util.concurrent.TimeUnit.MINUTES);
@@ -532,7 +610,7 @@ public class BookingServiceImpl implements BookingService {
         }
 
         log.info("Cash deposit PayOS link created — orderCode={} deposit={}VND (10% of {})",
-                orderCode, depositVnd, service.getPrice());
+                orderCode, depositVnd, totalPrice);
 
         return InitiatePaymentResponse.builder()
                 .orderCode(orderCode)
@@ -592,14 +670,15 @@ public class BookingServiceImpl implements BookingService {
         }
 
         // ── Kiểm tra lại trùng lịch ───────────────────────────────────────────
+        List<Integer> pendingServiceIds = resolveServiceIds(pending.getServiceId(), pending.getServiceIds());
+        int pendingTotalDuration = resolveTotalDuration(pendingServiceIds);
         Service service = serviceRepository.findById(pending.getServiceId()).get();
-        checkPetConflict(pending.getPetId(), pending.getAppointmentDatetime(),
-                service.getDurationMinutes());
+        checkPetConflict(pending.getPetId(), pending.getAppointmentDatetime(), pendingTotalDuration);
 
         if (pending.getStaffId() != null) {
-            LocalDateTime ws = pending.getAppointmentDatetime().minusMinutes(service.getDurationMinutes());
-            LocalDateTime we = pending.getAppointmentDatetime().plusMinutes(service.getDurationMinutes());
-            if (bookingRepository.existsConflictingBookingForStaff(pending.getStaffId(), ws, we)) {
+            LocalDateTime ws = pending.getAppointmentDatetime();
+            LocalDateTime we = pending.getAppointmentDatetime().plusMinutes(pendingTotalDuration);
+            if (bookingRepository.countConflictingBookingForStaff(pending.getStaffId(), ws, we) > 0) {
                 redisTemplate.delete(CASH_PENDING_PREFIX + orderCode);
                 releaseStaffSlot(pending.getStaffId(), pending.getAppointmentDatetime());
                 throw new AppException(ErrorCode.STAFF_BOOKING_CONFLICT);
@@ -615,10 +694,10 @@ public class BookingServiceImpl implements BookingService {
         if (staff == null) {
             List<Staff> activeStaff = staffRepository.findByShopIdAndIsActiveTrue(shop.getId());
             if (!activeStaff.isEmpty()) {
-                LocalDateTime ws = pending.getAppointmentDatetime().minusMinutes(service.getDurationMinutes());
-                LocalDateTime we = pending.getAppointmentDatetime().plusMinutes(service.getDurationMinutes());
+                LocalDateTime ws = pending.getAppointmentDatetime();
+                LocalDateTime we = pending.getAppointmentDatetime().plusMinutes(pendingTotalDuration);
                 List<Staff> availableStaff = activeStaff.stream().filter(s -> {
-                    boolean dbBusy = bookingRepository.existsConflictingBookingForStaff(s.getId(), ws, we);
+                    boolean dbBusy = bookingRepository.countConflictingBookingForStaff(s.getId(), ws, we) > 0;
                     String slotKey = STAFF_SLOT_PREFIX + s.getId() + ":"
                             + pending.getAppointmentDatetime().withSecond(0).withNano(0).toString();
                     boolean redisBusy = Boolean.TRUE.equals(redisTemplate.hasKey(slotKey));
@@ -776,11 +855,11 @@ public class BookingServiceImpl implements BookingService {
                 .map(s -> {
                     boolean available = true;
                     if (appointmentDatetime != null) {
-                        LocalDateTime ws = appointmentDatetime.minusMinutes(durationMinutes);
+                        LocalDateTime ws = appointmentDatetime;
                         LocalDateTime we = appointmentDatetime.plusMinutes(durationMinutes);
 
                         // Check DB
-                        boolean dbBusy = bookingRepository.existsConflictingBookingForStaff(s.getId(), ws, we);
+                        boolean dbBusy = bookingRepository.countConflictingBookingForStaff(s.getId(), ws, we) > 0;
 
                         // Check Redis slot
                         String slotKey = STAFF_SLOT_PREFIX + s.getId() + ":"
@@ -801,6 +880,13 @@ public class BookingServiceImpl implements BookingService {
     }
 
     @Override
+    public boolean checkPetAvailability(int petId, LocalDateTime appointmentDatetime, int durationMinutes) {
+        LocalDateTime windowStart = appointmentDatetime;
+        LocalDateTime windowEnd   = appointmentDatetime.plusMinutes(durationMinutes);
+        return bookingRepository.countConflictingBookingForPet(petId, windowStart, windowEnd) == 0;
+    }
+
+    @Override
     public List<BookingResponse> getShopBookings(String ownerEmail, LocalDateTime start, LocalDateTime end) {
         Shop shop = shopRepository.findByOwnerEmail(ownerEmail)
                 .orElseThrow(() -> new AppException(ErrorCode.SHOP_NOT_FOUND));
@@ -810,5 +896,161 @@ public class BookingServiceImpl implements BookingService {
                 : bookingRepository.findByShopId(shop.getId());
 
         return bookings.stream().map(this::toResponse).collect(Collectors.toList());
+    }
+
+    // ─── Available time slots ─────────────────────────────────────────────────
+
+    /**
+     * Trả về danh sách các time slot còn available trong ngày cho shop.
+     *
+     * Logic:
+     * 1. Lấy openTime / closeTime của shop (format "HH:mm").
+     *    Nếu shop không có openTime/closeTime → dùng mặc định 08:00 – 20:00.
+     * 2. Sinh ra tất cả các slot từ openTime đến closeTime - durationMinutes,
+     *    bước nhảy = durationMinutes.
+     * 3. Với mỗi slot, kiểm tra xem có ít nhất 1 staff active còn rảnh không
+     *    (check cả DB và Redis).
+     * 4. Chỉ trả về các slot có ít nhất 1 staff rảnh.
+     */
+    @Override
+    public List<LocalDateTime> getAvailableTimeSlots(int shopId, java.time.LocalDate date, int durationMinutes) {
+        Shop shop = shopRepository.findById(shopId)
+                .orElseThrow(() -> new AppException(ErrorCode.SHOP_NOT_FOUND));
+
+        // ── Parse openTime / closeTime ────────────────────────────────────────
+        java.time.LocalTime open  = parseShopTime(shop.getOpenTime(),  java.time.LocalTime.of(8, 0));
+        java.time.LocalTime close = parseShopTime(shop.getCloseTime(), java.time.LocalTime.of(20, 0));
+
+        // ── Lấy danh sách staff active ────────────────────────────────────────
+        List<Staff> activeStaff = staffRepository.findByShopIdAndIsActiveTrue(shopId);
+
+        // Nếu shop không có nhân viên nào → không có slot nào available
+        if (activeStaff.isEmpty()) {
+            return java.util.Collections.emptyList();
+        }
+
+        // ── Sinh slots và lọc ─────────────────────────────────────────────────
+        List<LocalDateTime> availableSlots = new java.util.ArrayList<>();
+        java.time.LocalTime cursor = open;
+
+        while (!cursor.plusMinutes(durationMinutes).isAfter(close)) {
+            LocalDateTime slotStart = LocalDateTime.of(date, cursor);
+            LocalDateTime slotEnd   = slotStart.plusMinutes(durationMinutes);
+
+            // Kiểm tra xem có ít nhất 1 staff rảnh trong slot này không
+            boolean hasAvailableStaff = activeStaff.stream().anyMatch(s -> {
+                // Check DB: có booking trùng giờ không?
+                boolean dbBusy = bookingRepository.countConflictingBookingForStaff(
+                        s.getId(), slotStart, slotEnd) > 0;
+                if (dbBusy) return false;
+
+                // Check Redis: slot đang bị giữ bởi pending booking không?
+                String slotKey = STAFF_SLOT_PREFIX + s.getId() + ":"
+                        + slotStart.withSecond(0).withNano(0).toString();
+                boolean redisBusy = Boolean.TRUE.equals(redisTemplate.hasKey(slotKey));
+                return !redisBusy;
+            });
+
+            if (hasAvailableStaff) {
+                availableSlots.add(slotStart);
+            }
+
+            cursor = cursor.plusMinutes(durationMinutes);
+        }
+
+        return availableSlots;
+    }
+
+    /**
+     * Parse time string "HH:mm" hoặc "H:mm" thành LocalTime.
+     * Nếu null / blank / lỗi → trả về defaultTime.
+     */
+    private java.time.LocalTime parseShopTime(String timeStr, java.time.LocalTime defaultTime) {
+        if (timeStr == null || timeStr.isBlank()) return defaultTime;
+        try {
+            return java.time.LocalTime.parse(timeStr,
+                    java.time.format.DateTimeFormatter.ofPattern("H:mm"));
+        } catch (Exception e) {
+            try {
+                return java.time.LocalTime.parse(timeStr);
+            } catch (Exception ex) {
+                log.warn("Cannot parse shop time '{}', using default {}", timeStr, defaultTime);
+                return defaultTime;
+            }
+        }
+    }
+
+    // ─── Available slots by service list ─────────────────────────────────────
+
+    /**
+     * Tính tổng duration của danh sách services, sinh slots theo bước 60 phút,
+     * check conflict với tổng duration đó.
+     *
+     * Ví dụ: service A (60 phút) + service B (90 phút) = 150 phút tổng.
+     * Slots: 08:00, 09:00, 10:00, ...
+     * Slot 09:00 available khi có staff rảnh từ 09:00 → 11:30.
+     *
+     * Nếu staff đang có booking 09:30–10:30 (60 phút), thì:
+     *   - Slot 08:00 (kết thúc 10:30): overlap → busy
+     *   - Slot 09:00 (kết thúc 11:30): overlap → busy
+     *   - Slot 10:00 (kết thúc 12:10): overlap → busy
+     *   - Slot 11:00 (kết thúc 13:30): không overlap → available
+     */
+    @Override
+    public List<LocalDateTime> getAvailableTimeSlotsForServices(int shopId,
+                                                                  java.time.LocalDate date,
+                                                                  List<Integer> serviceIds) {
+        Shop shop = shopRepository.findById(shopId)
+                .orElseThrow(() -> new AppException(ErrorCode.SHOP_NOT_FOUND));
+
+        // ── Tính tổng duration ────────────────────────────────────────────────
+        int totalDuration = serviceIds.stream()
+                .mapToInt(id -> serviceRepository.findById(id)
+                        .map(Service::getDurationMinutes)
+                        .orElse(0))
+                .sum();
+
+        if (totalDuration <= 0) totalDuration = 60; // fallback
+
+        // ── Parse openTime / closeTime ────────────────────────────────────────
+        java.time.LocalTime open  = parseShopTime(shop.getOpenTime(),  java.time.LocalTime.of(8, 0));
+        java.time.LocalTime close = parseShopTime(shop.getCloseTime(), java.time.LocalTime.of(20, 0));
+
+        // ── Lấy danh sách staff active ────────────────────────────────────────
+        List<Staff> activeStaff = staffRepository.findByShopIdAndIsActiveTrue(shopId);
+        if (activeStaff.isEmpty()) {
+            return java.util.Collections.emptyList();
+        }
+
+        // ── Sinh slots theo bước 60 phút, check conflict với totalDuration ────
+        // Bước 60 phút để UI hiển thị đẹp (08:00, 09:00, 10:00...)
+        // Nhưng window check = totalDuration để đảm bảo đủ thời gian làm hết services
+        final int SLOT_STEP = 60;
+        final int finalTotalDuration = totalDuration;
+
+        List<LocalDateTime> availableSlots = new java.util.ArrayList<>();
+        java.time.LocalTime cursor = open;
+
+        while (!cursor.plusMinutes(finalTotalDuration).isAfter(close)) {
+            LocalDateTime slotStart = LocalDateTime.of(date, cursor);
+            LocalDateTime slotEnd   = slotStart.plusMinutes(finalTotalDuration);
+
+            boolean hasAvailableStaff = activeStaff.stream().anyMatch(s -> {
+                boolean dbBusy = bookingRepository.countConflictingBookingForStaff(
+                        s.getId(), slotStart, slotEnd) > 0;
+                if (dbBusy) return false;
+                String slotKey = STAFF_SLOT_PREFIX + s.getId() + ":"
+                        + slotStart.withSecond(0).withNano(0).toString();
+                return !Boolean.TRUE.equals(redisTemplate.hasKey(slotKey));
+            });
+
+            if (hasAvailableStaff) {
+                availableSlots.add(slotStart);
+            }
+
+            cursor = cursor.plusMinutes(SLOT_STEP);
+        }
+
+        return availableSlots;
     }
 }
