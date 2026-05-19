@@ -589,14 +589,37 @@ public class BookingServiceImpl implements BookingService {
 
 
 
-        // Bypass PayOS payment link creation: redirect directly to returnUrl with PAID status parameters
-        String bypassCheckoutUrl = returnUrl + "?code=00&status=PAID&orderCode=" + orderCode;
-        log.info("Cash deposit PayOS link creation bypassed — redirecting directly to {} (orderCode={})", bypassCheckoutUrl, orderCode);
+        PayOSCreateResponse payosResponse;
+        try {
+            payosResponse = payOSService.createPaymentLink(
+                    orderCode, depositVnd, description, returnUrl, cancelUrl);
+        } catch (Exception e) {
+            redisTemplate.delete(CASH_PENDING_PREFIX + orderCode);
+            if (request.getStaffId() != null) {
+                releaseStaffSlot(request.getStaffId(), request.getAppointmentDatetime());
+            }
+            log.error("PayOS createPaymentLink failed for cash deposit: {}", e.getMessage(), e);
+            throw new AppException(ErrorCode.PAYOS_ERROR);
+        }
+
+        if (payosResponse == null || !payosResponse.isSuccess() || payosResponse.getData() == null) {
+            redisTemplate.delete(CASH_PENDING_PREFIX + orderCode);
+            if (request.getStaffId() != null) {
+                releaseStaffSlot(request.getStaffId(), request.getAppointmentDatetime());
+            }
+            log.error("PayOS error for cash deposit: code={}, desc={}",
+                    payosResponse != null ? payosResponse.getCode() : "null",
+                    payosResponse != null ? payosResponse.getDesc() : "null");
+            throw new AppException(ErrorCode.PAYOS_ERROR);
+        }
+
+        log.info("PayOS cash deposit link created — orderCode={} checkoutUrl={}",
+                orderCode, payosResponse.getData().getCheckoutUrl());
 
         return InitiatePaymentResponse.builder()
                 .orderCode(orderCode)
-                .checkoutUrl(bypassCheckoutUrl)
-                .qrCode("MOCK_QR_CODE")
+                .checkoutUrl(payosResponse.getData().getCheckoutUrl())
+                .qrCode(payosResponse.getData().getQrCode())
                 .amount(depositVnd)
                 .description(description)
                 .build();
@@ -617,12 +640,6 @@ public class BookingServiceImpl implements BookingService {
             throw new AppException(ErrorCode.BOOKING_ALREADY_PAID);
         });
 
-        // Query PayOS (Bypassed for testing)
-        String payosStatus = "PAID";
-        String gatewayTxId = "BYPASS_TX_" + orderCode;
-
-        log.info("PayOS confirmCashDeposit bypassed — orderCode={} status={}", orderCode, payosStatus);
-
         // Lấy pending từ Redis
         Object raw = redisTemplate.opsForValue().get(CASH_PENDING_PREFIX + orderCode);
         if (raw == null) {
@@ -634,6 +651,28 @@ public class BookingServiceImpl implements BookingService {
 
         if (pending.getUserId() != user.getId()) {
             throw new AppException(ErrorCode.BOOKING_NOT_BELONG_TO_USER);
+        }
+
+        // Query PayOS
+        PayOSPaymentInfoResponse info;
+        try {
+            info = payOSService.getPaymentInfo(orderCode);
+        } catch (Exception e) {
+            log.error("PayOS getPaymentInfo failed for cash deposit: {}", e.getMessage(), e);
+            throw new AppException(ErrorCode.PAYOS_ERROR);
+        }
+
+        String payosStatus = info.getPaymentStatus();
+        String gatewayTxId = info.getData() != null ? info.getData().getId() : null;
+
+        log.info("PayOS confirmCashDeposit — orderCode={} status={}", orderCode, payosStatus);
+
+        if (!"PAID".equals(payosStatus)) {
+            redisTemplate.delete(CASH_PENDING_PREFIX + orderCode);
+            if (pending.getStaffId() != null) {
+                releaseStaffSlot(pending.getStaffId(), pending.getAppointmentDatetime());
+            }
+            throw new AppException(ErrorCode.BOOKING_NOT_FOUND);
         }
 
         // ── Kiểm tra lại trùng lịch ───────────────────────────────────────────
