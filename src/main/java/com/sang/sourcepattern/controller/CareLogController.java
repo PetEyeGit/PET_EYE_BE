@@ -40,7 +40,7 @@ public class CareLogController {
     }
 
     @GetMapping("/{bookingId}")
-    @PreAuthorize("hasAnyRole('STAFF', 'CUSTOMER', 'SHOP_OWNER')")
+    @PreAuthorize("hasAnyRole('STAFF', 'USER', 'SHOP_OWNER')")
     @Operation(summary = "Get all care logs for a booking")
     public ApiResponse<List<CareLogResponse>> getLogs(@PathVariable int bookingId) {
         return ApiResponse.<List<CareLogResponse>>builder()

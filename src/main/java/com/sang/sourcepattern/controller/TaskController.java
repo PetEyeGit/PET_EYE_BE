@@ -195,6 +195,35 @@ public class TaskController {
                 .build();
     }
 
+    @GetMapping("/{bookingId}/staff-change-history")
+    @PreAuthorize("hasAnyRole('SHOP_OWNER', 'USER')")
+    @Operation(summary = "Get staff change request history for a booking")
+    public ApiResponse<List<com.sang.sourcepattern.dto.response.StaffChangeRequestResponse>> getStaffChangeHistory(@PathVariable int bookingId) {
+        List<StaffChangeRequest> requests = taskService.getStaffChangeHistory(bookingId);
+        List<com.sang.sourcepattern.dto.response.StaffChangeRequestResponse> dtos = requests.stream()
+                .map(req -> com.sang.sourcepattern.dto.response.StaffChangeRequestResponse.builder()
+                        .id(req.getId())
+                        .bookingId(req.getBooking().getId())
+                        .reason(req.getReason())
+                        .status(req.getStatus())
+                        .oldStaff(req.getOldStaff() != null ? 
+                                com.sang.sourcepattern.dto.response.StaffChangeRequestResponse.StaffDto.builder()
+                                    .id(req.getOldStaff().getId())
+                                    .fullName(req.getOldStaff().getFullName())
+                                    .build() : null)
+                        .proposedStaff(req.getProposedStaff() != null ? 
+                                com.sang.sourcepattern.dto.response.StaffChangeRequestResponse.StaffDto.builder()
+                                    .id(req.getProposedStaff().getId())
+                                    .fullName(req.getProposedStaff().getFullName())
+                                    .build() : null)
+                        .build())
+                .collect(java.util.stream.Collectors.toList());
+
+        return ApiResponse.<List<com.sang.sourcepattern.dto.response.StaffChangeRequestResponse>>builder()
+                .result(dtos)
+                .build();
+    }
+
     /**
      * PUT /tasks/staff-change/{requestId}/respond
      * Customer: Respond to a staff change request.
