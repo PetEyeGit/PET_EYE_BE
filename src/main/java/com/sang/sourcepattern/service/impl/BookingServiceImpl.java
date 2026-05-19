@@ -156,6 +156,7 @@ public class BookingServiceImpl implements BookingService {
                 .userId(booking.getUser().getId())
                 .shopId(booking.getShop().getId())
                 .shopName(booking.getShop().getShopName())
+                .shopAddress(booking.getShop().getAddress())
                 .serviceId(booking.getService().getId())
                 .serviceName(booking.getService().getServiceName())
                 .servicePrice(booking.getService().getPrice())

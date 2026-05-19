@@ -132,10 +132,9 @@ public class WalletServiceImpl implements WalletService {
 
     @Override
     public BigDecimal getAdminBalance() {
-        // Tổng phí admin = tổng tiền đã thu (10%) từ tất cả booking COMPLETED
-        // = SUM(payment.amount * adminFeeRate) WHERE payment.status = SUCCESS
-        BigDecimal totalRevenue = paymentRepository.sumTotalRevenue();
-        return totalRevenue.multiply(adminFeeRate).setScale(0, RoundingMode.DOWN);
+        // Tổng phí admin = 10% từ tất cả booking COMPLETED
+        BigDecimal completedRevenue = bookingRepository.sumTotalCompletedRevenue();
+        return completedRevenue.multiply(adminFeeRate).setScale(0, RoundingMode.DOWN);
     }
 
     @Override
@@ -206,31 +205,42 @@ public class WalletServiceImpl implements WalletService {
 
         // Cộng TRỰC TIẾP vào available + totalEarned
         ShopWallet wallet = getOrCreateWallet(booking.getShop());
-        wallet.setAvailableBalance(safe(wallet.getAvailableBalance()).add(shopShare));
+        
+        // Không cộng vào availableBalance nếu thanh toán bằng tiền mặt (CASH hoặc CASH_DEPOSIT)
+        // vì Shop đã tự nhận phần tiền này bằng tiền mặt trực tiếp từ khách hàng.
+        boolean isCashPayment = "CASH_DEPOSIT".equals(paymentMethod) || "CASH".equals(paymentMethod);
+        if (!isCashPayment) {
+            wallet.setAvailableBalance(safe(wallet.getAvailableBalance()).add(shopShare));
+        }
+        
         wallet.setTotalEarned(safe(wallet.getTotalEarned()).add(shopShare));
         wallet.setUpdatedAt(LocalDateTime.now());
         walletRepository.save(wallet);
 
-        if (transactionRepository.existsByBookingIdAndType(bookingId, "WALLET_CREDIT")) {
-            log.warn("Wallet credit transaction already exists for booking {}, skipping creation.", bookingId);
-            return;
+        if (!isCashPayment) {
+            if (transactionRepository.existsByBookingIdAndType(bookingId, "WALLET_CREDIT")) {
+                log.warn("Wallet credit transaction already exists for booking {}, skipping creation.", bookingId);
+                return;
+            }
+
+            // Ghi Transaction WALLET_CREDIT
+            transactionRepository.save(Transaction.builder()
+                    .booking(booking)
+                    .shop(booking.getShop())
+                    .type("WALLET_CREDIT")
+                    .amount(shopShare)
+                    .paymentMethod(paymentMethod)
+                    .status("SUCCESS")
+                    .description(String.format("Wallet credit for booking #%d (90%% of %s VND)",
+                            bookingId, fullPrice.toPlainString()))
+                    .completedAt(LocalDateTime.now())
+                    .build());
+
+            log.info("Wallet credited for COMPLETED booking {} — shopShare={} (90% of {})",
+                    bookingId, shopShare, fullPrice);
+        } else {
+            log.info("Cash booking completed {} — no wallet credit. Shop received cash directly.", bookingId);
         }
-
-        // Ghi Transaction WALLET_CREDIT
-        transactionRepository.save(Transaction.builder()
-                .booking(booking)
-                .shop(booking.getShop())
-                .type("WALLET_CREDIT")
-                .amount(shopShare)
-                .paymentMethod(paymentMethod)
-                .status("SUCCESS")
-                .description(String.format("Wallet credit for booking #%d (90%% of %s VND)",
-                        bookingId, fullPrice.toPlainString()))
-                .completedAt(LocalDateTime.now())
-                .build());
-
-        log.info("Wallet credited for COMPLETED booking {} — shopShare={} (90% of {})",
-                bookingId, shopShare, fullPrice);
     }
 
     @Override

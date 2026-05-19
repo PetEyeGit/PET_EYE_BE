@@ -55,7 +55,7 @@ public class AdminController {
 
     @GetMapping("/dashboard")
     public ApiResponse<Map<String, Object>> getDashboard() {
-        BigDecimal totalRevenue = paymentRepository.sumTotalRevenue();
+        BigDecimal totalRevenue = bookingRepository.sumTotalRevenue();
         long totalUsers = userRepository.count();
         long totalShops = shopRepository.count();
         long totalBookings = bookingRepository.count();

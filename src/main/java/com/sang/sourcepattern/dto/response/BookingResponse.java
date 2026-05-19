@@ -16,6 +16,7 @@ public class BookingResponse {
     int userId;
     int shopId;
     String shopName;
+    String shopAddress;
     int serviceId;
     String serviceName;
     BigDecimal servicePrice;

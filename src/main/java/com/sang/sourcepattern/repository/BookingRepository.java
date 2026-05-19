@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -15,6 +16,14 @@ public interface BookingRepository extends JpaRepository<Booking, Integer> {
     List<Booking> findByUserId(int userId);
     List<Booking> findByShopId(int shopId);
     Optional<Booking> findByPayosOrderCode(Long payosOrderCode);
+
+    /** Tổng doanh thu toàn hệ thống từ bookings (CONFIRMED / IN_PROGRESS / COMPLETED) */
+    @Query("SELECT COALESCE(SUM(b.service.price), 0) FROM Booking b WHERE b.status IN ('CONFIRMED', 'IN_PROGRESS', 'COMPLETED')")
+    BigDecimal sumTotalRevenue();
+
+    /** Tổng doanh thu của các booking đã hoàn thành */
+    @Query("SELECT COALESCE(SUM(b.service.price), 0) FROM Booking b WHERE b.status = 'COMPLETED'")
+    BigDecimal sumTotalCompletedRevenue();
 
     /** Tasks assigned to a specific staff member */
     List<Booking> findByStaffId(int staffId);
