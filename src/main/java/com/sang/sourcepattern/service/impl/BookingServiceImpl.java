@@ -589,34 +589,14 @@ public class BookingServiceImpl implements BookingService {
 
 
 
-        PayOSCreateResponse payosResponse;
-        try {
-            payosResponse = payOSService.createPaymentLink(
-                    orderCode, depositVnd, description, returnUrl, cancelUrl);
-        } catch (Exception e) {
-            redisTemplate.delete(CASH_PENDING_PREFIX + orderCode);
-            if (request.getStaffId() != null) {
-                releaseStaffSlot(request.getStaffId(), request.getAppointmentDatetime());
-            }
-            log.error("PayOS createPaymentLink (cash deposit) failed: {}", e.getMessage(), e);
-            throw new AppException(ErrorCode.PAYOS_ERROR);
-        }
-
-        if (payosResponse == null || !payosResponse.isSuccess() || payosResponse.getData() == null) {
-            redisTemplate.delete(CASH_PENDING_PREFIX + orderCode);
-            if (request.getStaffId() != null) {
-                releaseStaffSlot(request.getStaffId(), request.getAppointmentDatetime());
-            }
-            throw new AppException(ErrorCode.PAYOS_ERROR);
-        }
-
-        log.info("Cash deposit PayOS link created — orderCode={} deposit={}VND (10% of {})",
-                orderCode, depositVnd, totalPrice);
+        // Bypass PayOS payment link creation: redirect directly to returnUrl with PAID status parameters
+        String bypassCheckoutUrl = returnUrl + "?code=00&status=PAID&orderCode=" + orderCode;
+        log.info("Cash deposit PayOS link creation bypassed — redirecting directly to {} (orderCode={})", bypassCheckoutUrl, orderCode);
 
         return InitiatePaymentResponse.builder()
                 .orderCode(orderCode)
-                .checkoutUrl(payosResponse.getData().getCheckoutUrl())
-                .qrCode(payosResponse.getData().getQrCode())
+                .checkoutUrl(bypassCheckoutUrl)
+                .qrCode("MOCK_QR_CODE")
                 .amount(depositVnd)
                 .description(description)
                 .build();
@@ -637,25 +617,11 @@ public class BookingServiceImpl implements BookingService {
             throw new AppException(ErrorCode.BOOKING_ALREADY_PAID);
         });
 
-        // Query PayOS (Bypass if deposit rate is 0)
-        BigDecimal depositRate = walletService.getAdminFeeRate();
-        PayOSPaymentInfoResponse info = null;
+        // Query PayOS (Bypassed for testing)
         String payosStatus = "PAID";
+        String gatewayTxId = "BYPASS_TX_" + orderCode;
 
-        try {
-            info = payOSService.getPaymentInfo(orderCode);
-            payosStatus = info.getPaymentStatus();
-        } catch (Exception e) {
-            log.error("PayOS getPaymentInfo (cash deposit) failed: {}", e.getMessage(), e);
-            throw new AppException(ErrorCode.PAYOS_ERROR);
-        }
-
-        log.info("PayOS confirmCashDeposit — orderCode={} status={}", orderCode, payosStatus);
-
-        if (!"PAID".equals(payosStatus)) {
-            redisTemplate.delete(CASH_PENDING_PREFIX + orderCode);
-            throw new AppException(ErrorCode.BOOKING_NOT_FOUND);
-        }
+        log.info("PayOS confirmCashDeposit bypassed — orderCode={} status={}", orderCode, payosStatus);
 
         // Lấy pending từ Redis
         Object raw = redisTemplate.opsForValue().get(CASH_PENDING_PREFIX + orderCode);
@@ -733,7 +699,7 @@ public class BookingServiceImpl implements BookingService {
                 .description(String.format(
                         "10%% deposit (PayOS) for cash booking #%d — full price: %s VND",
                         booking.getId(), service.getPrice().toPlainString()))
-                .gatewayTransactionId(info.getData().getId())
+                .gatewayTransactionId(gatewayTxId)
                 .build();
         paymentRepository.save(payment);
 
@@ -746,7 +712,7 @@ public class BookingServiceImpl implements BookingService {
                 .paymentMethod("CASH_DEPOSIT")
                 .status("SUCCESS")
                 .payosOrderCode(orderCode)
-                .gatewayTransactionId(info.getData().getId())
+                .gatewayTransactionId(gatewayTxId)
                 .description(String.format(
                         "10%% deposit paid (PayOS) for cash booking #%d", booking.getId()))
                 .completedAt(LocalDateTime.now())

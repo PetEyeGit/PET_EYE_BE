@@ -191,13 +191,25 @@ public class TaskServiceImpl implements TaskService {
         if (booking.getShop().getId() != shop.getId())
             throw new AppException(ErrorCode.BOOKING_NOT_BELONG_TO_STAFF_SHOP);
 
+        if (List.of("IN_PROGRESS", "COMPLETED", "CANCELLED").contains(booking.getStatus())) {
+            throw new AppException(ErrorCode.BOOKING_STATUS_INVALID);
+        }
+
         Staff staff = staffRepository.findById(staffId)
                 .orElseThrow(() -> new AppException(ErrorCode.STAFF_NOT_FOUND));
 
         if (staff.getShop().getId() != shop.getId())
             throw new AppException(ErrorCode.STAFF_NOT_BELONG_TO_SHOP);
 
-        if (booking.getStaff() != null && booking.getStaff().getId() != staffId) {
+        // Check if there is already a pending request for this booking
+        List<StaffChangeRequest> pendingRequests = staffChangeRequestRepository.findByBookingIdAndStatus(bookingId, "PENDING");
+        if (!pendingRequests.isEmpty()) {
+            throw new AppException(ErrorCode.CANNOT_UPDATE_STATUS_WHILE_REQUEST_PENDING);
+        }
+
+        // Enforce request-flow if staff is already assigned, regardless of whether booking is approved or not
+        if (List.of("WAITING_SHOP_APPROVAL", "CONFIRMED", "IN_PROGRESS").contains(booking.getStatus()) 
+                && booking.getStaff() != null && booking.getStaff().getId() != staffId) {
             throw new AppException(ErrorCode.CANNOT_CHANGE_STAFF_DIRECTLY);
         }
 
@@ -219,6 +231,22 @@ public class TaskServiceImpl implements TaskService {
 
         if (booking.getShop().getId() != shop.getId())
             throw new AppException(ErrorCode.BOOKING_NOT_BELONG_TO_STAFF_SHOP);
+
+        if (List.of("COMPLETED", "CANCELLED").contains(booking.getStatus())) {
+            throw new AppException(ErrorCode.BOOKING_STATUS_INVALID);
+        }
+
+        // Check if there is already a pending request for this booking
+        List<StaffChangeRequest> pendingRequests = staffChangeRequestRepository.findByBookingIdAndStatus(bookingId, "PENDING");
+        if (!pendingRequests.isEmpty()) {
+            throw new AppException(ErrorCode.CANNOT_UPDATE_STATUS_WHILE_REQUEST_PENDING);
+        }
+
+        // Prevent direct unassignment if the booking has a staff assigned
+        if (List.of("WAITING_SHOP_APPROVAL", "CONFIRMED", "IN_PROGRESS").contains(booking.getStatus()) 
+                && booking.getStaff() != null) {
+            throw new AppException(ErrorCode.CANNOT_CHANGE_STAFF_DIRECTLY);
+        }
 
         booking.setStaff(null);
         bookingRepository.save(booking);
@@ -301,6 +329,10 @@ public class TaskServiceImpl implements TaskService {
         Booking booking = bookingRepository.findById(bookingId)
                 .orElseThrow(() -> new AppException(ErrorCode.BOOKING_NOT_FOUND));
                 
+        if (List.of("IN_PROGRESS", "COMPLETED", "CANCELLED").contains(booking.getStatus())) {
+            throw new AppException(ErrorCode.BOOKING_STATUS_INVALID);
+        }
+                
         if (booking.getShop().getId() != shop.getId())
             throw new AppException(ErrorCode.BOOKING_NOT_BELONG_TO_STAFF_SHOP);
             
@@ -362,6 +394,10 @@ public class TaskServiceImpl implements TaskService {
         if ("ACCEPTED".equals(status.toUpperCase())) {
             Booking booking = request.getBooking();
             booking.setStaff(request.getProposedStaff());
+            if ("WAITING_SHOP_APPROVAL".equals(booking.getStatus())) {
+                booking.setStatus("CONFIRMED");
+                log.info("Booking {} status automatically set to CONFIRMED after staff change acceptance", booking.getId());
+            }
             bookingRepository.save(booking);
             log.info("User accepted staff change for booking {}", booking.getId());
 
@@ -390,6 +426,11 @@ public class TaskServiceImpl implements TaskService {
 
         staffChangeRequestRepository.save(request);
         return toResponse(request.getBooking());
+    }
+
+    @Override
+    public List<StaffChangeRequest> getStaffChangeHistory(int bookingId) {
+        return staffChangeRequestRepository.findByBookingId(bookingId);
     }
 
     // ─── Status transition validation ─────────────────────────────────────────

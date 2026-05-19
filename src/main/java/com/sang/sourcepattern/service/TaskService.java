@@ -37,4 +37,7 @@ public interface TaskService {
 
     /** Customer: respond to a staff change request */
     TaskResponse respondToStaffChange(int requestId, String status, String userEmail);
+
+    /** Get staff change request history for a booking */
+    List<StaffChangeRequest> getStaffChangeHistory(int bookingId);
 }
