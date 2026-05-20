@@ -24,6 +24,7 @@ import com.sang.sourcepattern.dto.response.StaffResponse;
 import com.sang.sourcepattern.repository.ShopRepository;
 import com.sang.sourcepattern.repository.StaffRepository;
 import com.sang.sourcepattern.repository.StaffCertificateRepository;
+import com.sang.sourcepattern.repository.UserTokenRepository;
 import com.sang.sourcepattern.repository.UserRepository;
 import com.sang.sourcepattern.dto.response.StaffCertificateResponse;
 import com.sang.sourcepattern.service.ShopService;
@@ -47,6 +48,7 @@ public class ShopServiceImpl implements ShopService {
 
     ShopRepository shopRepository;
     UserRepository userRepository;
+    UserTokenRepository userTokenRepository;
     RoleRepository roleRepository;
     BookingRepository bookingRepository;
     PetRepository petRepository;
@@ -415,6 +417,10 @@ public class ShopServiceImpl implements ShopService {
         // Xóa tài khoản owner (chưa active)
         User owner = shop.getOwner();
         if (owner != null && !owner.isActive()) {
+            // Xóa tokens của user trước, sau đó null owner rồi mới xóa user
+            userTokenRepository.deleteByUserId(owner.getId());
+            shop.setOwner(null);
+            shopRepository.save(shop);
             userRepository.delete(owner);
         }
 

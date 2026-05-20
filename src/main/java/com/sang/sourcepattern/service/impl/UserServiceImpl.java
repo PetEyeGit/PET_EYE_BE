@@ -238,7 +238,8 @@ public class UserServiceImpl implements UserService {
     private void sendVerificationToken(User user) {
         // OTP 6 số random
         String otp = String.format("%06d", new java.util.Random().nextInt(1_000_000));
-        userTokenRepository.save(UserToken.builder()
+        // saveAndFlush đảm bảo token được ghi xuống DB trước khi gửi email
+        userTokenRepository.saveAndFlush(UserToken.builder()
                 .token(otp)
                 .type("VERIFY_EMAIL")
                 .user(user)
