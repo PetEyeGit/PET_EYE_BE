@@ -407,24 +407,23 @@ public class ShopServiceImpl implements ShopService {
         Shop shop = shopRepository.findById(shopId)
                 .orElseThrow(() -> new AppException(ErrorCode.SHOP_NOT_FOUND));
 
-        shop.setVerified(false);
-        shop.setStatus(ShopStatus.REJECTED);
-        shopRepository.save(shop);
+        User owner = shop.getOwner();
 
-        // Gửi email từ chối
+        // Gửi email từ chối trước khi xóa data
         emailService.sendShopRejectedEmail(shop.getEmail(), shop.getShopName(), reason);
 
-        // Xóa tài khoản owner (chưa active)
-        User owner = shop.getOwner();
-        if (owner != null && !owner.isActive()) {
-            // Xóa tokens của user trước, sau đó null owner rồi mới xóa user
+        // Shop mới PENDING chỉ có: user_token → shop → user
+        // Xóa theo đúng thứ tự FK
+        if (owner != null) {
             userTokenRepository.deleteByUserId(owner.getId());
-            shop.setOwner(null);
-            shopRepository.save(shop);
+        }
+        shopRepository.delete(shop);
+
+        if (owner != null && !owner.isActive()) {
             userRepository.delete(owner);
         }
 
-        log.info("Shop rejected by admin: {}", shop.getShopName());
+        log.info("Shop registration rejected and deleted: {}", shop.getShopName());
     }
 
     @Override

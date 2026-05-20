@@ -11,7 +11,7 @@ import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
 
-import jakarta.mail.MessagingException;
+import org.springframework.scheduling.annotation.Async;
 import jakarta.mail.internet.MimeMessage;
 
 @Service
@@ -74,7 +74,8 @@ public class EmailServiceImpl implements EmailService {
         sendHtmlEmail(toEmail, subject, html);
     }
 
-    private void sendHtmlEmail(String to, String subject, String htmlContent) {
+    @Async
+    public void sendHtmlEmail(String to, String subject, String htmlContent) {
         try {
             MimeMessage message = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
@@ -86,7 +87,6 @@ public class EmailServiceImpl implements EmailService {
             log.info("Email sent to: {}", to);
         } catch (Exception e) {
             log.error("Failed to send email to {}: {}", to, e.getMessage());
-            throw new RuntimeException("Failed to send email: " + e.getMessage(), e);
         }
     }
 

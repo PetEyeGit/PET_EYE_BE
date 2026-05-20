@@ -11,4 +11,5 @@ public interface ServiceRepository extends JpaRepository<Service, Integer> {
     List<Service> findByShopId(int shopId);
     List<Service> findByShopIdAndActiveTrue(int shopId);
     List<Service> findByShopIdAndCategory(int shopId, String category);
+    void deleteByShopId(int shopId);
 }
