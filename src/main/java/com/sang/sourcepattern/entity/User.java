@@ -40,8 +40,7 @@ public class User {
     @Builder.Default
     LocalDateTime createdAt = LocalDateTime.now();
 
-    @Builder.Default
-    boolean active = true;
+    boolean active;
 
     @Builder.Default
     boolean emailVerified = false;

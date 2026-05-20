@@ -10,4 +10,5 @@ import java.util.Optional;
 public interface UserTokenRepository extends JpaRepository<UserToken, Integer> {
     Optional<UserToken> findByTokenAndType(String token, String type);
     void deleteByUserIdAndType(int userId, String type);
+    void deleteByUserId(int userId);
 }
