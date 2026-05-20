@@ -11,6 +11,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 import com.sang.sourcepattern.dto.request.UserUpdateRequest;
 import com.sang.sourcepattern.dto.request.UserCreationRequest;
@@ -144,6 +145,7 @@ public class UserController {
     }
 
     @PatchMapping("/notifications/{id}/read")
+    @Transactional
     ApiResponse<Void> markNotificationRead(@PathVariable int id,
                                            @AuthenticationPrincipal Jwt jwt) {
         String identifier = jwt.getSubject();
@@ -166,6 +168,7 @@ public class UserController {
     }
 
     @PatchMapping("/notifications/mark-all-read")
+    @Transactional
     ApiResponse<Void> markAllNotificationsRead(@AuthenticationPrincipal Jwt jwt) {
         String identifier = jwt.getSubject();
         User user;
@@ -182,5 +185,46 @@ public class UserController {
         notificationRepository.saveAll(unread);
         
         return ApiResponse.<Void>builder().message("All marked as read").build();
+    }
+
+    @DeleteMapping("/notifications/read")
+    @Transactional
+    ApiResponse<Void> deleteReadNotifications(@AuthenticationPrincipal Jwt jwt) {
+        String identifier = jwt.getSubject();
+        User user;
+        if (identifier.contains("@")) {
+            user = userRepository.findByEmail(identifier)
+                    .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
+        } else {
+            user = userRepository.findById(Integer.parseInt(identifier))
+                    .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
+        }
+
+        List<Notification> read = notificationRepository.findByUserIdAndIsReadTrue(user.getId());
+        notificationRepository.deleteAll(read);
+        
+        return ApiResponse.<Void>builder().message("Deleted all read notifications").build();
+    }
+
+    @DeleteMapping("/notifications/{id}")
+    @Transactional
+    ApiResponse<Void> deleteNotification(@PathVariable int id, @AuthenticationPrincipal Jwt jwt) {
+        String identifier = jwt.getSubject();
+        User user;
+        if (identifier.contains("@")) {
+            user = userRepository.findByEmail(identifier)
+                    .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
+        } else {
+            user = userRepository.findById(Integer.parseInt(identifier))
+                    .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
+        }
+
+        notificationRepository.findById(id).ifPresent(n -> {
+            if (n.getUser().getId() == user.getId()) {
+                notificationRepository.delete(n);
+            }
+        });
+        
+        return ApiResponse.<Void>builder().message("Deleted notification").build();
     }
 }

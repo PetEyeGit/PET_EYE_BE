@@ -1,5 +1,6 @@
 package com.sang.sourcepattern.entity;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
@@ -41,6 +42,7 @@ public class Notification {
     }
 
     @Builder.Default
+    @JsonProperty("isRead")
     boolean isRead = false;
 
     @Builder.Default
