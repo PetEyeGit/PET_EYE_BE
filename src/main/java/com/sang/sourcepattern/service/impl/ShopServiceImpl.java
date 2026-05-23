@@ -58,6 +58,7 @@ public class ShopServiceImpl implements ShopService {
     PasswordEncoder passwordEncoder;
     StaffRepository staffRepository;
     StaffCertificateRepository staffCertificateRepository;
+    com.sang.sourcepattern.repository.TransactionRepository transactionRepository;
 
     com.sang.sourcepattern.service.EmailService emailService;
 
@@ -199,19 +200,34 @@ public class ShopServiceImpl implements ShopService {
         List<Booking> allBookings = bookingRepository.findByShopId(shop.getId());
         
         // 1. KPI Stats
+        List<com.sang.sourcepattern.entity.Transaction> shopTxns = transactionRepository.findByShopIdOrderByCreatedAtDesc(shop.getId());
+        
+        java.math.BigDecimal totalRefunds = shopTxns.stream()
+                .filter(t -> "REFUND".equals(t.getType()) && "SUCCESS".equals(t.getStatus()))
+                .map(com.sang.sourcepattern.entity.Transaction::getAmount)
+                .reduce(java.math.BigDecimal.ZERO, java.math.BigDecimal::add);
+
         java.math.BigDecimal totalRevenue = allBookings.stream()
                 .filter(b -> "COMPLETED".equals(b.getStatus()))
                 .map(b -> b.getService().getPrice())
-                .reduce(java.math.BigDecimal.ZERO, java.math.BigDecimal::add);
+                .reduce(java.math.BigDecimal.ZERO, java.math.BigDecimal::add)
+                .subtract(totalRefunds);
 
         java.time.LocalDateTime now = java.time.LocalDateTime.now();
         java.time.LocalDateTime startOfMonth = now.withDayOfMonth(1).withHour(0).withMinute(0).withSecond(0);
+
+        java.math.BigDecimal refundsThisMonth = shopTxns.stream()
+                .filter(t -> "REFUND".equals(t.getType()) && "SUCCESS".equals(t.getStatus()))
+                .filter(t -> t.getCreatedAt().isAfter(startOfMonth))
+                .map(com.sang.sourcepattern.entity.Transaction::getAmount)
+                .reduce(java.math.BigDecimal.ZERO, java.math.BigDecimal::add);
 
         java.math.BigDecimal revenueThisMonth = allBookings.stream()
                 .filter(b -> "COMPLETED".equals(b.getStatus()))
                 .filter(b -> b.getAppointmentDatetime().isAfter(startOfMonth))
                 .map(b -> b.getService().getPrice())
-                .reduce(java.math.BigDecimal.ZERO, java.math.BigDecimal::add);
+                .reduce(java.math.BigDecimal.ZERO, java.math.BigDecimal::add)
+                .subtract(refundsThisMonth);
 
         long totalBookings = allBookings.size();
         long pendingBookings = allBookings.stream()
@@ -233,12 +249,20 @@ public class ShopServiceImpl implements ShopService {
         List<ShopDashboardResponse.RevenueChartData> revenueChart = new java.util.ArrayList<>();
         
         for (int i = 6; i >= 0; i--) {
-            java.time.LocalDate date = now.toLocalDate().minusDays(i);
+            final java.time.LocalDate date = now.toLocalDate().minusDays(i);
             java.math.BigDecimal dayAmount = allBookings.stream()
                     .filter(b -> "COMPLETED".equals(b.getStatus()))
-                    .filter(b -> b.getAppointmentDatetime().toLocalDate().equals(date))
+                    .filter(b -> b.getAppointmentDatetime() != null && b.getAppointmentDatetime().toLocalDate().equals(date))
                     .map(b -> b.getService().getPrice())
                     .reduce(java.math.BigDecimal.ZERO, java.math.BigDecimal::add);
+            
+            java.math.BigDecimal dayRefunds = shopTxns.stream()
+                    .filter(t -> "REFUND".equals(t.getType()) && "SUCCESS".equals(t.getStatus()))
+                    .filter(t -> t.getCreatedAt().toLocalDate().equals(date))
+                    .map(com.sang.sourcepattern.entity.Transaction::getAmount)
+                    .reduce(java.math.BigDecimal.ZERO, java.math.BigDecimal::add);
+            
+            dayAmount = dayAmount.subtract(dayRefunds);
             
             revenueChart.add(new ShopDashboardResponse.RevenueChartData(date.format(dayFormatter), dayAmount));
         }

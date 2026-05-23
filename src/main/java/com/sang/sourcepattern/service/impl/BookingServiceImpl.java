@@ -26,8 +26,11 @@ import org.springframework.transaction.annotation.Transactional;
 import java.io.Serializable;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.text.NumberFormat;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Locale;
+import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
@@ -48,7 +51,7 @@ public class BookingServiceImpl implements BookingService {
     StaffRepository       staffRepository;
     PayOSService          payOSService;
     WalletServiceImpl     walletService;
-
+    NotificationRepository notificationRepository;
     /** Redis template để lưu PendingBooking thay vì in-memory */
     RedisTemplate<String, Object> redisTemplate;
 
@@ -167,6 +170,10 @@ public class BookingServiceImpl implements BookingService {
                 .appointmentDatetime(booking.getAppointmentDatetime())
                 .status(booking.getStatus())
                 .note(booking.getNote())
+                .cancellationReason(booking.getCancellationReason())
+                .bankName(booking.getBankName())
+                .bankAccount(booking.getBankAccount())
+                .accountHolder(booking.getAccountHolder())
                 .payosOrderCode(booking.getPayosOrderCode())
                 .createdAt(booking.getCreatedAt())
                 .checkoutUrl(payment != null ? payment.getCheckoutUrl() : null)
@@ -811,11 +818,52 @@ public class BookingServiceImpl implements BookingService {
         if (!isUser && !isOwner)
             throw new AppException(ErrorCode.UNAUTHENTICATED);
 
-        if ("COMPLETED".equals(booking.getStatus()))
+        // Không cho phép hủy booking ở trạng thái COMPLETED hoặc IN_PROGRESS
+        if ("COMPLETED".equals(booking.getStatus()) || "IN_PROGRESS".equals(booking.getStatus()))
             throw new AppException(ErrorCode.BOOKING_ALREADY_PAID);
 
-        booking.setStatus("CANCELLED");
+        boolean wasCancelRequested = "CANCEL_REQUESTED".equals(booking.getStatus());
+        
+        if (wasCancelRequested) {
+            booking.setStatus("WAITING_REFUND");
+        } else {
+            booking.setStatus("CANCELLED");
+        }
         bookingRepository.save(booking);
+
+        if (wasCancelRequested) {
+            List<User> admins = userRepository.findByRoleName("ADMIN");
+            String broadcastId = UUID.randomUUID().toString();
+            String bankInfo = (booking.getBankName() != null && !booking.getBankName().isBlank())
+                    ? String.format("%s | %s | %s", booking.getBankName(), booking.getAccountHolder(), booking.getBankAccount())
+                    : "Chưa có thông tin ngân hàng";
+            BigDecimal refundAmount = booking.getService() != null ? booking.getService().getPrice() : BigDecimal.ZERO;
+            String amountText = NumberFormat.getCurrencyInstance(new Locale("vi", "VN")).format(refundAmount);
+            String content = String.format("Đơn hủy lịch #%d đã được chấp nhận. Vui lòng hoàn tiền cho khách hàng %s về: %s. Số tiền: %s.",
+                    bookingId,
+                    booking.getUser().getFullName(),
+                    bankInfo,
+                    amountText);
+            List<Notification> notifications = admins.stream()
+                    .map(admin -> Notification.builder()
+                            .user(admin)
+                            .title("Yêu cầu hoàn tiền khách hàng")
+                            .content(content)
+                            .broadcastId(broadcastId)
+                            .notificationType(Notification.NotificationType.SYSTEM)
+                            .build())
+                    .collect(Collectors.toList());
+            notificationRepository.saveAll(notifications);
+            
+            // Thông báo cho user
+            Notification notifToUser = Notification.builder()
+                    .user(booking.getUser())
+                    .title("Đơn hủy đang đợi hoàn tiền")
+                    .content("Shop đã duyệt đơn hủy lịch #" + bookingId + " của bạn. Hệ thống có thể sẽ xử lý hoàn tiền trong vòng vài ngày.")
+                    .notificationType(Notification.NotificationType.SYSTEM)
+                    .build();
+            notificationRepository.save(notifToUser);
+        }
 
         // Cập nhật Payment
         paymentRepository.findByBookingId(bookingId).ifPresent(p -> {
@@ -832,6 +880,38 @@ public class BookingServiceImpl implements BookingService {
                 });
 
         log.info("Booking {} CANCELLED by {}", bookingId, userEmail);
+        return toResponse(booking);
+    }
+
+    @Override
+    @Transactional
+    public BookingResponse requestBookingCancellation(int bookingId, String reason, String bankName, String bankAccount, String accountHolder, String userEmail) {
+        if (reason == null || reason.isBlank() || bankName == null || bankName.isBlank() || bankAccount == null || bankAccount.isBlank() || accountHolder == null || accountHolder.isBlank()) {
+            throw new AppException(ErrorCode.INVALID_REQUEST);
+        }
+
+        User user = resolveUser(userEmail);
+        Booking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new AppException(ErrorCode.BOOKING_NOT_FOUND));
+
+        if (booking.getUser().getId() != user.getId())
+            throw new AppException(ErrorCode.BOOKING_NOT_BELONG_TO_USER);
+
+        if ("COMPLETED".equals(booking.getStatus()) || "IN_PROGRESS".equals(booking.getStatus()))
+            throw new AppException(ErrorCode.BOOKING_ALREADY_PAID);
+        if ("CANCELLED".equals(booking.getStatus()))
+            throw new AppException(ErrorCode.BOOKING_CANCELLED);
+        if ("CANCEL_REQUESTED".equals(booking.getStatus()))
+            throw new AppException(ErrorCode.REQUEST_ALREADY_PROCESSED);
+
+        booking.setStatus("CANCEL_REQUESTED");
+        booking.setCancellationReason(reason);
+        booking.setBankName(bankName);
+        booking.setBankAccount(bankAccount);
+        booking.setAccountHolder(accountHolder);
+        bookingRepository.save(booking);
+
+        log.info("Booking {} CANCEL REQUESTED by {}", bookingId, userEmail);
         return toResponse(booking);
     }
 

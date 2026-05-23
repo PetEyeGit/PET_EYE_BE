@@ -44,7 +44,7 @@ public class TaskServiceImpl implements TaskService {
     NotificationRepository notificationRepository;
 
     // Valid status transition chain for Staff
-    private static final Set<String> VALID_STATUSES = Set.of("CONFIRMED", "IN_PROGRESS", "COMPLETED", "CANCELLED");
+    private static final Set<String> VALID_STATUSES = Set.of("CONFIRMED", "IN_PROGRESS", "COMPLETED", "CANCELLED", "CANCEL_REQUESTED");
 
     // ─── helpers ──────────────────────────────────────────────────────────────
 
@@ -103,6 +103,10 @@ public class TaskServiceImpl implements TaskService {
                 .appointmentDatetime(b.getAppointmentDatetime())
                 .status(b.getStatus())
                 .note(b.getNote())
+                .cancellationReason(b.getCancellationReason())
+                .bankName(b.getBankName())
+                .bankAccount(b.getBankAccount())
+                .accountHolder(b.getAccountHolder())
                 .createdAt(b.getCreatedAt())
                 .build();
     }
@@ -441,6 +445,7 @@ public class TaskServiceImpl implements TaskService {
             case "WAITING_SHOP_APPROVAL" -> Set.of("CONFIRMED", "CANCELLED").contains(next);
             case "CONFIRMED"       -> Set.of("IN_PROGRESS", "CANCELLED").contains(next);
             case "IN_PROGRESS"     -> Set.of("COMPLETED", "CANCELLED").contains(next);
+            case "CANCEL_REQUESTED" -> Set.of("CANCELLED").contains(next);
             case "COMPLETED", "CANCELLED" -> false; // Terminal states
             default                -> false;
         };

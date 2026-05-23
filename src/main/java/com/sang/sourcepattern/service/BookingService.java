@@ -50,6 +50,9 @@ public interface BookingService {
     /** Cancel a booking */
     BookingResponse cancelBooking(int bookingId, String userEmail);
 
+    /** Request cancellation and send to shop approval */
+    BookingResponse requestBookingCancellation(int bookingId, String reason, String bankName, String bankAccount, String accountHolder, String userEmail);
+
     /** Get active staff list for a shop */
     List<StaffResponse> getShopStaff(int shopId);
 

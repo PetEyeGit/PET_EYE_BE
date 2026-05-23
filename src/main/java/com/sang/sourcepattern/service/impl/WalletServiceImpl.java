@@ -478,6 +478,91 @@ public class WalletServiceImpl implements WalletService {
 
     @Override
     @Transactional
+    public WithdrawalRequestResponse confirmManualWithdrawal(int requestId) {
+        WithdrawalRequest wr = withdrawalRepository.findById(requestId)
+                .orElseThrow(() -> new AppException(ErrorCode.WITHDRAWAL_NOT_FOUND));
+
+        if (!"PENDING".equals(wr.getStatus()) && !"PAYING".equals(wr.getStatus())) {
+            throw new AppException(ErrorCode.WITHDRAWAL_ALREADY_PROCESSED);
+        }
+
+        wr.setStatus("APPROVED");
+        wr.setProcessedAt(LocalDateTime.now());
+        withdrawalRepository.save(wr);
+
+        ShopWallet wallet = getOrCreateWallet(wr.getShop());
+        wallet.setTotalWithdrawn(safe(wallet.getTotalWithdrawn()).add(wr.getAmount()));
+        wallet.setUpdatedAt(LocalDateTime.now());
+        walletRepository.save(wallet);
+
+        transactionRepository.save(Transaction.builder()
+                .shop(wr.getShop())
+                .withdrawal(wr)
+                .type("WITHDRAWAL")
+                .amount(wr.getAmount())
+                .paymentMethod("MANUAL")
+                .status("SUCCESS")
+                .description("Manual payout to " + wr.getAccountHolder()
+                        + " (" + wr.getBankName() + " " + wr.getBankAccount() + ")")
+                .completedAt(LocalDateTime.now())
+                .build());
+
+        log.info("Withdrawal {} APPROVED manually — shop={} amount={}",
+                wr.getId(), wr.getShop().getShopName(), wr.getAmount());
+        return toWithdrawalResponse(wr);
+    }
+
+    @Override
+    @Transactional
+    public void confirmRefundForBooking(int bookingId) {
+        Booking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new AppException(ErrorCode.BOOKING_NOT_FOUND));
+
+        if (!"WAITING_REFUND".equals(booking.getStatus()) && !"CANCELLED".equals(booking.getStatus())) {
+            throw new AppException(ErrorCode.BOOKING_CANCELLED);
+        }
+
+        BigDecimal refundAmount = booking.getService() != null ? booking.getService().getPrice() : BigDecimal.ZERO;
+        if (refundAmount.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new AppException(ErrorCode.INVALID_REQUEST);
+        }
+
+        ShopWallet wallet = getOrCreateWallet(booking.getShop());
+
+        if (safe(wallet.getAvailableBalance()).compareTo(refundAmount) < 0) {
+            throw new AppException(ErrorCode.INSUFFICIENT_BALANCE);
+        }
+
+        // Trừ tiền khỏi availableBalance và giảm totalEarned
+        wallet.setAvailableBalance(safe(wallet.getAvailableBalance()).subtract(refundAmount));
+        wallet.setTotalEarned(safe(wallet.getTotalEarned()).subtract(refundAmount));
+        wallet.setUpdatedAt(LocalDateTime.now());
+        walletRepository.save(wallet);
+
+        // Ghi Transaction REFUND
+        transactionRepository.save(Transaction.builder()
+                .shop(booking.getShop())
+                .type("REFUND")
+                .amount(refundAmount)
+                .status("SUCCESS")
+                .description("Refund for booking #" + bookingId + " to " + (booking.getUser() != null ? booking.getUser().getFullName() : "customer"))
+                .completedAt(LocalDateTime.now())
+                .build());
+
+        // Update booking status to CANCELLED once refund is processed
+        if ("WAITING_REFUND".equals(booking.getStatus())) {
+            booking.setStatus("CANCELLED");
+            bookingRepository.save(booking);
+            
+            // Optionally, we could send a notification to the user that their refund is complete
+            // But the requirement only specified the notification at the time of shop approval.
+        }
+
+        log.info("Refund for booking {} processed — shop={} amount={}", bookingId, booking.getShop().getShopName(), refundAmount);
+    }
+
+    @Override
+    @Transactional
     public WithdrawalRequestResponse rejectWithdrawal(int requestId, String adminNote) {
         WithdrawalRequest wr = withdrawalRepository.findById(requestId)
                 .orElseThrow(() -> new AppException(ErrorCode.WITHDRAWAL_NOT_FOUND));

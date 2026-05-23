@@ -68,6 +68,17 @@ public interface WalletService {
      */
     WithdrawalRequestResponse confirmPayout(long orderCode);
 
+    /**
+     * Admin xác nhận thủ công đã chuyển khoản cho shop (không qua PayOS).
+     * Status chuyển sang APPROVED, trừ totalWithdrawn.
+     */
+    WithdrawalRequestResponse confirmManualWithdrawal(int requestId);
+
+    /** Admin xác nhận hoàn tiền cho đơn đã huỷ (Admin quét QR và chuyển tiền cho khách).
+     *  Trừ `availableBalance` và `totalEarned` của shop, ghi Transaction type=REFUND.
+     */
+    void confirmRefundForBooking(int bookingId);
+
     /** Admin từ chối yêu cầu rút tiền */
     WithdrawalRequestResponse rejectWithdrawal(int requestId, String adminNote);
 

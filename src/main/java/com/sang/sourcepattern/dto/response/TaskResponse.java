@@ -43,5 +43,9 @@ public class TaskResponse {
     String status;
 
     String note;
+    String cancellationReason;
+    String bankName;
+    String bankAccount;
+    String accountHolder;
     LocalDateTime createdAt;
 }

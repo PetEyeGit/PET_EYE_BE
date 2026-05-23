@@ -117,6 +117,28 @@ public class WalletController {
                 .build();
     }
 
+    @PostMapping("/admin/withdrawals/{id}/confirm-manual")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Admin xác nhận thủ công đã chuyển khoản cho shop (không qua PayOS)")
+    public ApiResponse<WithdrawalRequestResponse> confirmWithdrawal(
+            @PathVariable int id) {
+        return ApiResponse.<WithdrawalRequestResponse>builder()
+                .result(walletService.confirmManualWithdrawal(id))
+                .message("Đã xác nhận chuyển khoản thủ công thành công.")
+                .build();
+    }
+
+        @PostMapping("/admin/refunds/{bookingId}/confirm")
+        @PreAuthorize("hasRole('ADMIN')")
+        @Operation(summary = "Admin xác nhận hoàn tiền cho đơn đã huỷ (quét QR)")
+        public ApiResponse<String> confirmRefundForBooking(@PathVariable("bookingId") int bookingId) {
+                walletService.confirmRefundForBooking(bookingId);
+                return ApiResponse.<String>builder()
+                                .result("OK")
+                                .message("Đã hoàn tiền cho khách hàng và cập nhật ví shop.")
+                                .build();
+        }
+
     @PostMapping("/admin/withdrawals/{id}/regenerate-payout")
     @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "Tạo lại PayOS link mới khi link cũ đã bị huỷ/hết hạn (status PAYING)")

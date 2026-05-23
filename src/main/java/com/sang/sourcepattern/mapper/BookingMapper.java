@@ -26,6 +26,7 @@ public class BookingMapper {
                 .appointmentDatetime(booking.getAppointmentDatetime())
                 .status(booking.getStatus())
                 .note(booking.getNote())
+                .cancellationReason(booking.getCancellationReason())
                 .payosOrderCode(booking.getPayosOrderCode())
                 .createdAt(booking.getCreatedAt())
                 .build();

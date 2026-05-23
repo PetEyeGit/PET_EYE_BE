@@ -30,6 +30,10 @@ public class BookingResponse {
     LocalDateTime appointmentDatetime;
     String status;
     String note;
+    String cancellationReason;
+    String bankName;
+    String bankAccount;
+    String accountHolder;
     Long payosOrderCode;
     LocalDateTime createdAt;
 

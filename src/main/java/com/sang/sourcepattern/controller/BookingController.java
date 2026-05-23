@@ -1,6 +1,7 @@
 package com.sang.sourcepattern.controller;
 
 import com.sang.sourcepattern.dto.request.BookingCreationRequest;
+import com.sang.sourcepattern.dto.request.CancelBookingRequest;
 import com.sang.sourcepattern.dto.request.InitiatePaymentRequest;
 import com.sang.sourcepattern.dto.response.ApiResponse;
 import com.sang.sourcepattern.dto.response.BookingResponse;
@@ -123,6 +124,27 @@ public class BookingController {
         return ApiResponse.<BookingResponse>builder()
                 .result(bookingService.cancelBooking(id, jwt.getClaim("email")))
                 .message("Booking cancelled")
+                .build();
+    }
+
+    @PostMapping("/{id}/cancel-request")
+    @PreAuthorize("hasRole('USER')")
+    @Operation(summary = "Request cancellation of a booking pending shop approval")
+    public ApiResponse<BookingResponse> requestBookingCancellation(
+            @PathVariable int id,
+            @RequestBody @Valid CancelBookingRequest request,
+            @AuthenticationPrincipal Jwt jwt) {
+
+        return ApiResponse.<BookingResponse>builder()
+                .result(bookingService.requestBookingCancellation(
+                        id,
+                        request.getReason(),
+                        request.getBankName(),
+                        request.getBankAccount(),
+                        request.getAccountHolder(),
+                        jwt.getClaim("email")
+                ))
+                .message("Booking cancellation request submitted")
                 .build();
     }
 

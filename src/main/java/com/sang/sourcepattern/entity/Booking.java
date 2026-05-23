@@ -46,6 +46,11 @@ public class Booking {
 
     String note;
 
+    String cancellationReason;
+    String bankName;
+    String bankAccount;
+    String accountHolder;
+
     /** PayOS order code — unique long used to match webhook callback */
     Long payosOrderCode;
 
