@@ -21,6 +21,9 @@ public interface TransactionRepository extends JpaRepository<Transaction, Intege
 
     List<Transaction> findByWithdrawalIdOrderByCreatedAtDesc(int withdrawalId);
 
+    @Query("SELECT t FROM Transaction t WHERE t.booking.user.id = :userId ORDER BY t.createdAt DESC")
+    List<Transaction> findByBookingUserIdOrderByCreatedAtDesc(@org.springframework.data.repository.query.Param("userId") int userId);
+
     /** Tổng doanh thu shop (WALLET_CREDIT SUCCESS) */
     @Query("SELECT COALESCE(SUM(t.amount), 0) FROM Transaction t " +
            "WHERE t.shop.id = :shopId AND t.type = 'WALLET_CREDIT' AND t.status = 'SUCCESS'")

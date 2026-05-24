@@ -280,6 +280,37 @@ public class ShopServiceImpl implements ShopService {
                 .limit(5)
                 .collect(java.util.stream.Collectors.toList());
 
+        // 4. Monthly Growth
+        java.time.LocalDateTime startOfLastMonth = startOfMonth.minusMonths(1);
+
+        java.math.BigDecimal refundsLastMonth = shopTxns.stream()
+                .filter(t -> "REFUND".equals(t.getType()) && "SUCCESS".equals(t.getStatus()))
+                .filter(t -> t.getCreatedAt().isAfter(startOfLastMonth) && t.getCreatedAt().isBefore(startOfMonth))
+                .map(com.sang.sourcepattern.entity.Transaction::getAmount)
+                .reduce(java.math.BigDecimal.ZERO, java.math.BigDecimal::add);
+
+        java.math.BigDecimal revenueLastMonth = allBookings.stream()
+                .filter(b -> "COMPLETED".equals(b.getStatus()))
+                .filter(b -> b.getAppointmentDatetime() != null && b.getAppointmentDatetime().isAfter(startOfLastMonth) && b.getAppointmentDatetime().isBefore(startOfMonth))
+                .map(b -> b.getService().getPrice())
+                .reduce(java.math.BigDecimal.ZERO, java.math.BigDecimal::add)
+                .subtract(refundsLastMonth);
+
+        Double monthlyGrowthPercentage = 0.0;
+        if (revenueLastMonth.compareTo(java.math.BigDecimal.ZERO) > 0) {
+            monthlyGrowthPercentage = revenueThisMonth.subtract(revenueLastMonth)
+                    .divide(revenueLastMonth, 4, java.math.RoundingMode.HALF_UP)
+                    .multiply(new java.math.BigDecimal("100"))
+                    .doubleValue();
+        } else if (revenueThisMonth.compareTo(java.math.BigDecimal.ZERO) > 0) {
+            monthlyGrowthPercentage = 100.0;
+        }
+
+        String topServiceName = topServices.isEmpty() ? "các dịch vụ" : topServices.get(0).getName();
+        String monthlyGrowthDescription = monthlyGrowthPercentage >= 0 
+            ? "Hệ thống ghi nhận sự tăng trưởng ổn định nhờ vào " + topServiceName + "."
+            : "Doanh thu đang giảm so với tháng trước, cân nhắc tạo mã giảm giá cho " + topServiceName + ".";
+
         return ShopDashboardResponse.builder()
                 .totalRevenue(totalRevenue)
                 .revenueThisMonth(revenueThisMonth)
@@ -289,6 +320,8 @@ public class ShopServiceImpl implements ShopService {
                 .totalPets(totalPets)
                 .revenueChart(revenueChart)
                 .topServices(topServices)
+                .monthlyGrowthPercentage(monthlyGrowthPercentage)
+                .monthlyGrowthDescription(monthlyGrowthDescription)
                 .build();
     }
 
