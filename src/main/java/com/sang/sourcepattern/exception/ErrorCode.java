@@ -106,6 +106,8 @@ public enum ErrorCode {
     INVALID_REQUEST(10006,"Invalid request",HttpStatus.BAD_REQUEST),
     ;
 
+
+
     private final int code;
     private final String message;
     private final HttpStatus statusCode;

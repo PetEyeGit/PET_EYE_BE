@@ -178,6 +178,7 @@ public class BookingServiceImpl implements BookingService {
                 .createdAt(booking.getCreatedAt())
                 .checkoutUrl(payment != null ? payment.getCheckoutUrl() : null)
                 .paymentStatus(payment != null ? payment.getStatus() : null)
+                .paymentMethod(payment != null ? payment.getMethod() : null)
                 .build();
     }
 
@@ -896,6 +897,11 @@ public class BookingServiceImpl implements BookingService {
 
         if (booking.getUser().getId() != user.getId())
             throw new AppException(ErrorCode.BOOKING_NOT_BELONG_TO_USER);
+
+        Payment payment = paymentRepository.findByBookingId(bookingId).orElse(null);
+        if (payment != null && "CASH_DEPOSIT".equals(payment.getMethod())) {
+            throw new AppException(ErrorCode.INVALID_REQUEST); // Deposit bookings cannot request refund
+        }
 
         if ("COMPLETED".equals(booking.getStatus()) || "IN_PROGRESS".equals(booking.getStatus()))
             throw new AppException(ErrorCode.BOOKING_ALREADY_PAID);

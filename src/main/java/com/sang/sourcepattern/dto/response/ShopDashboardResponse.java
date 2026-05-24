@@ -24,6 +24,10 @@ public class ShopDashboardResponse {
     List<RevenueChartData> revenueChart;
     List<ServiceStat> topServices;
 
+    // Growth
+    Double monthlyGrowthPercentage;
+    String monthlyGrowthDescription;
+
     @Data
     @Builder
     @NoArgsConstructor

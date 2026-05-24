@@ -40,4 +40,5 @@ public class BookingResponse {
     // Payment info
     String checkoutUrl;
     String paymentStatus;
+    String paymentMethod;
 }
