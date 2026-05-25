@@ -527,6 +527,26 @@ public class BookingServiceImpl implements BookingService {
             releaseStaffSlot(staff.getId(), pending.getAppointmentDatetime());
         }
 
+        // --- Notification cho Shop Owner và Staff ---
+        Notification notifOwner = Notification.builder()
+                .user(shop.getOwner())
+                .title("Có đơn đặt lịch mới")
+                .content(String.format("Có đơn đặt lịch mới #%d từ khách hàng %s.", booking.getId(), user.getFullName()))
+                .notificationType(Notification.NotificationType.BOOKING)
+                .build();
+        notificationRepository.save(notifOwner);
+
+        if (staff != null && staff.getUser() != null) {
+            Notification notifStaff = Notification.builder()
+                    .user(staff.getUser())
+                    .title("Bạn vừa được giao lịch hẹn mới")
+                    .content(String.format("Bạn vừa được giao một lịch hẹn mới #%d.", booking.getId()))
+                    .notificationType(Notification.NotificationType.BOOKING)
+                    .build();
+            notificationRepository.save(notifStaff);
+        }
+        // ------------------------------------------
+
         log.info("Booking {} CONFIRMED (PayOS) — orderCode={}", booking.getId(), orderCode);
         return toResponse(booking);
     }
@@ -769,6 +789,26 @@ public class BookingServiceImpl implements BookingService {
         if (staff != null) {
             releaseStaffSlot(staff.getId(), pending.getAppointmentDatetime());
         }
+
+        // --- Notification cho Shop Owner và Staff ---
+        Notification notifOwner = Notification.builder()
+                .user(shop.getOwner())
+                .title("Có đơn đặt lịch mới (Cọc tiền mặt)")
+                .content(String.format("Có đơn đặt lịch mới #%d từ khách hàng %s.", booking.getId(), user.getFullName()))
+                .notificationType(Notification.NotificationType.BOOKING)
+                .build();
+        notificationRepository.save(notifOwner);
+
+        if (staff != null && staff.getUser() != null) {
+            Notification notifStaff = Notification.builder()
+                    .user(staff.getUser())
+                    .title("Bạn vừa được giao lịch hẹn mới")
+                    .content(String.format("Bạn vừa được giao một lịch hẹn mới #%d.", booking.getId()))
+                    .notificationType(Notification.NotificationType.BOOKING)
+                    .build();
+            notificationRepository.save(notifStaff);
+        }
+        // ------------------------------------------
 
         log.info("Cash booking {} CONFIRMED — deposit={}VND (10%), remaining {}VND (90%) to be collected in cash",
                 booking.getId(), depositAmount, service.getPrice().subtract(depositAmount));
