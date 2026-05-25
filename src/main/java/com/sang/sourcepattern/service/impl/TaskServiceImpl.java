@@ -178,6 +178,17 @@ public class TaskServiceImpl implements TaskService {
         booking.setStaff(staff);
         booking.setStatus("WAITING_SHOP_APPROVAL");
         bookingRepository.save(booking);
+
+        // --- Notification cho Shop Owner ---
+        Notification notifOwner = Notification.builder()
+                .user(booking.getShop().getOwner())
+                .title("Nhân viên đã nhận lịch")
+                .content(String.format("Nhân viên %s vừa nhận thực hiện đơn #%d.", staff.getFullName(), bookingId))
+                .notificationType(Notification.NotificationType.BOOKING)
+                .build();
+        notificationRepository.save(notifOwner);
+        // ------------------------------------
+
         log.info("Staff {} claimed booking {} (waiting for shop approval)", staff.getFullName(), bookingId);
         return toResponse(booking);
     }
@@ -219,6 +230,19 @@ public class TaskServiceImpl implements TaskService {
 
         booking.setStaff(staff);
         bookingRepository.save(booking);
+
+        // --- Notification cho Staff mới ---
+        if (staff.getUser() != null) {
+            Notification notifStaff = Notification.builder()
+                    .user(staff.getUser())
+                    .title("Bạn được phân công lịch hẹn mới")
+                    .content(String.format("Bạn vừa được chủ shop phân công thực hiện lịch hẹn #%d.", bookingId))
+                    .notificationType(Notification.NotificationType.BOOKING)
+                    .build();
+            notificationRepository.save(notifStaff);
+        }
+        // -----------------------------------
+
         log.info("Owner assigned staff {} to booking {}", staff.getFullName(), bookingId);
         return toResponse(booking);
     }
@@ -252,8 +276,22 @@ public class TaskServiceImpl implements TaskService {
             throw new AppException(ErrorCode.CANNOT_CHANGE_STAFF_DIRECTLY);
         }
 
+        Staff oldStaff = booking.getStaff();
         booking.setStaff(null);
         bookingRepository.save(booking);
+
+        // --- Notification cho Staff cũ ---
+        if (oldStaff != null && oldStaff.getUser() != null) {
+            Notification notifStaff = Notification.builder()
+                    .user(oldStaff.getUser())
+                    .title("Đã gỡ lịch hẹn")
+                    .content(String.format("Bạn không còn phụ trách lịch hẹn #%d nữa.", bookingId))
+                    .notificationType(Notification.NotificationType.BOOKING)
+                    .build();
+            notificationRepository.save(notifStaff);
+        }
+        // -----------------------------------
+
         log.info("Owner unassigned staff from booking {}", bookingId);
         return toResponse(booking);
     }
@@ -299,6 +337,40 @@ public class TaskServiceImpl implements TaskService {
         booking.setStatus(newStatus);
         bookingRepository.save(booking);
         log.info("Requester {} updated booking {} status: {} → {}", requesterEmail, bookingId, current, newStatus);
+
+        // --- Notifications cho User ---
+        if (!current.equals(newStatus)) {
+            String title = null;
+            String content = null;
+            switch (newStatus) {
+                case "CONFIRMED":
+                    title = "Shop đã xác nhận lịch hẹn";
+                    content = String.format("Shop đã xác nhận lịch hẹn #%d của bạn.", bookingId);
+                    break;
+                case "IN_PROGRESS":
+                    title = "Đang thực hiện dịch vụ";
+                    content = String.format("Thú cưng của bạn đang được phục vụ (đơn #%d).", bookingId);
+                    break;
+                case "COMPLETED":
+                    title = "Dịch vụ đã hoàn thành";
+                    content = String.format("Dịch vụ đã hoàn thành cho đơn #%d. Cảm ơn bạn!", bookingId);
+                    break;
+                case "CANCELLED":
+                    title = "Lịch hẹn đã bị hủy";
+                    content = String.format("Lịch hẹn #%d đã bị hủy bởi shop.", bookingId);
+                    break;
+            }
+            if (title != null && content != null) {
+                Notification notifUser = Notification.builder()
+                        .user(booking.getUser())
+                        .title(title)
+                        .content(content)
+                        .notificationType(Notification.NotificationType.BOOKING)
+                        .build();
+                notificationRepository.save(notifUser);
+            }
+        }
+        // ------------------------------
 
         // Cập nhật ví khi booking hoàn thành
         if ("COMPLETED".equals(newStatus)) {
