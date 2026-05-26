@@ -11,4 +11,5 @@ public interface PetService {
     PetResponse getPet(int id);
     PetResponse updatePet(int id, com.sang.sourcepattern.dto.request.PetUpdateRequest request);
     void deletePet(int id, String reason);
+    void addAlbumImageFromCareLog(int petId, int careLogId);
 }

@@ -9,6 +9,7 @@ import com.sang.sourcepattern.mapper.PetMapper;
 import com.sang.sourcepattern.repository.PetDocumentRepository;
 import com.sang.sourcepattern.repository.PetRepository;
 import com.sang.sourcepattern.repository.UserRepository;
+import com.sang.sourcepattern.repository.CareLogRepository;
 import com.sang.sourcepattern.service.PetService;
 import jakarta.transaction.Transactional;
 import lombok.AccessLevel;
@@ -28,6 +29,7 @@ public class PetServiceImpl implements PetService {
     PetRepository petRepository;
     UserRepository userRepository;
     PetDocumentRepository petDocumentRepository;
+    CareLogRepository careLogRepository;
     PetMapper petMapper;
 
     @Override
@@ -140,35 +142,7 @@ public class PetServiceImpl implements PetService {
             }
         }
 
-        if (request.getMedicalRecords() != null) {
-            // Force clearing of the old records and flush to delete orphans
-            if (pet.getMedicalRecords() != null) {
-                pet.getMedicalRecords().clear();
-                petRepository.saveAndFlush(pet);
-            } else {
-                pet.setMedicalRecords(new ArrayList<>());
-            }
 
-            for (PetMedicalRecordDTO dto : request.getMedicalRecords()) {
-                PetMedicalRecord record = petMapper.toPetMedicalRecord(dto);
-                record.setPet(pet);
-                pet.getMedicalRecords().add(record);
-            }
-        }
-
-        if (request.getVaccinations() != null) {
-            if (pet.getVaccinations() != null) {
-                pet.getVaccinations().clear();
-                petRepository.saveAndFlush(pet);
-            } else {
-                pet.setVaccinations(new ArrayList<>());
-            }
-            for (PetVaccinationDTO dto : request.getVaccinations()) {
-                PetVaccination v = petMapper.toPetVaccination(dto);
-                v.setPet(pet);
-                pet.getVaccinations().add(v);
-            }
-        }
 
         if (request.getReminders() != null) {
             if (pet.getReminders() != null) {
@@ -209,6 +183,37 @@ public class PetServiceImpl implements PetService {
         
         pet.setActive(false);
         pet.setUnactiveReason(reason);
+        petRepository.delete(pet);
+    }
+
+    @Override
+    @Transactional
+    public void addAlbumImageFromCareLog(int petId, int careLogId) {
+        Pet pet = petRepository.findById(petId)
+                .orElseThrow(() -> new AppException(ErrorCode.PET_NOT_EXISTED));
+
+        CareLog careLog = careLogRepository.findById(careLogId)
+                .orElseThrow(() -> new AppException(ErrorCode.CARE_LOG_NOT_FOUND));
+
+        if (careLog.getBooking() == null || careLog.getBooking().getPet() == null || !careLog.getBooking().getPet().getId().equals(petId)) {
+            throw new AppException(ErrorCode.CARE_LOG_NOT_BELONG_TO_PET);
+        }
+
+        if (careLog.getImageUrl() == null || careLog.getImageUrl().trim().isEmpty()) {
+            throw new AppException(ErrorCode.NO_IMAGE_IN_CARE_LOG);
+        }
+
+        if (pet.getAlbum() == null) {
+            pet.setAlbum(new ArrayList<>());
+        }
+
+        PetImage image = PetImage.builder()
+                .imageUrl(careLog.getImageUrl())
+                .uploadDate(java.time.LocalDateTime.now())
+                .pet(pet)
+                .build();
+                
+        pet.getAlbum().add(image);
         petRepository.save(pet);
     }
 }
