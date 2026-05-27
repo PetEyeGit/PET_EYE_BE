@@ -98,7 +98,7 @@ logging:
       hibernate:
         SQL: OFF
       springframework:
-        web: INFO
+        web: DEBUG
 
 # ===============================
 # Cloudinary CONFIG (MAP FROM .env)

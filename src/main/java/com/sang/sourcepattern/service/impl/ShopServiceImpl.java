@@ -350,7 +350,8 @@ public class ShopServiceImpl implements ShopService {
                 .phone(request.getPhone())
                 .address(request.getAddress())
                 .roles(roles)
-                .active(false) // Chưa active — chờ admin duyệt
+                .active(false)
+                .emailVerified(false)
                 .build();
 
         owner = userRepository.save(owner);
@@ -363,7 +364,21 @@ public class ShopServiceImpl implements ShopService {
 
         shop = shopRepository.save(shop);
 
-        log.info("Shop registered successfully: {} (Pending Approval)", shop.getShopName());
+        // 3. Tạo OTP và flush trước khi gửi email
+        String otp = String.format("%06d", new java.util.Random().nextInt(1_000_000));
+        userTokenRepository.saveAndFlush(
+                com.sang.sourcepattern.entity.UserToken.builder()
+                        .token(otp)
+                        .type("VERIFY_EMAIL")
+                        .user(owner)
+                        .expiresAt(java.time.LocalDateTime.now().plusMinutes(10))
+                        .build()
+        );
+
+        // 4. Gửi email OTP (async — không block response)
+        emailService.sendVerificationEmail(owner.getEmail(), owner.getFullName(), otp);
+
+        log.info("Shop registered: {} — OTP sent to {}", shop.getShopName(), owner.getEmail());
 
         ShopResponse response = shopMapper.toShopResponse(shop);
         response.setStaffs(getStaffByShop(response.getId()));

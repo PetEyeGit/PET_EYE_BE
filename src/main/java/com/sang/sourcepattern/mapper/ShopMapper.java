@@ -20,7 +20,6 @@ public interface ShopMapper {
     @Mapping(target = "openTime", ignore = true)
     @Mapping(target = "closeTime", ignore = true)
     @Mapping(target = "workingDays", ignore = true)
-    @Mapping(target = "licenseNumber", ignore = true)
     @Mapping(target = "assignmentMode", ignore = true)
     Shop toShop(ShopRegistrationRequest request);
 

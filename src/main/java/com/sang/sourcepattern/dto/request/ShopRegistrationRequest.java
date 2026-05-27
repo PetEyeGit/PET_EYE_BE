@@ -38,4 +38,6 @@ public class ShopRegistrationRequest {
     String password;
 
     String licenseImageUrl;
+
+    String licenseNumber;
 }
