@@ -98,7 +98,10 @@ logging:
       hibernate:
         SQL: OFF
       springframework:
-        web: DEBUG
+        web: INFO
+    com:
+      sang:
+        sourcepattern: INFO
 
 # ===============================
 # Cloudinary CONFIG (MAP FROM .env)
@@ -107,6 +110,18 @@ cloudinary:
   cloud-name: ${CLOUDINARY_CLOUD_NAME}
   api-key: ${CLOUDINARY_API_KEY}
   api-secret: ${CLOUDINARY_API_SECRET}
+
+# ===============================
+# Goong Map CONFIG
+# ===============================
+goong:
+  api:
+    key: ${GOONG_API_KEY}
+  geocode:
+    url: https://rsapi.goong.io/geocode
+  distance:
+    matrix:
+      url: https://rsapi.goong.io/DistanceMatrix
 # ===============================
 # PayOS CONFIG (MAP FROM .env)
 # ===============================

@@ -16,6 +16,8 @@ public class ShopResponse {
     String phone;
     String address;
     String city;
+    Double latitude;
+    Double longitude;
     String description;
     String licenseNumber;
     String licenseImageUrl;

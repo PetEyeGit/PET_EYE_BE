@@ -50,6 +50,7 @@ public class AdminController {
     ShopRepository shopRepository;
     NotificationRepository notificationRepository;
     MessageRepository messageRepository;
+    com.sang.sourcepattern.service.GoongMapService goongMapService;
 
     // ─── Dashboard ───────────────────────────────────────────────────────────
 
@@ -208,6 +209,43 @@ public class AdminController {
         notificationRepository.deleteAll(group);
         return ApiResponse.<Void>builder()
                 .message("Deleted " + group.size() + " notification(s)")
+                .build();
+    }
+
+    // ─── Geocode all shops ───────────────────────────────────────────────────
+
+    /** Admin geocode lại tất cả shop để lấy tọa độ từ Goong API */
+    @PostMapping("/shops/geocode-all")
+    public ApiResponse<Map<String, Object>> geocodeAllShops() {
+        List<com.sang.sourcepattern.entity.Shop> shops = shopRepository.findAll();
+        int success = 0;
+        int failed = 0;
+
+        for (com.sang.sourcepattern.entity.Shop shop : shops) {
+            if (shop.getAddress() != null && !shop.getAddress().isEmpty()) {
+                com.sang.sourcepattern.dto.response.goong.LatLong location = 
+                        goongMapService.geocodeAddress(shop.getAddress());
+                
+                if (location != null) {
+                    shop.setLatitude(location.getLatitude());
+                    shop.setLongitude(location.getLongitude());
+                    shopRepository.save(shop);
+                    success++;
+                } else {
+                    failed++;
+                }
+            } else {
+                failed++;
+            }
+        }
+
+        return ApiResponse.<Map<String, Object>>builder()
+                .result(Map.of(
+                        "total", shops.size(),
+                        "success", success,
+                        "failed", failed
+                ))
+                .message("Geocoded " + success + " shops successfully")
                 .build();
     }
 }
