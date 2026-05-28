@@ -22,6 +22,14 @@ public class PetMedicalRecord {
     @JoinColumn(name = "pet_id")
     Pet pet;
 
+    @ManyToOne
+    @JoinColumn(name = "booking_id")
+    Booking booking;
+
+    @ManyToOne
+    @JoinColumn(name = "staff_id")
+    Staff staff;
+
     String diagnosis;
     String treatment;
     String prescription;

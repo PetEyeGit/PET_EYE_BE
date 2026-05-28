@@ -42,6 +42,7 @@ public interface PetMapper {
     @Mapping(target = "pet", ignore = true)
     PetMedicalRecord toPetMedicalRecord(PetMedicalRecordDTO request);
 
+    @Mapping(target = "staffName", source = "staff.fullName")
     PetMedicalRecordDTO toPetMedicalRecordDTO(PetMedicalRecord record);
 
     @Mapping(target = "id", ignore = true)
