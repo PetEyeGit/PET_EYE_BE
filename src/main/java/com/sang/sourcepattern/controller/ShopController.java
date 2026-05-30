@@ -105,6 +105,28 @@ public class ShopController {
                 .build();
     }
 
+    @GetMapping("/nearby")
+    @Operation(summary = "Search nearby shops by location and radius (public)")
+    public ApiResponse<List<com.sang.sourcepattern.dto.response.ShopNearbyResponse>> searchNearby(
+            @RequestParam Double lat,
+            @RequestParam Double lng,
+            @RequestParam(defaultValue = "10.0") Double radius) {
+        return ApiResponse.<List<com.sang.sourcepattern.dto.response.ShopNearbyResponse>>builder()
+                .result(shopService.searchNearbyShops(lat, lng, radius))
+                .build();
+    }
+
+    @GetMapping("/{id}/directions")
+    @Operation(summary = "Get directions from user location to shop (public)")
+    public ApiResponse<com.sang.sourcepattern.dto.response.goong.GoongDirectionsResponse> getDirections(
+            @PathVariable int id,
+            @RequestParam Double fromLat,
+            @RequestParam Double fromLng) {
+        return ApiResponse.<com.sang.sourcepattern.dto.response.goong.GoongDirectionsResponse>builder()
+                .result(shopService.getDirectionsToShop(id, fromLat, fromLng))
+                .build();
+    }
+
     // ─── Registration ────────────────────────────────────────────────────────
 
     @PostMapping("/register")

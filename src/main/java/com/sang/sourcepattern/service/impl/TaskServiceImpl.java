@@ -16,6 +16,7 @@ import com.sang.sourcepattern.repository.ShopRepository;
 import com.sang.sourcepattern.repository.StaffChangeRequestRepository;
 import com.sang.sourcepattern.repository.StaffRepository;
 import com.sang.sourcepattern.repository.UserRepository;
+import com.sang.sourcepattern.repository.PetMedicalRecordRepository;
 import com.sang.sourcepattern.service.TaskService;
 import com.sang.sourcepattern.service.WalletService;
 import lombok.AccessLevel;
@@ -43,6 +44,7 @@ public class TaskServiceImpl implements TaskService {
     StaffChangeRequestRepository staffChangeRequestRepository;
     NotificationRepository notificationRepository;
     com.sang.sourcepattern.service.CameraService cameraService;
+    PetMedicalRecordRepository petMedicalRecordRepository;
 
     // Valid status transition chain for Staff
     private static final Set<String> VALID_STATUSES = Set.of("CONFIRMED", "IN_PROGRESS", "COMPLETED", "CANCELLED", "CANCEL_REQUESTED");
@@ -335,6 +337,16 @@ public class TaskServiceImpl implements TaskService {
         String current = booking.getStatus();
         if (!isValidTransition(current, newStatus))
             throw new AppException(ErrorCode.BOOKING_STATUS_INVALID);
+            
+        // Check medical record constraint for CLINIC services when completing
+        if ("COMPLETED".equals(newStatus)) {
+            if ("CLINIC".equalsIgnoreCase(booking.getService().getCategory())) {
+                int count = petMedicalRecordRepository.countByBookingId(bookingId);
+                if (count == 0) {
+                    throw new AppException(ErrorCode.MISSING_MEDICAL_RECORD);
+                }
+            }
+        }
 
         booking.setStatus(newStatus);
         bookingRepository.save(booking);

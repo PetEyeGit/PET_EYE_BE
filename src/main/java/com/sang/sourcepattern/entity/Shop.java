@@ -30,6 +30,10 @@ public class Shop {
     String phone;
     String address;
     String city;
+    
+    /** Tọa độ địa lý — lấy từ Goong Geocoding API */
+    Double latitude;
+    Double longitude;
     String description;
     String licenseNumber;
     String licenseImageUrl;

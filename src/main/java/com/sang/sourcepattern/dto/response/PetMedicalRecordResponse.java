@@ -1,8 +1,7 @@
-package com.sang.sourcepattern.dto.request;
+package com.sang.sourcepattern.dto.response;
 
 import lombok.*;
 import lombok.experimental.FieldDefaults;
-
 import java.time.LocalDateTime;
 
 @Data
@@ -10,11 +9,16 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @AllArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE)
-public class PetMedicalRecordDTO {
+public class PetMedicalRecordResponse {
+    int id;
+    int petId;
+    Integer bookingId;
+    Integer staffId;
+    String staffName;
+    String shopName;
     String diagnosis;
     String treatment;
     String prescription;
     LocalDateTime visitDate;
     String veterinarianNote;
-    String staffName;
 }
