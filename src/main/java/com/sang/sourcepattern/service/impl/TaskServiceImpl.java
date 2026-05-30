@@ -42,6 +42,7 @@ public class TaskServiceImpl implements TaskService {
     WalletService     walletService;
     StaffChangeRequestRepository staffChangeRequestRepository;
     NotificationRepository notificationRepository;
+    com.sang.sourcepattern.service.CameraService cameraService;
 
     // Valid status transition chain for Staff
     private static final Set<String> VALID_STATUSES = Set.of("CONFIRMED", "IN_PROGRESS", "COMPLETED", "CANCELLED", "CANCEL_REQUESTED");
@@ -101,6 +102,7 @@ public class TaskServiceImpl implements TaskService {
                 .staffId(b.getStaff() != null ? b.getStaff().getId() : null)
                 .staffName(b.getStaff() != null ? b.getStaff().getFullName() : null)
                 .appointmentDatetime(b.getAppointmentDatetime())
+                .checkOut(b.getCheckOut())
                 .status(b.getStatus())
                 .note(b.getNote())
                 .cancellationReason(b.getCancellationReason())
@@ -371,6 +373,10 @@ public class TaskServiceImpl implements TaskService {
             }
         }
         // ------------------------------
+
+        if ("COMPLETED".equals(newStatus) || "CANCELLED".equals(newStatus)) {
+            cameraService.stopStream(bookingId);
+        }
 
         // Cập nhật ví khi booking hoàn thành
         if ("COMPLETED".equals(newStatus)) {

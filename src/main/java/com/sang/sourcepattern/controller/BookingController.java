@@ -63,6 +63,18 @@ public class BookingController {
                 .build();
     }
 
+    @PostMapping("/mock-confirm")
+    @PreAuthorize("hasRole('USER')")
+    @Operation(summary = "Mock: Bypass PayOS and confirm payment directly")
+    public ApiResponse<BookingResponse> mockConfirmPayment(
+            @RequestParam long orderCode,
+            @AuthenticationPrincipal Jwt jwt) {
+
+        return ApiResponse.<BookingResponse>builder()
+                .result(bookingService.mockConfirmPayment(orderCode, jwt.getClaim("email")))
+                .build();
+    }
+
     // ─── Cash flow (2-step: 10% deposit via PayOS + 90% cash at venue) ─────────
 
     @PostMapping("/cash/initiate")
@@ -91,6 +103,19 @@ public class BookingController {
                 .build();
     }
 
+    @PostMapping("/cash/mock-confirm")
+    @PreAuthorize("hasRole('USER')")
+    @Operation(summary = "Mock: Bypass PayOS and confirm cash deposit directly")
+    public ApiResponse<BookingResponse> mockConfirmCashDeposit(
+            @RequestParam long orderCode,
+            @AuthenticationPrincipal Jwt jwt) {
+
+        return ApiResponse.<BookingResponse>builder()
+                .result(bookingService.mockConfirmCashDeposit(orderCode, jwt.getClaim("email")))
+                .message("Booking confirmed (MOCK). Please pay the remaining 90% in cash at the venue.")
+                .build();
+    }
+
     // ─── Queries ──────────────────────────────────────────────────────────────
 
     @GetMapping("/my")
@@ -103,7 +128,7 @@ public class BookingController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasRole('USER')")
+    @PreAuthorize("hasAnyRole('USER', 'SHOP_OWNER', 'STAFF', 'ADMIN')")
     @Operation(summary = "Get booking detail by id")
     public ApiResponse<BookingResponse> getBookingById(
             @PathVariable int id,
@@ -244,8 +269,8 @@ public class BookingController {
     }
 
     @GetMapping("/shop")
-    @PreAuthorize("hasRole('SHOP_OWNER')")
-    @Operation(summary = "Get all bookings for the authenticated shop owner within a range")
+    @PreAuthorize("hasAnyRole('SHOP_OWNER', 'STAFF')")
+    @Operation(summary = "Get all bookings for the authenticated shop owner or staff within a range")
     public ApiResponse<List<BookingResponse>> getShopBookings(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime start,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime end,

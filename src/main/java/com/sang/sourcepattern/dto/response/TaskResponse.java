@@ -42,6 +42,9 @@ public class TaskResponse {
      */
     String status;
 
+    LocalDateTime checkOut;
+
+
     String note;
     String cancellationReason;
     String bankName;

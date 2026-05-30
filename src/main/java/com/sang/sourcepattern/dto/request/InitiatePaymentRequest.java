@@ -36,5 +36,10 @@ public class InitiatePaymentRequest {
     @NotNull @Future
     LocalDateTime appointmentDatetime;
 
+    LocalDateTime checkIn;
+    LocalDateTime checkOut;
+
     String note;
+    String cageSize;
+    String roomType;
 }

@@ -40,4 +40,7 @@ public class ServiceCreationRequest {
     /** Custom display labels per tier, e.g. {"BASIC":"Tiêu chuẩn","HD":"Nét cao"} */
     java.util.Map<String, String> cameraTierLabels;
     String cameraDescription;
+
+    java.util.List<String> cageSize;
+    java.util.List<String> roomType;
 }

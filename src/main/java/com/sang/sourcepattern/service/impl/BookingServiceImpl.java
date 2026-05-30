@@ -52,6 +52,7 @@ public class BookingServiceImpl implements BookingService {
     PayOSService          payOSService;
     WalletServiceImpl     walletService;
     NotificationRepository notificationRepository;
+    com.sang.sourcepattern.service.CameraService cameraService;
     /** Redis template để lưu PendingBooking thay vì in-memory */
     RedisTemplate<String, Object> redisTemplate;
 
@@ -90,9 +91,13 @@ public class BookingServiceImpl implements BookingService {
         int petId;
         Integer staffId;
         LocalDateTime appointmentDatetime;
+        LocalDateTime checkIn;
+        LocalDateTime checkOut;
         String note;
         int amountVnd;
         String description;
+        String cageSize;
+        String roomType;
     }
 
     // ─── Redis helpers ────────────────────────────────────────────────────────
@@ -154,6 +159,31 @@ public class BookingServiceImpl implements BookingService {
 
     private BookingResponse toResponse(Booking booking) {
         Payment payment = paymentRepository.findByBookingId(booking.getId()).orElse(null);
+
+        // Check if current user is owner or staff of the shop
+        boolean isShopUser = false;
+        try {
+            org.springframework.security.core.Authentication auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+            if (auth != null && auth.getPrincipal() instanceof org.springframework.security.oauth2.jwt.Jwt jwt) {
+                String email = jwt.getClaim("email");
+                if (booking.getShop().getOwner().getEmail().equalsIgnoreCase(email)) {
+                    isShopUser = true;
+                } else {
+                    isShopUser = staffRepository.findByUserEmail(email)
+                            .map(s -> s.getShop().getId() == booking.getShop().getId())
+                            .orElse(false);
+                }
+            }
+        } catch (Exception e) {
+            // ignore
+        }
+
+        boolean isAccepted = java.util.List.of("CONFIRMED", "IN_PROGRESS", "COMPLETED").contains(booking.getStatus());
+        boolean isLodging = booking.getService().getCategory() != null &&
+            (booking.getService().getCategory().equalsIgnoreCase("BOARDING") || booking.getService().getCategory().equalsIgnoreCase("Hotel"));
+        boolean cameraEnabled = isLodging && booking.getService().isCameraEnabled();
+        String streamUrl = (isAccepted && cameraEnabled) ? booking.getCameraStreamUrl() : null;
+
         return BookingResponse.builder()
                 .id(booking.getId())
                 .userId(booking.getUser().getId())
@@ -179,6 +209,19 @@ public class BookingServiceImpl implements BookingService {
                 .checkoutUrl(payment != null ? payment.getCheckoutUrl() : null)
                 .paymentStatus(payment != null ? payment.getStatus() : null)
                 .paymentMethod(payment != null ? payment.getMethod() : null)
+                .cameraRtspUrl(isShopUser ? booking.getCameraRtspUrl() : null)
+                .cameraStreamUrl(streamUrl)
+                .cameraEnabled(cameraEnabled)
+                .cameraConfiguredAt(booking.getCameraConfiguredAt())
+                .checkIn(booking.getCheckIn())
+                .checkOut(booking.getCheckOut())
+                .serviceEndDatetime(booking.getService() != null && "BOARDING".equalsIgnoreCase(booking.getService().getCategory()) && booking.getCheckOut() != null
+                        ? booking.getCheckOut()
+                        : (booking.getAppointmentDatetime() != null && booking.getService() != null
+                                ? booking.getAppointmentDatetime().plusMinutes(booking.getService().getDurationMinutes())
+                                : null))
+                .cageSize(booking.getCageSize())
+                .roomType(booking.getRoomType())
                 .build();
     }
 
@@ -188,12 +231,12 @@ public class BookingServiceImpl implements BookingService {
      * windowStart = appointmentTime (bắt đầu booking mới)
      * windowEnd   = appointmentTime + durationMinutes (kết thúc booking mới)
      */
-    private void checkPetConflict(int petId, LocalDateTime appointmentTime, int durationMinutes) {
+    private void checkPetConflict(int petId, int shopId, LocalDateTime appointmentTime, int durationMinutes, boolean isBoarding) {
         LocalDateTime windowStart = appointmentTime;
         LocalDateTime windowEnd   = appointmentTime.plusMinutes(durationMinutes);
 
         boolean conflict = bookingRepository.countConflictingBookingForPet(
-                petId, windowStart, windowEnd) > 0;
+                petId, windowStart, windowEnd, shopId, isBoarding) > 0;
 
         if (conflict) {
             throw new AppException(ErrorCode.PET_BOOKING_CONFLICT);
@@ -204,7 +247,8 @@ public class BookingServiceImpl implements BookingService {
      * Kiểm tra staff có bị trùng lịch không.
      * Dùng interval overlap: newStart < existingEnd AND existingStart < newEnd
      */
-    private void checkStaffConflict(int staffId, LocalDateTime appointmentTime, int durationMinutes) {
+    private void checkStaffConflict(int staffId, LocalDateTime appointmentTime, int durationMinutes, boolean isBoarding) {
+        if (isBoarding) return;
         LocalDateTime windowStart = appointmentTime;
         LocalDateTime windowEnd   = appointmentTime.plusMinutes(durationMinutes);
 
@@ -227,11 +271,12 @@ public class BookingServiceImpl implements BookingService {
      * Nếu không có ai rảnh → throw NO_STAFF_AVAILABLE.
      * Chỉ gọi khi user KHÔNG chọn staff cụ thể (staffId == null).
      */
-    private void checkShopHasAvailableStaff(int shopId, LocalDateTime appointmentTime, int durationMinutes) {
+    private void checkShopHasAvailableStaff(int shopId, LocalDateTime appointmentTime, int durationMinutes, boolean isBoarding) {
         List<Staff> activeStaff = staffRepository.findByShopIdAndIsActiveTrue(shopId);
         if (activeStaff.isEmpty()) {
             throw new AppException(ErrorCode.NO_STAFF_AVAILABLE);
         }
+        if (isBoarding) return;
 
         LocalDateTime windowStart = appointmentTime;
         LocalDateTime windowEnd   = appointmentTime.plusMinutes(durationMinutes);
@@ -323,15 +368,20 @@ public class BookingServiceImpl implements BookingService {
         // Tổng duration để check conflict
         int totalDuration = resolveTotalDuration(effectiveServiceIds);
 
+        // Kiểm tra xem có service nào là boarding không
+        boolean isBoarding = effectiveServiceIds.stream()
+                .map(id -> serviceRepository.findById(id).orElse(null))
+                .anyMatch(s -> s != null && ("BOARDING".equalsIgnoreCase(s.getCategory()) || "Hotel".equalsIgnoreCase(s.getCategory())));
+
         // ── Kiểm tra trùng lịch pet ──────────────────────────────────────────
-        checkPetConflict(request.getPetId(), request.getAppointmentDatetime(), totalDuration);
+        checkPetConflict(request.getPetId(), request.getShopId(), request.getAppointmentDatetime(), totalDuration, isBoarding);
 
         // ── Kiểm tra trùng lịch staff (nếu có chọn staff) ────────────────────
         if (request.getStaffId() != null) {
-            checkStaffConflict(request.getStaffId(), request.getAppointmentDatetime(), totalDuration);
+            checkStaffConflict(request.getStaffId(), request.getAppointmentDatetime(), totalDuration, isBoarding);
         } else {
             // Không chọn staff cụ thể → kiểm tra shop còn nhân viên rảnh không
-            checkShopHasAvailableStaff(request.getShopId(), request.getAppointmentDatetime(), totalDuration);
+            checkShopHasAvailableStaff(request.getShopId(), request.getAppointmentDatetime(), totalDuration, isBoarding);
         }
 
         long orderCode = ThreadLocalRandom.current().nextLong(10_000_000L, 99_999_999L);
@@ -346,8 +396,8 @@ public class BookingServiceImpl implements BookingService {
                 user.getId(), request.getShopId(), request.getServiceId(),
                 effectiveServiceIds,
                 request.getPetId(), request.getStaffId(),
-                request.getAppointmentDatetime(), request.getNote(),
-                amountVnd, description
+                request.getAppointmentDatetime(), request.getCheckIn(), request.getCheckOut(), request.getNote(),
+                amountVnd, description, request.getCageSize(), request.getRoomType()
         );
         savePending(orderCode, pending);
 
@@ -443,13 +493,14 @@ public class BookingServiceImpl implements BookingService {
         int pendingTotalDuration = resolveTotalDuration(pendingServiceIds);
         Service service = serviceRepository.findById(pending.getServiceId()).get();
 
-        checkPetConflict(pending.getPetId(), pending.getAppointmentDatetime(), pendingTotalDuration);
+        boolean isBoarding = "BOARDING".equalsIgnoreCase(service.getCategory()) || "Hotel".equalsIgnoreCase(service.getCategory());
+        checkPetConflict(pending.getPetId(), pending.getShopId(), pending.getAppointmentDatetime(), pendingTotalDuration, isBoarding);
 
         // Double-check staff conflict từ DB (slot Redis đã được giữ ở bước 1)
         if (pending.getStaffId() != null) {
             LocalDateTime ws = pending.getAppointmentDatetime();
             LocalDateTime we = pending.getAppointmentDatetime().plusMinutes(pendingTotalDuration);
-            if (bookingRepository.countConflictingBookingForStaff(pending.getStaffId(), ws, we) > 0) {
+            if (!isBoarding && bookingRepository.countConflictingBookingForStaff(pending.getStaffId(), ws, we) > 0) {
                 deletePending(orderCode);
                 releaseStaffSlot(pending.getStaffId(), pending.getAppointmentDatetime());
                 throw new AppException(ErrorCode.STAFF_BOOKING_CONFLICT);
@@ -469,7 +520,7 @@ public class BookingServiceImpl implements BookingService {
                 LocalDateTime we = pending.getAppointmentDatetime().plusMinutes(pendingTotalDuration);
                 
                 List<Staff> availableStaff = activeStaff.stream().filter(s -> {
-                    boolean dbBusy = bookingRepository.countConflictingBookingForStaff(s.getId(), ws, we) > 0;
+                    boolean dbBusy = !isBoarding && bookingRepository.countConflictingBookingForStaff(s.getId(), ws, we) > 0;
                     String slotKey = STAFF_SLOT_PREFIX + s.getId() + ":"
                                  + pending.getAppointmentDatetime().withSecond(0).withNano(0).toString();
                     boolean redisBusy = Boolean.TRUE.equals(redisTemplate.hasKey(slotKey));
@@ -488,7 +539,11 @@ public class BookingServiceImpl implements BookingService {
         Booking booking = Booking.builder()
                 .user(user).shop(shop).service(service).pet(pet).staff(staff)
                 .appointmentDatetime(pending.getAppointmentDatetime())
+                .checkIn(pending.getCheckIn())
+                .checkOut(pending.getCheckOut())
                 .note(pending.getNote())
+                .cageSize(pending.getCageSize())
+                .roomType(pending.getRoomType())
                 .status((staff != null && !"AUTO".equals(shop.getAssignmentMode())) ? "WAITING_SHOP_APPROVAL" : "CONFIRMED")
                 .payosOrderCode(orderCode)
                 .build();
@@ -551,6 +606,144 @@ public class BookingServiceImpl implements BookingService {
         return toResponse(booking);
     }
 
+    @Override
+    @Transactional
+    public BookingResponse mockConfirmPayment(long orderCode, String userEmail) {
+        User user = resolveUser(userEmail);
+
+        // Idempotent check
+        bookingRepository.findByPayosOrderCode(orderCode).ifPresent(existing -> {
+            throw new AppException(ErrorCode.BOOKING_ALREADY_PAID);
+        });
+
+        // Lấy pending từ Redis
+        PendingBooking pending = getPending(orderCode);
+        if (pending == null) {
+            log.warn("Pending booking not found in Redis for orderCode={}", orderCode);
+            throw new AppException(ErrorCode.BOOKING_NOT_FOUND);
+        }
+
+        if (pending.getUserId() != user.getId()) {
+            throw new AppException(ErrorCode.BOOKING_NOT_BELONG_TO_USER);
+        }
+
+        // ── Kiểm tra lại trùng lịch (double-check trước khi lưu DB) ──────────
+        List<Integer> pendingServiceIds = resolveServiceIds(pending.getServiceId(), pending.getServiceIds());
+        int pendingTotalDuration = resolveTotalDuration(pendingServiceIds);
+        Service service = serviceRepository.findById(pending.getServiceId()).get();
+
+        boolean isBoarding = "BOARDING".equalsIgnoreCase(service.getCategory()) || "Hotel".equalsIgnoreCase(service.getCategory());
+        checkPetConflict(pending.getPetId(), pending.getShopId(), pending.getAppointmentDatetime(), pendingTotalDuration, isBoarding);
+
+        // Double-check staff conflict từ DB (slot Redis đã được giữ ở bước 1)
+        if (pending.getStaffId() != null) {
+            LocalDateTime ws = pending.getAppointmentDatetime();
+            LocalDateTime we = pending.getAppointmentDatetime().plusMinutes(pendingTotalDuration);
+            if (!isBoarding && bookingRepository.countConflictingBookingForStaff(pending.getStaffId(), ws, we) > 0) {
+                deletePending(orderCode);
+                releaseStaffSlot(pending.getStaffId(), pending.getAppointmentDatetime());
+                throw new AppException(ErrorCode.STAFF_BOOKING_CONFLICT);
+            }
+        }
+
+        Shop shop   = shopRepository.findById(pending.getShopId()).get();
+        Pet pet     = petRepository.findById(pending.getPetId()).get();
+        Staff staff = pending.getStaffId() != null
+                ? staffRepository.findById(pending.getStaffId()).orElse(null)
+                : null;
+
+        if (staff == null) {
+            List<Staff> activeStaff = staffRepository.findByShopIdAndIsActiveTrue(shop.getId());
+            if (!activeStaff.isEmpty()) {
+                LocalDateTime ws = pending.getAppointmentDatetime();
+                LocalDateTime we = pending.getAppointmentDatetime().plusMinutes(pendingTotalDuration);
+                
+                List<Staff> availableStaff = activeStaff.stream().filter(s -> {
+                    boolean dbBusy = !isBoarding && bookingRepository.countConflictingBookingForStaff(s.getId(), ws, we) > 0;
+                    String slotKey = STAFF_SLOT_PREFIX + s.getId() + ":"
+                                 + pending.getAppointmentDatetime().withSecond(0).withNano(0).toString();
+                    boolean redisBusy = Boolean.TRUE.equals(redisTemplate.hasKey(slotKey));
+                    return !dbBusy && !redisBusy;
+                }).collect(Collectors.toList());
+
+                if (!availableStaff.isEmpty()) {
+                    staff = availableStaff.get(java.util.concurrent.ThreadLocalRandom.current().nextInt(availableStaff.size()));
+                } else {
+                    staff = activeStaff.get(java.util.concurrent.ThreadLocalRandom.current().nextInt(activeStaff.size()));
+                }
+            }
+        }
+
+        // ── Tạo Booking ───────────────────────────────────────────────────────
+        Booking booking = Booking.builder()
+                .user(user).shop(shop).service(service).pet(pet).staff(staff)
+                .appointmentDatetime(pending.getAppointmentDatetime())
+                .checkIn(pending.getCheckIn())
+                .checkOut(pending.getCheckOut())
+                .note(pending.getNote())
+                .cageSize(pending.getCageSize())
+                .roomType(pending.getRoomType())
+                .status((staff != null && !"AUTO".equals(shop.getAssignmentMode())) ? "WAITING_SHOP_APPROVAL" : "CONFIRMED")
+                .payosOrderCode(orderCode)
+                .build();
+        booking = bookingRepository.save(booking);
+
+        // ── Tạo Payment ───────────────────────────────────────────────────────
+        Payment payment = Payment.builder()
+                .booking(booking)
+                .amount(service.getPrice())
+                .method("MOCK")
+                .status("SUCCESS")
+                .payosOrderCode(orderCode)
+                .description(pending.getDescription())
+                .gatewayTransactionId("MOCK-" + orderCode)
+                .build();
+        paymentRepository.save(payment);
+
+        // ── Ghi Transaction ───────────────────────────────────────────────────
+        transactionRepository.save(Transaction.builder()
+                .booking(booking)
+                .shop(shop)
+                .type("BOOKING_PAYMENT")
+                .amount(service.getPrice())
+                .paymentMethod("MOCK")
+                .status("SUCCESS")
+                .payosOrderCode(orderCode)
+                .gatewayTransactionId("MOCK-" + orderCode)
+                .description("Mock payment for booking #" + booking.getId())
+                .completedAt(LocalDateTime.now())
+                .build());
+
+        deletePending(orderCode);
+
+        // Giải phóng Redis slot (booking đã vào DB, không cần lock nữa)
+        if (staff != null) {
+            releaseStaffSlot(staff.getId(), pending.getAppointmentDatetime());
+        }
+
+        // --- Notification cho Shop Owner và Staff ---
+        Notification notifOwner = Notification.builder()
+                .user(shop.getOwner())
+                .title("Có đơn đặt lịch mới")
+                .content(String.format("Có đơn đặt lịch mới #%d từ khách hàng %s.", booking.getId(), user.getFullName()))
+                .notificationType(Notification.NotificationType.BOOKING)
+                .build();
+        notificationRepository.save(notifOwner);
+
+        if (staff != null && staff.getUser() != null) {
+            Notification notifStaff = Notification.builder()
+                    .user(staff.getUser())
+                    .title("Bạn vừa được giao lịch hẹn mới")
+                    .content(String.format("Bạn vừa được giao một lịch hẹn mới #%d.", booking.getId()))
+                    .notificationType(Notification.NotificationType.BOOKING)
+                    .build();
+            notificationRepository.save(notifStaff);
+        }
+
+        log.info("Booking {} CONFIRMED (MOCK) — orderCode={}", booking.getId(), orderCode);
+        return toResponse(booking);
+    }
+
     // ─── CASH booking (2-step: 10% deposit via PayOS + 90% cash at venue) ────
 
     /**
@@ -571,15 +764,20 @@ public class BookingServiceImpl implements BookingService {
         // Tổng duration để check conflict
         int totalDuration = resolveTotalDuration(effectiveServiceIds);
 
+        // Kiểm tra xem có service nào là boarding không
+        boolean isBoarding = effectiveServiceIds.stream()
+                .map(id -> serviceRepository.findById(id).orElse(null))
+                .anyMatch(s -> s != null && ("BOARDING".equalsIgnoreCase(s.getCategory()) || "Hotel".equalsIgnoreCase(s.getCategory())));
+
         // ── Kiểm tra trùng lịch pet ──────────────────────────────────────────
-        checkPetConflict(request.getPetId(), request.getAppointmentDatetime(), totalDuration);
+        checkPetConflict(request.getPetId(), request.getShopId(), request.getAppointmentDatetime(), totalDuration, isBoarding);
 
         // ── Kiểm tra trùng lịch staff ─────────────────────────────────────────
         if (request.getStaffId() != null) {
-            checkStaffConflict(request.getStaffId(), request.getAppointmentDatetime(), totalDuration);
+            checkStaffConflict(request.getStaffId(), request.getAppointmentDatetime(), totalDuration, isBoarding);
         } else {
             // Không chọn staff cụ thể → kiểm tra shop còn nhân viên rảnh không
-            checkShopHasAvailableStaff(request.getShopId(), request.getAppointmentDatetime(), totalDuration);
+            checkShopHasAvailableStaff(request.getShopId(), request.getAppointmentDatetime(), totalDuration, isBoarding);
         }
 
         // ── Tính tiền cọc = 10% tổng giá dịch vụ ────────────────────────────
@@ -598,8 +796,8 @@ public class BookingServiceImpl implements BookingService {
                 user.getId(), request.getShopId(), request.getServiceId(),
                 effectiveServiceIds,
                 request.getPetId(), request.getStaffId(),
-                request.getAppointmentDatetime(), request.getNote(),
-                depositVnd, description
+                request.getAppointmentDatetime(), request.getCheckIn(), request.getCheckOut(), request.getNote(),
+                depositVnd, description, request.getCageSize(), request.getRoomType()
         );
         redisTemplate.opsForValue().set(
                 CASH_PENDING_PREFIX + orderCode, pending,
@@ -707,12 +905,13 @@ public class BookingServiceImpl implements BookingService {
         List<Integer> pendingServiceIds = resolveServiceIds(pending.getServiceId(), pending.getServiceIds());
         int pendingTotalDuration = resolveTotalDuration(pendingServiceIds);
         Service service = serviceRepository.findById(pending.getServiceId()).get();
-        checkPetConflict(pending.getPetId(), pending.getAppointmentDatetime(), pendingTotalDuration);
+        boolean isBoarding = "BOARDING".equalsIgnoreCase(service.getCategory()) || "Hotel".equalsIgnoreCase(service.getCategory());
+        checkPetConflict(pending.getPetId(), pending.getShopId(), pending.getAppointmentDatetime(), pendingTotalDuration, isBoarding);
 
         if (pending.getStaffId() != null) {
             LocalDateTime ws = pending.getAppointmentDatetime();
             LocalDateTime we = pending.getAppointmentDatetime().plusMinutes(pendingTotalDuration);
-            if (bookingRepository.countConflictingBookingForStaff(pending.getStaffId(), ws, we) > 0) {
+            if (!isBoarding && bookingRepository.countConflictingBookingForStaff(pending.getStaffId(), ws, we) > 0) {
                 redisTemplate.delete(CASH_PENDING_PREFIX + orderCode);
                 releaseStaffSlot(pending.getStaffId(), pending.getAppointmentDatetime());
                 throw new AppException(ErrorCode.STAFF_BOOKING_CONFLICT);
@@ -731,7 +930,7 @@ public class BookingServiceImpl implements BookingService {
                 LocalDateTime ws = pending.getAppointmentDatetime();
                 LocalDateTime we = pending.getAppointmentDatetime().plusMinutes(pendingTotalDuration);
                 List<Staff> availableStaff = activeStaff.stream().filter(s -> {
-                    boolean dbBusy = bookingRepository.countConflictingBookingForStaff(s.getId(), ws, we) > 0;
+                    boolean dbBusy = !isBoarding && bookingRepository.countConflictingBookingForStaff(s.getId(), ws, we) > 0;
                     String slotKey = STAFF_SLOT_PREFIX + s.getId() + ":"
                             + pending.getAppointmentDatetime().withSecond(0).withNano(0).toString();
                     boolean redisBusy = Boolean.TRUE.equals(redisTemplate.hasKey(slotKey));
@@ -749,7 +948,11 @@ public class BookingServiceImpl implements BookingService {
         Booking booking = Booking.builder()
                 .user(user).shop(shop).service(service).pet(pet).staff(staff)
                 .appointmentDatetime(pending.getAppointmentDatetime())
+                .checkIn(pending.getCheckIn())
+                .checkOut(pending.getCheckOut())
                 .note(pending.getNote())
+                .cageSize(pending.getCageSize())
+                .roomType(pending.getRoomType())
                 .status((staff != null && !"AUTO".equals(shop.getAssignmentMode())) ? "WAITING_SHOP_APPROVAL" : "CONFIRMED")
                 .payosOrderCode(orderCode)
                 .build();
@@ -829,8 +1032,16 @@ public class BookingServiceImpl implements BookingService {
         User user = resolveUser(userEmail);
         Booking booking = bookingRepository.findById(bookingId)
                 .orElseThrow(() -> new AppException(ErrorCode.BOOKING_NOT_FOUND));
-        if (booking.getUser().getId() != user.getId())
-            throw new AppException(ErrorCode.BOOKING_NOT_BELONG_TO_USER);
+                
+        boolean isCustomer = booking.getUser().getId() == user.getId();
+        boolean isAssignedStaff = booking.getStaff() != null && booking.getStaff().getUser() != null && booking.getStaff().getUser().getId() == user.getId();
+        boolean isShopOwner = booking.getShop().getOwner() != null && booking.getShop().getOwner().getId() == user.getId();
+        boolean isAdmin = user.getRoles().stream().anyMatch(r -> "ADMIN".equals(r.getName()));
+        
+        if (!isCustomer && !isAssignedStaff && !isShopOwner && !isAdmin) {
+            throw new AppException(ErrorCode.UNAUTHENTICATED); // or custom error code
+        }
+        
         return toResponse(booking);
     }
 
@@ -920,6 +1131,7 @@ public class BookingServiceImpl implements BookingService {
                     transactionRepository.save(t);
                 });
 
+        cameraService.stopStream(bookingId);
         log.info("Booking {} CANCELLED by {}", bookingId, userEmail);
         return toResponse(booking);
     }
@@ -1015,17 +1227,28 @@ public class BookingServiceImpl implements BookingService {
     public boolean checkPetAvailability(int petId, LocalDateTime appointmentDatetime, int durationMinutes) {
         LocalDateTime windowStart = appointmentDatetime;
         LocalDateTime windowEnd   = appointmentDatetime.plusMinutes(durationMinutes);
-        return bookingRepository.countConflictingBookingForPet(petId, windowStart, windowEnd) == 0;
+        return bookingRepository.countStrictConflictingBookingForPet(petId, windowStart, windowEnd) == 0;
     }
 
     @Override
     public List<BookingResponse> getShopBookings(String ownerEmail, LocalDateTime start, LocalDateTime end) {
-        Shop shop = shopRepository.findByOwnerEmail(ownerEmail)
-                .orElseThrow(() -> new AppException(ErrorCode.SHOP_NOT_FOUND));
+        int shopId;
+        
+        var shopOpt = shopRepository.findByOwnerEmail(ownerEmail);
+        if (shopOpt.isPresent()) {
+            shopId = shopOpt.get().getId();
+        } else {
+            var staffOpt = staffRepository.findByUserEmail(ownerEmail);
+            if (staffOpt.isPresent()) {
+                shopId = staffOpt.get().getShop().getId();
+            } else {
+                throw new AppException(ErrorCode.SHOP_NOT_FOUND);
+            }
+        }
 
         List<Booking> bookings = (start != null && end != null)
-                ? bookingRepository.findByShopIdAndAppointmentDatetimeBetween(shop.getId(), start, end)
-                : bookingRepository.findByShopId(shop.getId());
+                ? bookingRepository.findByShopIdAndAppointmentDatetimeBetween(shopId, start, end)
+                : bookingRepository.findByShopId(shopId);
 
         return bookings.stream().map(this::toResponse).collect(Collectors.toList());
     }
@@ -1184,5 +1407,140 @@ public class BookingServiceImpl implements BookingService {
         }
 
         return availableSlots;
+    }
+    @Override
+    @Transactional
+    public BookingResponse mockConfirmCashDeposit(long orderCode, String userEmail) {
+        User user = resolveUser(userEmail);
+
+        // Idempotent check
+        bookingRepository.findByPayosOrderCode(orderCode).ifPresent(existing -> {
+            throw new AppException(ErrorCode.BOOKING_ALREADY_PAID);
+        });
+
+        // Lấy pending từ Redis
+        Object raw = redisTemplate.opsForValue().get(CASH_PENDING_PREFIX + orderCode);
+        if (raw == null) {
+            log.warn("Cash pending booking not found in Redis for orderCode={}", orderCode);
+            throw new AppException(ErrorCode.BOOKING_NOT_FOUND);
+        }
+        PendingBooking pending = (raw instanceof PendingBooking pb) ? pb : null;
+        if (pending == null) throw new AppException(ErrorCode.BOOKING_NOT_FOUND);
+
+        if (pending.getUserId() != user.getId()) {
+            throw new AppException(ErrorCode.BOOKING_NOT_BELONG_TO_USER);
+        }
+
+        // ── Kiểm tra lại trùng lịch ───────────────────────────────────────────
+        List<Integer> pendingServiceIds = resolveServiceIds(pending.getServiceId(), pending.getServiceIds());
+        int pendingTotalDuration = resolveTotalDuration(pendingServiceIds);
+        Service service = serviceRepository.findById(pending.getServiceId()).get();
+        boolean isBoarding = "BOARDING".equalsIgnoreCase(service.getCategory()) || "Hotel".equalsIgnoreCase(service.getCategory());
+        checkPetConflict(pending.getPetId(), pending.getShopId(), pending.getAppointmentDatetime(), pendingTotalDuration, isBoarding);
+
+        if (pending.getStaffId() != null) {
+            LocalDateTime ws = pending.getAppointmentDatetime();
+            LocalDateTime we = pending.getAppointmentDatetime().plusMinutes(pendingTotalDuration);
+            if (!isBoarding && bookingRepository.countConflictingBookingForStaff(pending.getStaffId(), ws, we) > 0) {
+                redisTemplate.delete(CASH_PENDING_PREFIX + orderCode);
+                releaseStaffSlot(pending.getStaffId(), pending.getAppointmentDatetime());
+                throw new AppException(ErrorCode.STAFF_BOOKING_CONFLICT);
+            }
+        }
+
+        Shop  shop = shopRepository.findById(pending.getShopId()).get();
+        Pet   pet  = petRepository.findById(pending.getPetId()).get();
+        Staff staff = pending.getStaffId() != null
+                ? staffRepository.findById(pending.getStaffId()).orElse(null)
+                : null;
+
+        if (staff == null) {
+            List<Staff> activeStaff = staffRepository.findByShopIdAndIsActiveTrue(shop.getId());
+            if (!activeStaff.isEmpty()) {
+                LocalDateTime ws = pending.getAppointmentDatetime();
+                LocalDateTime we = pending.getAppointmentDatetime().plusMinutes(pendingTotalDuration);
+                List<Staff> availableStaff = activeStaff.stream().filter(s -> {
+                    boolean dbBusy = !isBoarding && bookingRepository.countConflictingBookingForStaff(s.getId(), ws, we) > 0;
+                    String slotKey = STAFF_SLOT_PREFIX + s.getId() + ":"
+                            + pending.getAppointmentDatetime().withSecond(0).withNano(0).toString();
+                    boolean redisBusy = Boolean.TRUE.equals(redisTemplate.hasKey(slotKey));
+                    return !dbBusy && !redisBusy;
+                }).collect(Collectors.toList());
+                if (!availableStaff.isEmpty()) {
+                    staff = availableStaff.get(java.util.concurrent.ThreadLocalRandom.current().nextInt(availableStaff.size()));
+                } else {
+                    staff = activeStaff.get(java.util.concurrent.ThreadLocalRandom.current().nextInt(activeStaff.size()));
+                }
+            }
+        }
+
+        // ── Tạo Booking ───────────────────────────────────────────────────────
+        Booking booking = Booking.builder()
+                .user(user).shop(shop).service(service).pet(pet).staff(staff)
+                .appointmentDatetime(pending.getAppointmentDatetime())
+                .checkIn(pending.getCheckIn())
+                .checkOut(pending.getCheckOut())
+                .note(pending.getNote())
+                .status((staff != null && !"AUTO".equals(shop.getAssignmentMode())) ? "WAITING_SHOP_APPROVAL" : "CONFIRMED")
+                .payosOrderCode(orderCode)
+                .build();
+        booking = bookingRepository.save(booking);
+
+        // ── Tạo Payment: ghi nhận tiền cọc 10% (MOCK) ───────
+        BigDecimal depositAmount = new BigDecimal(pending.getAmountVnd());
+        Payment payment = Payment.builder()
+                .booking(booking)
+                .amount(depositAmount)
+                .method("MOCK_CASH_DEPOSIT")
+                .status("SUCCESS")
+                .payosOrderCode(orderCode)
+                .description(String.format(
+                        "10%% deposit (MOCK) for cash booking #%d — full price: %s VND",
+                        booking.getId(), service.getPrice().toPlainString()))
+                .gatewayTransactionId("MOCK-" + orderCode)
+                .build();
+        paymentRepository.save(payment);
+
+        // ── Ghi Transaction: tiền cọc 10% ─────────────────────────────────────
+        transactionRepository.save(Transaction.builder()
+                .booking(booking)
+                .shop(shop)
+                .type("BOOKING_PAYMENT")
+                .amount(depositAmount)
+                .paymentMethod("MOCK_CASH_DEPOSIT")
+                .status("SUCCESS")
+                .payosOrderCode(orderCode)
+                .gatewayTransactionId("MOCK-" + orderCode)
+                .description(String.format(
+                        "10%% deposit paid (MOCK) for cash booking #%d", booking.getId()))
+                .completedAt(LocalDateTime.now())
+                .build());
+
+        redisTemplate.delete(CASH_PENDING_PREFIX + orderCode);
+        if (staff != null) {
+            releaseStaffSlot(staff.getId(), pending.getAppointmentDatetime());
+        }
+
+        // --- Notification cho Shop Owner và Staff ---
+        Notification notifOwner = Notification.builder()
+                .user(shop.getOwner())
+                .title("Có đơn đặt lịch mới (Cọc tiền mặt - MOCK)")
+                .content(String.format("Có đơn đặt lịch mới #%d từ khách hàng %s.", booking.getId(), user.getFullName()))
+                .notificationType(Notification.NotificationType.BOOKING)
+                .build();
+        notificationRepository.save(notifOwner);
+
+        if (staff != null && staff.getUser() != null) {
+            Notification notifStaff = Notification.builder()
+                    .user(staff.getUser())
+                    .title("Bạn vừa được giao lịch hẹn mới")
+                    .content(String.format("Bạn vừa được giao một lịch hẹn mới #%d.", booking.getId()))
+                    .notificationType(Notification.NotificationType.BOOKING)
+                    .build();
+            notificationRepository.save(notifStaff);
+        }
+
+        log.info("Booking {} CONFIRMED (MOCK CASH) — orderCode={}", booking.getId(), orderCode);
+        return toResponse(booking);
     }
 }

@@ -42,9 +42,12 @@ public class Service {
 
     // ── BOARDING-only: camera configuration ──────────────────────────────────
 
-    /** Whether this boarding service includes camera monitoring */
     @Builder.Default
     boolean cameraEnabled = false;
+
+    // ── BOARDING-only details ────────────────────────────────────────────────
+    String cageSize;
+    String roomType;
 
     /**
      * JSON array of supported camera tier IDs, e.g. ["BASIC","HD","AI"]

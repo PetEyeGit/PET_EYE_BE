@@ -41,4 +41,16 @@ public class BookingResponse {
     String checkoutUrl;
     String paymentStatus;
     String paymentMethod;
+
+    String cameraRtspUrl;
+    String cameraStreamUrl;
+    boolean cameraEnabled;
+    LocalDateTime cameraConfiguredAt;
+    LocalDateTime checkIn;
+    LocalDateTime checkOut;
+    LocalDateTime serviceEndDatetime;
+
+    // Service Boarding fields
+    String cageSize;
+    String roomType;
 }
