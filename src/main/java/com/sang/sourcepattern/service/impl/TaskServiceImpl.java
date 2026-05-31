@@ -46,6 +46,7 @@ public class TaskServiceImpl implements TaskService {
     NotificationRepository notificationRepository;
     com.sang.sourcepattern.service.CameraService cameraService;
     PetMedicalRecordRepository petMedicalRecordRepository;
+    com.sang.sourcepattern.service.TierUpgradeService tierUpgradeService;
 
     // Valid status transition chain for Staff
     private static final Set<String> VALID_STATUSES = Set.of("CONFIRMED", "IN_PROGRESS", "COMPLETED", "CANCELLED", "CANCEL_REQUESTED");
@@ -410,6 +411,7 @@ public class TaskServiceImpl implements TaskService {
         // Cập nhật ví khi booking hoàn thành
         if ("COMPLETED".equals(newStatus)) {
             walletService.onBookingCompleted(bookingId);
+            tierUpgradeService.processTierUpgrade(booking.getUser());
         }
         // CANCELLED → không cần làm gì với ví (tiền chưa bao giờ vào ví)
 

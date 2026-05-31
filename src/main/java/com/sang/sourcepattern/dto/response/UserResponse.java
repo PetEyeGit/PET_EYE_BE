@@ -3,6 +3,7 @@ package com.sang.sourcepattern.dto.response;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 import java.util.Set;
+import java.util.List;
 
 @Data
 @Builder
@@ -17,6 +18,10 @@ public class UserResponse {
     String address;
     String avatar;
     boolean active;
+    boolean isBanned;
+    Double totalSpending;
+    MembershipTierResponse currentTier;
+    List<VoucherResponse> vouchers;
     Set<RoleResponse> roles;
 
 }

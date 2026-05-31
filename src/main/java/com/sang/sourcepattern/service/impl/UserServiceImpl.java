@@ -41,6 +41,7 @@ public class UserServiceImpl implements UserService {
     PasswordEncoder passwordEncoder;
     EmailService emailService;
     UserTokenRepository userTokenRepository;
+    com.sang.sourcepattern.repository.UserVoucherRepository userVoucherRepository;
 
     @Override
     @Transactional
@@ -82,17 +83,34 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public UserResponse getUserById(Integer userId) {
-        return userMapper.toUserResponse(
-                userRepository.findById(userId)
-                        .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED))
-        );
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
+        return mapUserWithVouchers(user);
     }
 
     @Override
     public List<UserResponse> getAllUsers() {
         return userRepository.findAll().stream()
-                .map(userMapper::toUserResponse)
+                .map(this::mapUserWithVouchers)
                 .toList();
+    }
+
+    private UserResponse mapUserWithVouchers(User user) {
+        UserResponse response = userMapper.toUserResponse(user);
+        List<com.sang.sourcepattern.dto.response.VoucherResponse> vouchers = userVoucherRepository.findByUserId(user.getId()).stream()
+                .map(uv -> com.sang.sourcepattern.dto.response.VoucherResponse.builder()
+                        .id((long) uv.getVoucher().getId())
+                        .code(uv.getVoucher().getCode())
+                        .targetTierName(uv.getVoucher().getTargetTier() != null ? uv.getVoucher().getTargetTier().getName() : null)
+                        .requiredSpending(uv.getVoucher().getTargetTier() != null ? uv.getVoucher().getTargetTier().getRequiredSpending() : null)
+                        .discountType(uv.getVoucher().getDiscountType())
+                        .discountValue(uv.getVoucher().getDiscountValue())
+                        .validDays(uv.getVoucher().getValidDays())
+                        .isUsed(uv.isUsed())
+                        .build())
+                .toList();
+        response.setVouchers(vouchers);
+        return response;
     }
 
     @Override

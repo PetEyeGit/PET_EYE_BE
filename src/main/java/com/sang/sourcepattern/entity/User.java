@@ -45,6 +45,13 @@ public class User {
     @Builder.Default
     boolean emailVerified = false;
 
+    @ManyToOne
+    @JoinColumn(name = "tier_id")
+    MembershipTier currentTier;
+
+    @Builder.Default
+    Double totalSpending = 0.0;
+
     @ManyToMany
     @Builder.Default
     Set<Role> roles = new HashSet<>();

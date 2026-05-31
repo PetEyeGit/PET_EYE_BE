@@ -52,6 +52,12 @@ public class Booking {
 
     String note;
 
+    @ManyToOne
+    @JoinColumn(name = "voucher_id")
+    Voucher appliedVoucher;
+
+    Double discountAmount;
+
     String cancellationReason;
     String bankName;
     String bankAccount;
