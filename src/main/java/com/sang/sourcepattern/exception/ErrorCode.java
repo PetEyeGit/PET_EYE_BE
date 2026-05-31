@@ -109,7 +109,11 @@ public enum ErrorCode {
     CANNOT_CHANGE_STAFF_DIRECTLY(10005, "Cannot change staff directly when a staff is already assigned. Please use the request flow.", HttpStatus.BAD_REQUEST),
     INVALID_REQUEST(10006,"Invalid request",HttpStatus.BAD_REQUEST),
     DOCKER_NOT_RUNNING(10007, "Docker daemon is not running or failed to start the camera stream", HttpStatus.INTERNAL_SERVER_ERROR),
-    INVALID_TIME_FORMAT(10008, "Invalid time format. Please use ISO 8601 format (e.g., 2024-12-31T23:59:59)", HttpStatus.BAD_REQUEST)
+    INVALID_TIME_FORMAT(10008, "Invalid time format. Please use ISO 8601 format (e.g., 2024-12-31T23:59:59)", HttpStatus.BAD_REQUEST),
+
+    // No-Show cancellation errors
+    NO_SHOW_TOO_EARLY(10009, "Cannot cancel as no-show yet. The grace period has not elapsed.", HttpStatus.BAD_REQUEST),
+    INVALID_GRACE_PERIOD(10010, "Late grace period must be between 5 and 30 minutes", HttpStatus.BAD_REQUEST)
     ;
 
 

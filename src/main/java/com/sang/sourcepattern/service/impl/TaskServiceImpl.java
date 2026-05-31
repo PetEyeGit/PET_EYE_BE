@@ -46,6 +46,8 @@ public class TaskServiceImpl implements TaskService {
     NotificationRepository notificationRepository;
     com.sang.sourcepattern.service.CameraService cameraService;
     PetMedicalRecordRepository petMedicalRecordRepository;
+    com.sang.sourcepattern.repository.PaymentRepository paymentRepository;
+    com.sang.sourcepattern.repository.TransactionRepository transactionRepository;
 
     // Valid status transition chain for Staff
     private static final Set<String> VALID_STATUSES = Set.of("CONFIRMED", "IN_PROGRESS", "COMPLETED", "CANCELLED", "CANCEL_REQUESTED");
@@ -105,6 +107,7 @@ public class TaskServiceImpl implements TaskService {
                 .staffId(b.getStaff() != null ? b.getStaff().getId() : null)
                 .staffName(b.getStaff() != null ? b.getStaff().getFullName() : null)
                 .appointmentDatetime(b.getAppointmentDatetime())
+                .checkOutDatetime(b.getCheckOutDatetime())
                 .checkOut(b.getCheckOut())
                 .serviceStartDatetime(b.getServiceStartDatetime())
                 .serviceEndDatetime(b.getServiceEndDatetime())
@@ -542,6 +545,101 @@ public class TaskServiceImpl implements TaskService {
     @Override
     public List<StaffChangeRequest> getStaffChangeHistory(int bookingId) {
         return staffChangeRequestRepository.findByBookingId(bookingId);
+    }
+
+    // ─── No-Show cancellation ─────────────────────────────────────────────────
+
+    @Override
+    @Transactional
+    public TaskResponse cancelNoShow(int bookingId, String requesterEmail) {
+        User requester = resolveUser(requesterEmail);
+        boolean isOwner = requester.getRoles().stream().anyMatch(r -> "SHOP_OWNER".equals(r.getName()));
+
+        Booking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new AppException(ErrorCode.BOOKING_NOT_FOUND));
+
+        // ── Validate Role ────────────────────────────────────────────────────
+        Shop shop;
+        Staff staff = null;
+        if (isOwner) {
+            shop = resolveOwnerShop(requesterEmail);
+            if (booking.getShop().getId() != shop.getId())
+                throw new AppException(ErrorCode.BOOKING_NOT_BELONG_TO_STAFF_SHOP);
+        } else {
+            staff = staffRepository.findByUserId(requester.getId())
+                    .orElseThrow(() -> new AppException(ErrorCode.STAFF_NOT_FOUND));
+            if (booking.getStaff() == null || booking.getStaff().getId() != staff.getId())
+                throw new AppException(ErrorCode.BOOKING_NOT_BELONG_TO_STAFF_SHOP);
+            shop = staff.getShop();
+        }
+
+        // ── Validate Status: chỉ cho hủy khi đơn ở WAITING_SHOP_APPROVAL hoặc CONFIRMED ──
+        if (!List.of("WAITING_SHOP_APPROVAL", "CONFIRMED").contains(booking.getStatus())) {
+            throw new AppException(ErrorCode.BOOKING_STATUS_INVALID);
+        }
+
+        // ── Validate Time: Grace Period ──────────────────────────────────────
+        int gracePeriod = shop.getLateGracePeriod(); // Lấy cấu hình từ Shop (default 15 phút)
+        LocalDateTime deadline = booking.getAppointmentDatetime().plusMinutes(gracePeriod);
+        if (LocalDateTime.now().isBefore(deadline)) {
+            throw new AppException(ErrorCode.NO_SHOW_TOO_EARLY);
+        }
+
+        // ── Update Booking ───────────────────────────────────────────────────
+        String previousStatus = booking.getStatus();
+        booking.setStatus("CANCELLED");
+        booking.setCancellationReason("LATE_NO_SHOW");
+        bookingRepository.save(booking);
+
+        // ── Update Payment → NO_SHOW_PENALTY (Admin giữ tiền cọc) ─────────
+        paymentRepository.findByBookingId(bookingId).ifPresent(p -> {
+            p.setStatus("NO_SHOW_PENALTY");
+            paymentRepository.save(p);
+        });
+
+        // ── Update Transaction → NO_SHOW_PENALTY ─────────────────────────────
+        transactionRepository.findByBookingIdOrderByCreatedAtDesc(bookingId)
+                .stream().findFirst().ifPresent(t -> {
+                    t.setStatus("NO_SHOW_PENALTY");
+                    t.setNote("No-show by customer — deposit retained by Admin");
+                    transactionRepository.save(t);
+                });
+
+        // ── Notifications ────────────────────────────────────────────────────
+        // 1. Thông báo cho Khách hàng
+        String staffName = (staff != null) ? staff.getFullName()
+                : (booking.getStaff() != null ? booking.getStaff().getFullName() : "Shop");
+        Notification notifUser = Notification.builder()
+                .user(booking.getUser())
+                .title("Lịch hẹn đã bị hủy do bạn không đến")
+                .content(String.format(
+                        "Lịch hẹn #%d của bạn đã bị hủy do bạn đến trễ quá %d phút so với giờ hẹn. "
+                        + "Phí đặt cọc sẽ không được hoàn lại.",
+                        bookingId, gracePeriod))
+                .notificationType(Notification.NotificationType.BOOKING)
+                .build();
+        notificationRepository.save(notifUser);
+
+        // 2. Thông báo cho Shop Owner (nếu Staff hủy)
+        if (!isOwner && shop.getOwner() != null) {
+            Notification notifOwner = Notification.builder()
+                    .user(shop.getOwner())
+                    .title("Nhân viên hủy đơn do khách không đến")
+                    .content(String.format(
+                            "Nhân viên %s vừa hủy đơn #%d do khách hàng %s không đến sau %d phút chờ.",
+                            staffName, bookingId, booking.getUser().getFullName(), gracePeriod))
+                    .notificationType(Notification.NotificationType.BOOKING)
+                    .build();
+            notificationRepository.save(notifOwner);
+        }
+
+        // Tắt camera stream nếu đang chạy
+        cameraService.stopStream(bookingId);
+
+        log.info("Booking {} cancelled as NO_SHOW by {} — grace period {}min elapsed (was {})",
+                bookingId, requesterEmail, gracePeriod, previousStatus);
+
+        return toResponse(booking);
     }
 
     // ─── Status transition validation ─────────────────────────────────────────

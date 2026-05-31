@@ -175,6 +175,20 @@ INSERT IGNORE INTO payment (id, booking_id, method, amount, status, checkout_url
 VALUES (998, 998, 'CASH_DEPOSIT', 45000, 'PAID', 'http://payos.vn/dummy', NOW());
 
 
+
+
+-- Booking 9: CONFIRMED (Test No-Show: Late 10 mins -> Error TOO EARLY) for Customer 1, Shop 1, Service 2
+INSERT IGNORE INTO booking (id, user_id, shop_id, service_id, pet_id, staff_id, appointment_datetime, status, note, cancellation_reason, payos_order_code, created_at)
+VALUES (999, 4, 1, 2, 991, 2, DATE_ADD(NOW(), INTERVAL -10 MINUTE), 'CONFIRMED', 'Test No-Show Chưa tới hạn', NULL, 100009, NOW());
+INSERT IGNORE INTO payment (id, booking_id, method, amount, status, checkout_url, payment_time)
+VALUES (999, 999, 'PAYOS', 450000, 'PAID', 'http://payos.vn/dummy', NOW());
+
+-- Booking 10: CONFIRMED (Test No-Show: Late 20 mins -> Success) for Customer 1, Shop 1, Service 2
+INSERT IGNORE INTO booking (id, user_id, shop_id, service_id, pet_id, staff_id, appointment_datetime, status, note, cancellation_reason, payos_order_code, created_at)
+VALUES (1000, 4, 1, 2, 991, 2, DATE_ADD(NOW(), INTERVAL -20 MINUTE), 'CONFIRMED', 'Test No-Show Đã quá hạn', NULL, 100010, NOW());
+INSERT IGNORE INTO payment (id, booking_id, method, amount, status, checkout_url, payment_time)
+VALUES (1000, 1000, 'PAYOS', 450000, 'PAID', 'http://payos.vn/dummy', NOW());
+
 -- Mock Transactions for existing Bookings
 INSERT IGNORE INTO transaction (id, booking_id, shop_id, type, amount, payment_method, status, description, created_at)
 VALUES (995, 995, 1, 'BOOKING_PAYMENT', 45000, 'CASH_DEPOSIT', 'SUCCESS', 'Thanh toán cọc 10%', NOW());
@@ -182,6 +196,10 @@ INSERT IGNORE INTO transaction (id, booking_id, shop_id, type, amount, payment_m
 VALUES (996, 996, 1, 'BOOKING_PAYMENT', 450000, 'PAYOS', 'SUCCESS', 'Thanh toán 100% qua PayOS', NOW());
 INSERT IGNORE INTO transaction (id, booking_id, shop_id, type, amount, payment_method, status, description, created_at)
 VALUES (998, 998, 1, 'REFUND', 45000, 'CASH_DEPOSIT', 'FAILED', 'Hoàn tiền cọc (thất bại do quy định)', NOW());
+INSERT IGNORE INTO transaction (id, booking_id, shop_id, type, amount, payment_method, status, description, created_at)
+VALUES (999, 999, 1, 'BOOKING_PAYMENT', 450000, 'PAYOS', 'SUCCESS', 'Thanh toán 100% qua PayOS (Booking 999)', NOW());
+INSERT IGNORE INTO transaction (id, booking_id, shop_id, type, amount, payment_method, status, description, created_at)
+VALUES (1000, 1000, 1, 'BOOKING_PAYMENT', 450000, 'PAYOS', 'SUCCESS', 'Thanh toán 100% qua PayOS (Booking 1000)', NOW());
 
 -- ==========================================
 -- PET IMAGES (ALBUM)
@@ -195,3 +213,28 @@ VALUES (2, 991, 'https://images.unsplash.com/photo-1583337130417-3346a1be7dee', 
 INSERT IGNORE INTO pet_image (id, pet_id, image_url, description, upload_date)
 VALUES (3, 992, 'https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba', 'Mimi ngủ nướng', DATE_ADD(NOW(), INTERVAL -2 DAY));
 
+-- ==========================================
+-- TEST NOTIFICATIONS
+-- ==========================================
+INSERT IGNORE INTO notification (id, user_id, title, content, broadcast_id, notification_type, is_read, created_at)
+VALUES 
+(1, 6, 'Có đơn hàng mới cần xử lý', 'Một khách hàng vừa đặt lịch Tắm & Spa Toàn Diện. Hãy vào kiểm tra và nhận ca ngay nhé!', 'bcast-001', 'BOOKING', 0, NOW()),
+(2, 6, 'Khách hàng thay đổi lịch hẹn', 'Đơn hàng #1002 đã được dời sang 15:00 ngày mai. Vui lòng sắp xếp thời gian.', 'bcast-002', 'BOOKING', 0, NOW()),
+(3, 7, 'Khách hàng thay đổi lịch hẹn', 'Đơn hàng #1002 đã được dời sang 15:00 ngày mai. Vui lòng sắp xếp thời gian.', 'bcast-002', 'BOOKING', 0, NOW()),
+(4, 7, 'Có đơn hàng mới cần xử lý', 'Một khách hàng vừa đặt lịch Tắm & Spa Toàn Diện. Hãy vào kiểm tra và nhận ca ngay nhé!', 'bcast-001', 'BOOKING', 0, NOW()),
+(5, 7, 'Nhắc nhở công việc', 'Sắp tới giờ thực hiện dịch vụ cho bé Lu. Vui lòng chuẩn bị dụng cụ đầy đủ.', 'bcast-003', 'REMINDER', 0, NOW()),
+(6, 7, 'Thưởng tháng 5', 'Chúc mừng bạn đã hoàn thành xuất sắc chỉ tiêu tháng. Bạn được thưởng nóng 500k!', 'bcast-004', 'SYSTEM', 0, NOW()),
+(7, 7, 'Cập nhật hệ thống', 'Hệ thống Workspace v2.0 đã cập nhật thêm tính năng lọc trạng thái đơn. Trải nghiệm ngay!', 'bcast-005', 'SYSTEM', 0, NOW()),
+(8, 4, 'Đơn hàng hoàn tất', 'Dịch vụ của bé đã hoàn tất. Vui lòng đánh giá dịch vụ.', 'bcast-006', 'BOOKING', 0, NOW()),
+(9, 2, 'Có đơn hàng mới', 'Cửa hàng của bạn vừa có 1 đơn hàng mới.', 'bcast-007', 'BOOKING', 0, NOW());
+
+-- ==========================================
+-- TEST CARE LOGS
+-- ==========================================
+INSERT IGNORE INTO care_log (id, booking_id, staff_id, type, note, timestamp)
+VALUES 
+(1, 997, 1, 'CLEANING', 'Đã tắm rửa vệ sinh sạch sẽ cho bé. Bé rất ngoan và hợp tác.', DATE_ADD(NOW(), INTERVAL -1 HOUR)),
+(2, 997, 1, 'FEEDING', 'Đã cho bé ăn hạt cao cấp theo đúng khẩu phần khách dặn.', DATE_ADD(NOW(), INTERVAL -30 MINUTE)),
+(3, 997, 1, 'MEDICAL', 'Đã kiểm tra tổng quát, da và lông bé đều khỏe mạnh không có ve rận.', DATE_ADD(NOW(), INTERVAL -10 MINUTE)),
+(4, 996, 2, 'EXERCISE', 'Bé đã được chạy bộ 15 phút tại sân chơi của shop.', DATE_ADD(NOW(), INTERVAL -2 HOUR)),
+(5, 996, 2, 'CLEANING', 'Đã chải chuốt lông rụng và cắt móng gọn gàng.', DATE_ADD(NOW(), INTERVAL -1 HOUR));

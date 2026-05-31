@@ -30,6 +30,7 @@ public class BookingMapper {
                 .payosOrderCode(booking.getPayosOrderCode())
                 .createdAt(booking.getCreatedAt())
                 .serviceStartDatetime(booking.getServiceStartDatetime())
+                .serviceEndDatetime(booking.getServiceEndDatetime())
                 .cameraRtspUrl(booking.getCameraRtspUrl())
                 .cameraStreamUrl(booking.getCameraStreamUrl())
                 .cameraEnabled(booking.getService() != null && booking.getService().isCameraEnabled())

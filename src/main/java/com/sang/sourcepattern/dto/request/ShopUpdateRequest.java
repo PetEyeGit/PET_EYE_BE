@@ -25,4 +25,6 @@ public class ShopUpdateRequest {
     String galleryUrls;
     /** MANUAL | OPEN_POOL | AUTO */
     String assignmentMode;
+    /** Số phút châm chước No-Show (5–30). Null = không thay đổi */
+    Integer lateGracePeriod;
 }

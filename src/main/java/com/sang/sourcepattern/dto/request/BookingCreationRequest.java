@@ -46,6 +46,7 @@ public class BookingCreationRequest {
     LocalDateTime checkOut;
 
     String note;
+
     String cageSize;
     String roomType;
 
