@@ -105,15 +105,11 @@ public class TaskServiceImpl implements TaskService {
                 .staffId(b.getStaff() != null ? b.getStaff().getId() : null)
                 .staffName(b.getStaff() != null ? b.getStaff().getFullName() : null)
                 .appointmentDatetime(b.getAppointmentDatetime())
-<<<<<<< HEAD
-                .checkOutDatetime(b.getCheckOutDatetime())
+                .checkOut(b.getCheckOut())
                 .serviceStartDatetime(b.getServiceStartDatetime())
                 .serviceEndDatetime(b.getServiceEndDatetime())
                 .cageSize(b.getCageSize())
                 .roomType(b.getRoomType())
-=======
-                .checkOut(b.getCheckOut())
->>>>>>> 0ece44c8dcde72d4790872899b24d840a3407aec
                 .status(b.getStatus())
                 .cameraEnabled(b.getService().isCameraEnabled())
                 .rtspLink(b.getRtspLink())

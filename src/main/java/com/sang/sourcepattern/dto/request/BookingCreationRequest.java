@@ -46,9 +46,6 @@ public class BookingCreationRequest {
     LocalDateTime checkOut;
 
     String note;
-
-    LocalDateTime checkIn;
-    LocalDateTime checkOut;
     String cageSize;
     String roomType;
 
@@ -58,7 +55,4 @@ public class BookingCreationRequest {
      */
     @Builder.Default
     String paymentMethod = "PAYOS";
-
-    String cageSize;
-    String roomType;
 }

@@ -73,6 +73,4 @@ public class Booking {
     @Builder.Default
     LocalDateTime createdAt = LocalDateTime.now();
 
-    String cageSize;
-    String roomType;
 }

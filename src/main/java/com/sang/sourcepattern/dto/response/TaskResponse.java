@@ -42,8 +42,7 @@ public class TaskResponse {
      */
     String status;
 
-<<<<<<< HEAD
-    LocalDateTime checkOutDatetime;
+    LocalDateTime checkOut;
     LocalDateTime serviceStartDatetime;
     LocalDateTime serviceEndDatetime;
     String cageSize;
@@ -52,10 +51,6 @@ public class TaskResponse {
     boolean cameraEnabled;
     String rtspLink;
     String category;
-=======
-    LocalDateTime checkOut;
-
->>>>>>> 0ece44c8dcde72d4790872899b24d840a3407aec
 
     String note;
     String cancellationReason;

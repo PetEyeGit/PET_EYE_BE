@@ -50,7 +50,6 @@ public class BookingResponse {
     LocalDateTime cameraConfiguredAt;
     LocalDateTime checkIn;
     LocalDateTime checkOut;
-    LocalDateTime serviceEndDatetime;
 
     // Service Boarding fields
     String cageSize;
