@@ -29,10 +29,8 @@ public class BookingMapper {
                 .cancellationReason(booking.getCancellationReason())
                 .payosOrderCode(booking.getPayosOrderCode())
                 .createdAt(booking.getCreatedAt())
-<<<<<<< HEAD
                 .serviceStartDatetime(booking.getServiceStartDatetime())
                 .serviceEndDatetime(booking.getServiceEndDatetime())
-=======
                 .cameraRtspUrl(booking.getCameraRtspUrl())
                 .cameraStreamUrl(booking.getCameraStreamUrl())
                 .cameraEnabled(booking.getService() != null && booking.getService().isCameraEnabled())
@@ -46,7 +44,6 @@ public class BookingMapper {
                                 : null))
                 .cageSize(booking.getCageSize())
                 .roomType(booking.getRoomType())
->>>>>>> 0ece44c8dcde72d4790872899b24d840a3407aec
                 .build();
     }
 }

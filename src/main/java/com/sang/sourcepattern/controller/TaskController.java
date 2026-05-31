@@ -240,4 +240,21 @@ public class TaskController {
                 .message("Responded to staff change request")
                 .build();
     }
+
+    /**
+     * PUT /tasks/{bookingId}/no-show
+     * Staff/Owner: Cancel a booking due to customer no-show (late arrival beyond grace period).
+     * The deposit (10%) is retained by Admin as a no-show penalty.
+     */
+    @PutMapping("/{bookingId}/no-show")
+    @PreAuthorize("hasAnyRole('STAFF', 'SHOP_OWNER')")
+    @Operation(summary = "Staff/Owner: cancel booking due to customer no-show")
+    public ApiResponse<TaskResponse> cancelNoShow(
+            @AuthenticationPrincipal Jwt jwt,
+            @PathVariable int bookingId) {
+        return ApiResponse.<TaskResponse>builder()
+                .result(taskService.cancelNoShow(bookingId, jwt.getClaim("email")))
+                .message("Booking cancelled due to customer no-show")
+                .build();
+    }
 }

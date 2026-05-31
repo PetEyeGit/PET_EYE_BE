@@ -456,6 +456,14 @@ public class ShopServiceImpl implements ShopService {
                 .orElseThrow(() -> new AppException(ErrorCode.SHOP_NOT_FOUND));
 
         shopMapper.updateShop(shop, request);
+
+        // Validate & apply lateGracePeriod nếu có truyền lên
+        if (request.getLateGracePeriod() != null) {
+            if (request.getLateGracePeriod() < 5 || request.getLateGracePeriod() > 30) {
+                throw new AppException(ErrorCode.INVALID_GRACE_PERIOD);
+            }
+            shop.setLateGracePeriod(request.getLateGracePeriod());
+        }
         
         // Re-geocode if address changed
         if (request.getAddress() != null && !request.getAddress().isEmpty()) {

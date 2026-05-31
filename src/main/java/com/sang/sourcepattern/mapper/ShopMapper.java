@@ -23,6 +23,7 @@ public interface ShopMapper {
     @Mapping(target = "assignmentMode", ignore = true)
     @Mapping(target = "latitude", ignore = true)
     @Mapping(target = "longitude", ignore = true)
+    @Mapping(target = "lateGracePeriod", ignore = true)
     Shop toShop(ShopRegistrationRequest request);
 
     @Mapping(target = "ownerId", source = "owner.id")
@@ -41,5 +42,6 @@ public interface ShopMapper {
     @Mapping(target = "licenseNumber", ignore = true)
     @Mapping(target = "latitude", ignore = true)
     @Mapping(target = "longitude", ignore = true)
+    @Mapping(target = "lateGracePeriod", ignore = true)
     void updateShop(@MappingTarget Shop shop, ShopUpdateRequest request);
 }

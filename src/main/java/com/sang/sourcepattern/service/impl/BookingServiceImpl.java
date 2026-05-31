@@ -96,10 +96,7 @@ public class BookingServiceImpl implements BookingService {
         String note;
         int amountVnd;
         String description;
-<<<<<<< HEAD
         LocalDateTime checkOutDatetime;
-=======
->>>>>>> 0ece44c8dcde72d4790872899b24d840a3407aec
         String cageSize;
         String roomType;
     }
@@ -400,14 +397,9 @@ public class BookingServiceImpl implements BookingService {
                 user.getId(), request.getShopId(), request.getServiceId(),
                 effectiveServiceIds,
                 request.getPetId(), request.getStaffId(),
-<<<<<<< HEAD
-                request.getAppointmentDatetime(), request.getNote(),
-                amountVnd, description,
+                request.getAppointmentDatetime(), request.getCheckIn(), request.getCheckOut(),
+                request.getNote(), amountVnd, description,
                 request.getCheckOut(), request.getCageSize(), request.getRoomType()
-=======
-                request.getAppointmentDatetime(), request.getCheckIn(), request.getCheckOut(), request.getNote(),
-                amountVnd, description, request.getCageSize(), request.getRoomType()
->>>>>>> 0ece44c8dcde72d4790872899b24d840a3407aec
         );
         savePending(orderCode, pending);
 
@@ -549,14 +541,11 @@ public class BookingServiceImpl implements BookingService {
         Booking booking = Booking.builder()
                 .user(user).shop(shop).service(service).pet(pet).staff(staff)
                 .appointmentDatetime(pending.getAppointmentDatetime())
-<<<<<<< HEAD
                 .checkOutDatetime(pending.getCheckOutDatetime())
                 .cageSize(pending.getCageSize())
                 .roomType(pending.getRoomType())
-=======
                 .checkIn(pending.getCheckIn())
                 .checkOut(pending.getCheckOut())
->>>>>>> 0ece44c8dcde72d4790872899b24d840a3407aec
                 .note(pending.getNote())
                 .cageSize(pending.getCageSize())
                 .roomType(pending.getRoomType())
@@ -812,14 +801,9 @@ public class BookingServiceImpl implements BookingService {
                 user.getId(), request.getShopId(), request.getServiceId(),
                 effectiveServiceIds,
                 request.getPetId(), request.getStaffId(),
-<<<<<<< HEAD
-                request.getAppointmentDatetime(), request.getNote(),
-                depositVnd, description,
+                request.getAppointmentDatetime(), request.getCheckIn(), request.getCheckOut(),
+                request.getNote(), depositVnd, description,
                 request.getCheckOut(), request.getCageSize(), request.getRoomType()
-=======
-                request.getAppointmentDatetime(), request.getCheckIn(), request.getCheckOut(), request.getNote(),
-                depositVnd, description, request.getCageSize(), request.getRoomType()
->>>>>>> 0ece44c8dcde72d4790872899b24d840a3407aec
         );
         redisTemplate.opsForValue().set(
                 CASH_PENDING_PREFIX + orderCode, pending,
@@ -970,14 +954,11 @@ public class BookingServiceImpl implements BookingService {
         Booking booking = Booking.builder()
                 .user(user).shop(shop).service(service).pet(pet).staff(staff)
                 .appointmentDatetime(pending.getAppointmentDatetime())
-<<<<<<< HEAD
                 .checkOutDatetime(pending.getCheckOutDatetime())
                 .cageSize(pending.getCageSize())
                 .roomType(pending.getRoomType())
-=======
                 .checkIn(pending.getCheckIn())
                 .checkOut(pending.getCheckOut())
->>>>>>> 0ece44c8dcde72d4790872899b24d840a3407aec
                 .note(pending.getNote())
                 .cageSize(pending.getCageSize())
                 .roomType(pending.getRoomType())

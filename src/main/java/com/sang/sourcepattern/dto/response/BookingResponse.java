@@ -6,6 +6,7 @@ import lombok.experimental.FieldDefaults;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
+
 @Data
 @Builder
 @NoArgsConstructor
@@ -50,7 +51,6 @@ public class BookingResponse {
     LocalDateTime cameraConfiguredAt;
     LocalDateTime checkIn;
     LocalDateTime checkOut;
-    LocalDateTime serviceEndDatetime;
 
     // Service Boarding fields
     String cageSize;
