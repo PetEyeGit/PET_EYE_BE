@@ -11,6 +11,9 @@ import com.sang.sourcepattern.entity.User;
 import com.sang.sourcepattern.exception.AppException;
 import com.sang.sourcepattern.exception.ErrorCode;
 import com.sang.sourcepattern.mapper.ShopMapper;
+import org.mapstruct.factory.Mappers;
+import org.springframework.beans.factory.annotation.Autowired;
+import lombok.experimental.NonFinal;
 import com.sang.sourcepattern.dto.response.ShopDashboardResponse;
 import com.sang.sourcepattern.dto.response.CustomerDetailResponse;
 import com.sang.sourcepattern.dto.response.CustomerItemResponse;
@@ -53,6 +56,8 @@ public class ShopServiceImpl implements ShopService {
     RoleRepository roleRepository;
     BookingRepository bookingRepository;
     PetRepository petRepository;
+    @NonFinal
+    @Autowired(required = false)
     ShopMapper shopMapper;
     PetMapper petMapper;
     BookingMapper bookingMapper;
@@ -66,6 +71,7 @@ public class ShopServiceImpl implements ShopService {
 
     @Override
     public CustomerDetailResponse getCustomerDetail(String ownerEmail, int customerId) {
+        if (shopMapper == null) shopMapper = Mappers.getMapper(ShopMapper.class);
         Shop shop = shopRepository.findByOwnerEmail(ownerEmail)
                 .orElseThrow(() -> new AppException(ErrorCode.SHOP_NOT_FOUND));
 
@@ -456,6 +462,14 @@ public class ShopServiceImpl implements ShopService {
                 .orElseThrow(() -> new AppException(ErrorCode.SHOP_NOT_FOUND));
 
         shopMapper.updateShop(shop, request);
+
+        // Validate & apply lateGracePeriod nếu có truyền lên
+        if (request.getLateGracePeriod() != null) {
+            if (request.getLateGracePeriod() < 5 || request.getLateGracePeriod() > 30) {
+                throw new AppException(ErrorCode.INVALID_GRACE_PERIOD);
+            }
+            shop.setLateGracePeriod(request.getLateGracePeriod());
+        }
         
         // Re-geocode if address changed
         if (request.getAddress() != null && !request.getAddress().isEmpty()) {

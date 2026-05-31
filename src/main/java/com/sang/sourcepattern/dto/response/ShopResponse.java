@@ -35,4 +35,6 @@ public class ShopResponse {
     String assignmentMode;
     /** PENDING | APPROVED | REJECTED */
     String status;
+    /** Số phút châm chước No-Show */
+    int lateGracePeriod;
 }

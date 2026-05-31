@@ -61,6 +61,10 @@ public class Shop {
     @Builder.Default
     String assignmentMode = "MANUAL";
 
+    /** Số phút châm chước trước khi Staff được phép hủy đơn do khách không đến (No-Show). Min 5, Max 30. */
+    @Builder.Default
+    int lateGracePeriod = 15;
+
     @OneToMany(mappedBy = "shop")
     List<Service> services;
 

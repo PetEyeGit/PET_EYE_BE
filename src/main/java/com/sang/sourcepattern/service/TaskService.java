@@ -40,4 +40,7 @@ public interface TaskService {
 
     /** Get staff change request history for a booking */
     List<StaffChangeRequest> getStaffChangeHistory(int bookingId);
+
+    /** Staff/Owner: cancel a booking due to customer no-show (late arrival beyond grace period) */
+    TaskResponse cancelNoShow(int bookingId, String requesterEmail);
 }

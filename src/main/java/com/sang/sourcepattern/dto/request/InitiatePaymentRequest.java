@@ -46,4 +46,5 @@ public class InitiatePaymentRequest {
     String note;
     String cageSize;
     String roomType;
+
 }
