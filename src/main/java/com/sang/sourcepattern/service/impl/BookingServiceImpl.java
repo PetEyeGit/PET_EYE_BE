@@ -93,6 +93,9 @@ public class BookingServiceImpl implements BookingService {
         String note;
         int amountVnd;
         String description;
+        LocalDateTime checkOutDatetime;
+        String cageSize;
+        String roomType;
     }
 
     // ─── Redis helpers ────────────────────────────────────────────────────────
@@ -347,7 +350,8 @@ public class BookingServiceImpl implements BookingService {
                 effectiveServiceIds,
                 request.getPetId(), request.getStaffId(),
                 request.getAppointmentDatetime(), request.getNote(),
-                amountVnd, description
+                amountVnd, description,
+                request.getCheckOut(), request.getCageSize(), request.getRoomType()
         );
         savePending(orderCode, pending);
 
@@ -488,6 +492,9 @@ public class BookingServiceImpl implements BookingService {
         Booking booking = Booking.builder()
                 .user(user).shop(shop).service(service).pet(pet).staff(staff)
                 .appointmentDatetime(pending.getAppointmentDatetime())
+                .checkOutDatetime(pending.getCheckOutDatetime())
+                .cageSize(pending.getCageSize())
+                .roomType(pending.getRoomType())
                 .note(pending.getNote())
                 .status((staff != null && !"AUTO".equals(shop.getAssignmentMode())) ? "WAITING_SHOP_APPROVAL" : "CONFIRMED")
                 .payosOrderCode(orderCode)
@@ -599,7 +606,8 @@ public class BookingServiceImpl implements BookingService {
                 effectiveServiceIds,
                 request.getPetId(), request.getStaffId(),
                 request.getAppointmentDatetime(), request.getNote(),
-                depositVnd, description
+                depositVnd, description,
+                request.getCheckOut(), request.getCageSize(), request.getRoomType()
         );
         redisTemplate.opsForValue().set(
                 CASH_PENDING_PREFIX + orderCode, pending,
@@ -749,6 +757,9 @@ public class BookingServiceImpl implements BookingService {
         Booking booking = Booking.builder()
                 .user(user).shop(shop).service(service).pet(pet).staff(staff)
                 .appointmentDatetime(pending.getAppointmentDatetime())
+                .checkOutDatetime(pending.getCheckOutDatetime())
+                .cageSize(pending.getCageSize())
+                .roomType(pending.getRoomType())
                 .note(pending.getNote())
                 .status((staff != null && !"AUTO".equals(shop.getAssignmentMode())) ? "WAITING_SHOP_APPROVAL" : "CONFIRMED")
                 .payosOrderCode(orderCode)

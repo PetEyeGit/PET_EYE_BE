@@ -25,6 +25,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -101,7 +102,15 @@ public class TaskServiceImpl implements TaskService {
                 .staffId(b.getStaff() != null ? b.getStaff().getId() : null)
                 .staffName(b.getStaff() != null ? b.getStaff().getFullName() : null)
                 .appointmentDatetime(b.getAppointmentDatetime())
+                .checkOutDatetime(b.getCheckOutDatetime())
+                .serviceStartDatetime(b.getServiceStartDatetime())
+                .serviceEndDatetime(b.getServiceEndDatetime())
+                .cageSize(b.getCageSize())
+                .roomType(b.getRoomType())
                 .status(b.getStatus())
+                .cameraEnabled(b.getService().isCameraEnabled())
+                .rtspLink(b.getRtspLink())
+                .category(b.getService().getCategory())
                 .note(b.getNote())
                 .cancellationReason(b.getCancellationReason())
                 .bankName(b.getBankName())
@@ -335,6 +344,15 @@ public class TaskServiceImpl implements TaskService {
             throw new AppException(ErrorCode.BOOKING_STATUS_INVALID);
 
         booking.setStatus(newStatus);
+        if ("IN_PROGRESS".equals(newStatus) && booking.getServiceStartDatetime() == null) {
+            booking.setServiceStartDatetime(LocalDateTime.now());
+        }
+        if ("COMPLETED".equals(newStatus)) {
+            booking.setServiceEndDatetime(LocalDateTime.now());
+        }
+        if (request.getRtspLink() != null && !request.getRtspLink().isBlank()) {
+            booking.setRtspLink(request.getRtspLink());
+        }
         bookingRepository.save(booking);
         log.info("Requester {} updated booking {} status: {} → {}", requesterEmail, bookingId, current, newStatus);
 
@@ -512,6 +530,7 @@ public class TaskServiceImpl implements TaskService {
     // ─── Status transition validation ─────────────────────────────────────────
 
     private boolean isValidTransition(String current, String next) {
+        if (current.equals(next)) return true; // Allow same status (e.g. for RTSP updates)
         return switch (current) {
             case "PENDING_PAYMENT" -> false; // Still waiting for payment
             case "WAITING_SHOP_APPROVAL" -> Set.of("CONFIRMED", "CANCELLED").contains(next);

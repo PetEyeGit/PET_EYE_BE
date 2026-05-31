@@ -18,4 +18,6 @@ public class TaskStatusUpdateRequest {
      */
     @NotBlank(message = "Status is required")
     String status;
+
+    String rtspLink;
 }

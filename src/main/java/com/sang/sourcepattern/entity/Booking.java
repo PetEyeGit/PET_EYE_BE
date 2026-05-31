@@ -39,6 +39,12 @@ public class Booking {
     Staff staff;
 
     LocalDateTime appointmentDatetime;
+    LocalDateTime checkOutDatetime;
+    LocalDateTime serviceStartDatetime;
+    LocalDateTime serviceEndDatetime;
+
+    String cageSize;
+    String roomType;
 
     /** PENDING_PAYMENT → CONFIRMED → COMPLETED | CANCELLED */
     @Builder.Default
@@ -50,6 +56,9 @@ public class Booking {
     String bankName;
     String bankAccount;
     String accountHolder;
+
+    @Column(columnDefinition = "TEXT")
+    String rtspLink;
 
     /** PayOS order code — unique long used to match webhook callback */
     Long payosOrderCode;

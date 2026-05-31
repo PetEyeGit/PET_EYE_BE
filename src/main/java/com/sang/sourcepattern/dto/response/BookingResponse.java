@@ -36,6 +36,8 @@ public class BookingResponse {
     String accountHolder;
     Long payosOrderCode;
     LocalDateTime createdAt;
+    LocalDateTime serviceStartDatetime;
+    LocalDateTime serviceEndDatetime;
 
     // Payment info
     String checkoutUrl;

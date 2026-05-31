@@ -42,6 +42,16 @@ public class TaskResponse {
      */
     String status;
 
+    LocalDateTime checkOutDatetime;
+    LocalDateTime serviceStartDatetime;
+    LocalDateTime serviceEndDatetime;
+    String cageSize;
+    String roomType;
+
+    boolean cameraEnabled;
+    String rtspLink;
+    String category;
+
     String note;
     String cancellationReason;
     String bankName;

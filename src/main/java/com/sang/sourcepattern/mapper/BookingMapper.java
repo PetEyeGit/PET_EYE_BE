@@ -29,6 +29,8 @@ public class BookingMapper {
                 .cancellationReason(booking.getCancellationReason())
                 .payosOrderCode(booking.getPayosOrderCode())
                 .createdAt(booking.getCreatedAt())
+                .serviceStartDatetime(booking.getServiceStartDatetime())
+                .serviceEndDatetime(booking.getServiceEndDatetime())
                 .build();
     }
 }

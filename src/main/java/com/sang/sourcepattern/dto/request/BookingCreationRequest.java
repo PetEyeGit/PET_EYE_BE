@@ -44,6 +44,11 @@ public class BookingCreationRequest {
 
     String note;
 
+    LocalDateTime checkIn;
+    LocalDateTime checkOut;
+    String cageSize;
+    String roomType;
+
     /**
      * PAYOS  → tạo PayOS payment link (default)
      * CASH   → đặt lịch ngay, không cần thanh toán online
