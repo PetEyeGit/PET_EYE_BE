@@ -42,6 +42,7 @@ public class TaskResponse {
      */
     String status;
 
+    LocalDateTime checkOut;
 
     LocalDateTime checkOutDatetime;
     LocalDateTime serviceStartDatetime;
@@ -52,7 +53,7 @@ public class TaskResponse {
     boolean cameraEnabled;
     String rtspLink;
     String category;
-    LocalDateTime checkOut;
+
 
     String note;
     String cancellationReason;

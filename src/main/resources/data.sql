@@ -177,6 +177,18 @@ VALUES (998, 998, 'CASH_DEPOSIT', 45000, 'PAID', 'http://payos.vn/dummy', NOW())
 
 
 
+-- Booking 9: CONFIRMED (Test No-Show: Late 10 mins -> Error TOO EARLY) for Customer 1, Shop 1, Service 2
+INSERT IGNORE INTO booking (id, user_id, shop_id, service_id, pet_id, staff_id, appointment_datetime, status, note, cancellation_reason, payos_order_code, created_at)
+VALUES (999, 4, 1, 2, 991, 2, DATE_ADD(NOW(), INTERVAL -10 MINUTE), 'CONFIRMED', 'Test No-Show Chưa tới hạn', NULL, 100009, NOW());
+INSERT IGNORE INTO payment (id, booking_id, method, amount, status, checkout_url, payment_time)
+VALUES (999, 999, 'PAYOS', 450000, 'PAID', 'http://payos.vn/dummy', NOW());
+
+-- Booking 10: CONFIRMED (Test No-Show: Late 20 mins -> Success) for Customer 1, Shop 1, Service 2
+INSERT IGNORE INTO booking (id, user_id, shop_id, service_id, pet_id, staff_id, appointment_datetime, status, note, cancellation_reason, payos_order_code, created_at)
+VALUES (1000, 4, 1, 2, 991, 2, DATE_ADD(NOW(), INTERVAL -20 MINUTE), 'CONFIRMED', 'Test No-Show Đã quá hạn', NULL, 100010, NOW());
+INSERT IGNORE INTO payment (id, booking_id, method, amount, status, checkout_url, payment_time)
+VALUES (1000, 1000, 'PAYOS', 450000, 'PAID', 'http://payos.vn/dummy', NOW());
+
 -- Mock Transactions for existing Bookings
 INSERT IGNORE INTO transaction (id, booking_id, shop_id, type, amount, payment_method, status, description, created_at)
 VALUES (995, 995, 1, 'BOOKING_PAYMENT', 45000, 'CASH_DEPOSIT', 'SUCCESS', 'Thanh toán cọc 10%', NOW());
@@ -184,6 +196,10 @@ INSERT IGNORE INTO transaction (id, booking_id, shop_id, type, amount, payment_m
 VALUES (996, 996, 1, 'BOOKING_PAYMENT', 450000, 'PAYOS', 'SUCCESS', 'Thanh toán 100% qua PayOS', NOW());
 INSERT IGNORE INTO transaction (id, booking_id, shop_id, type, amount, payment_method, status, description, created_at)
 VALUES (998, 998, 1, 'REFUND', 45000, 'CASH_DEPOSIT', 'FAILED', 'Hoàn tiền cọc (thất bại do quy định)', NOW());
+INSERT IGNORE INTO transaction (id, booking_id, shop_id, type, amount, payment_method, status, description, created_at)
+VALUES (999, 999, 1, 'BOOKING_PAYMENT', 450000, 'PAYOS', 'SUCCESS', 'Thanh toán 100% qua PayOS (Booking 999)', NOW());
+INSERT IGNORE INTO transaction (id, booking_id, shop_id, type, amount, payment_method, status, description, created_at)
+VALUES (1000, 1000, 1, 'BOOKING_PAYMENT', 450000, 'PAYOS', 'SUCCESS', 'Thanh toán 100% qua PayOS (Booking 1000)', NOW());
 
 -- ==========================================
 -- PET IMAGES (ALBUM)

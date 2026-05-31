@@ -44,7 +44,7 @@ public class InitiatePaymentRequest {
     LocalDateTime checkOut;
 
     String note;
-
     String cageSize;
     String roomType;
+
 }
