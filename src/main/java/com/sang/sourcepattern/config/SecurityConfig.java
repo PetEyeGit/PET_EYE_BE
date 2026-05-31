@@ -42,8 +42,10 @@ public class SecurityConfig {
             "/shops/public",
             "/shops/public/**",
             "/bookings/staff/**",
-            "/ws/**"
+            "/ws/**",
+            "/v1/camera/**"
     };
+
 
     private final CustomJwtDecoder customJwtDecoder;
 

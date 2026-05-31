@@ -29,8 +29,24 @@ public class BookingMapper {
                 .cancellationReason(booking.getCancellationReason())
                 .payosOrderCode(booking.getPayosOrderCode())
                 .createdAt(booking.getCreatedAt())
+<<<<<<< HEAD
                 .serviceStartDatetime(booking.getServiceStartDatetime())
                 .serviceEndDatetime(booking.getServiceEndDatetime())
+=======
+                .cameraRtspUrl(booking.getCameraRtspUrl())
+                .cameraStreamUrl(booking.getCameraStreamUrl())
+                .cameraEnabled(booking.getService() != null && booking.getService().isCameraEnabled())
+                .cameraConfiguredAt(booking.getCameraConfiguredAt())
+                .checkIn(booking.getCheckIn())
+                .checkOut(booking.getCheckOut())
+                .serviceEndDatetime(booking.getService() != null && "BOARDING".equalsIgnoreCase(booking.getService().getCategory()) && booking.getCheckOut() != null
+                        ? booking.getCheckOut()
+                        : (booking.getAppointmentDatetime() != null && booking.getService() != null
+                                ? booking.getAppointmentDatetime().plusMinutes(booking.getService().getDurationMinutes())
+                                : null))
+                .cageSize(booking.getCageSize())
+                .roomType(booking.getRoomType())
+>>>>>>> 0ece44c8dcde72d4790872899b24d840a3407aec
                 .build();
     }
 }

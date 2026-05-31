@@ -35,4 +35,12 @@ public interface ShopService {
 
     /** Admin: get staff of a shop */
     List<com.sang.sourcepattern.dto.response.StaffResponse> getStaffByShop(int shopId);
+
+    /** Public: search nearby shops by location and radius */
+    List<com.sang.sourcepattern.dto.response.ShopNearbyResponse> searchNearbyShops(
+            Double latitude, Double longitude, Double radiusKm);
+
+    /** Public: get directions from user location to shop */
+    com.sang.sourcepattern.dto.response.goong.GoongDirectionsResponse getDirectionsToShop(
+            int shopId, Double fromLat, Double fromLng);
 }

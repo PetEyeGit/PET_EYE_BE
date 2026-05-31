@@ -41,6 +41,7 @@ public class WalletServiceImpl implements WalletService {
     UserRepository              userRepository;
     NotificationRepository      notificationRepository;
     PayOSService                payOSService;
+    com.sang.sourcepattern.service.CameraService cameraService;
 
     /** Phí admin: 10% */
     @NonFinal
@@ -553,6 +554,7 @@ public class WalletServiceImpl implements WalletService {
         if ("WAITING_REFUND".equals(booking.getStatus())) {
             booking.setStatus("CANCELLED");
             bookingRepository.save(booking);
+            cameraService.stopStream(bookingId);
             
             // Optionally, we could send a notification to the user that their refund is complete
             // But the requirement only specified the notification at the time of shop approval.

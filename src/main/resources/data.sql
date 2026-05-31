@@ -182,3 +182,16 @@ INSERT IGNORE INTO transaction (id, booking_id, shop_id, type, amount, payment_m
 VALUES (996, 996, 1, 'BOOKING_PAYMENT', 450000, 'PAYOS', 'SUCCESS', 'Thanh toán 100% qua PayOS', NOW());
 INSERT IGNORE INTO transaction (id, booking_id, shop_id, type, amount, payment_method, status, description, created_at)
 VALUES (998, 998, 1, 'REFUND', 45000, 'CASH_DEPOSIT', 'FAILED', 'Hoàn tiền cọc (thất bại do quy định)', NOW());
+
+-- ==========================================
+-- PET IMAGES (ALBUM)
+-- ==========================================
+INSERT IGNORE INTO pet_image (id, pet_id, image_url, description, upload_date)
+VALUES (1, 991, 'https://images.unsplash.com/photo-1543466835-00a7907e9de1', 'Ảnh chân dung Bé Lu tại nhà', DATE_ADD(NOW(), INTERVAL -10 DAY));
+
+INSERT IGNORE INTO pet_image (id, pet_id, image_url, description, upload_date)
+VALUES (2, 991, 'https://images.unsplash.com/photo-1583337130417-3346a1be7dee', 'Bé Lu đi dạo công viên', DATE_ADD(NOW(), INTERVAL -5 DAY));
+
+INSERT IGNORE INTO pet_image (id, pet_id, image_url, description, upload_date)
+VALUES (3, 992, 'https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba', 'Mimi ngủ nướng', DATE_ADD(NOW(), INTERVAL -2 DAY));
+

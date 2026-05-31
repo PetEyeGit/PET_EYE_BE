@@ -99,6 +99,9 @@ logging:
         SQL: OFF
       springframework:
         web: INFO
+    com:
+      sang:
+        sourcepattern: INFO
 
 # ===============================
 # Cloudinary CONFIG (MAP FROM .env)
@@ -107,6 +110,18 @@ cloudinary:
   cloud-name: ${CLOUDINARY_CLOUD_NAME}
   api-key: ${CLOUDINARY_API_KEY}
   api-secret: ${CLOUDINARY_API_SECRET}
+
+# ===============================
+# Goong Map CONFIG
+# ===============================
+goong:
+  api:
+    key: ${GOONG_API_KEY}
+  geocode:
+    url: https://rsapi.goong.io/geocode
+  distance:
+    matrix:
+      url: https://rsapi.goong.io/DistanceMatrix
 # ===============================
 # PayOS CONFIG (MAP FROM .env)
 # ===============================
@@ -153,3 +168,13 @@ ai:
 # ===============================
 wallet:
   admin-fee-rate: 0.10
+
+# ===============================
+# CAMERA CONFIG (MAP FROM .env)
+# ===============================
+camera:
+  stream-host: ${CAMERA_STREAM_HOST:localhost}
+  kbone:
+    sn: ${CAMERA_KBONE_SN}
+    stream-url: ${CAMERA_KBONE_STREAM_URL}
+

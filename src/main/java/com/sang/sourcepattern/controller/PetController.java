@@ -61,4 +61,13 @@ public class PetController {
                 .message("Pet deactivated successfully. Reason: " + reason)
                 .build();
     }
+
+    @PostMapping("/{petId}/album/from-carelog/{careLogId}")
+    @Operation(summary = "Save an image from a CareLog to the Pet's Album")
+    ApiResponse<Void> addAlbumImageFromCareLog(@PathVariable int petId, @PathVariable int careLogId) {
+        petService.addAlbumImageFromCareLog(petId, careLogId);
+        return ApiResponse.<Void>builder()
+                .message("Care log image successfully added to pet album")
+                .build();
+    }
 }

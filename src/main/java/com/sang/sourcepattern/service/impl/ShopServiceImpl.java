@@ -1,5 +1,6 @@
 package com.sang.sourcepattern.service.impl;
 
+import com.sang.sourcepattern.dto.response.goong.LatLong;
 import com.sang.sourcepattern.enums.ShopStatus;
 import com.sang.sourcepattern.dto.request.ShopRegistrationRequest;
 import com.sang.sourcepattern.dto.request.ShopUpdateRequest;
@@ -61,6 +62,7 @@ public class ShopServiceImpl implements ShopService {
     com.sang.sourcepattern.repository.TransactionRepository transactionRepository;
 
     com.sang.sourcepattern.service.EmailService emailService;
+    com.sang.sourcepattern.service.GoongMapService goongMapService;
 
     @Override
     public CustomerDetailResponse getCustomerDetail(String ownerEmail, int customerId) {
@@ -350,7 +352,8 @@ public class ShopServiceImpl implements ShopService {
                 .phone(request.getPhone())
                 .address(request.getAddress())
                 .roles(roles)
-                .active(false) // Chưa active — chờ admin duyệt
+                .active(false)
+                .emailVerified(false)
                 .build();
 
         owner = userRepository.save(owner);
@@ -361,7 +364,30 @@ public class ShopServiceImpl implements ShopService {
         shop.setVerified(false);
         shop.setStatus(ShopStatus.PENDING);
 
+        // 2.1. Auto-geocode address to get lat/lng
+        if (request.getAddress() != null && !request.getAddress().isEmpty()) {
+            LatLong location = goongMapService.geocodeAddress(request.getAddress());
+            if (location != null) {
+                shop.setLatitude(location.getLatitude());
+                shop.setLongitude(location.getLongitude());
+            }
+        }
+
         shop = shopRepository.save(shop);
+
+        // 3. Tạo OTP và flush trước khi gửi email
+        String otp = String.format("%06d", new java.util.Random().nextInt(1_000_000));
+        userTokenRepository.saveAndFlush(
+                com.sang.sourcepattern.entity.UserToken.builder()
+                        .token(otp)
+                        .type("VERIFY_EMAIL")
+                        .user(owner)
+                        .expiresAt(java.time.LocalDateTime.now().plusMinutes(10))
+                        .build()
+        );
+
+        // 4. Gửi email OTP (async — không block response)
+        emailService.sendVerificationEmail(owner.getEmail(), owner.getFullName(), otp);
 
         log.info("Shop registered successfully: {} (Pending Approval)", shop.getShopName());
 
@@ -430,6 +456,16 @@ public class ShopServiceImpl implements ShopService {
                 .orElseThrow(() -> new AppException(ErrorCode.SHOP_NOT_FOUND));
 
         shopMapper.updateShop(shop, request);
+        
+        // Re-geocode if address changed
+        if (request.getAddress() != null && !request.getAddress().isEmpty()) {
+            LatLong location = goongMapService.geocodeAddress(request.getAddress());
+            if (location != null) {
+                shop.setLatitude(location.getLatitude());
+                shop.setLongitude(location.getLongitude());
+            }
+        }
+        
         log.info("Shop entity after mapping: Logo={}, Banner={}", shop.getLogoUrl(), shop.getBannerUrl());
         
         Shop saved = shopRepository.save(shop);
@@ -523,5 +559,72 @@ public class ShopServiceImpl implements ShopService {
                             .build();
                 })
                 .toList();
+    }
+
+    @Override
+    public List<com.sang.sourcepattern.dto.response.ShopNearbyResponse> searchNearbyShops(
+            Double latitude, Double longitude, Double radiusKm) {
+        
+        LatLong userLocation = new LatLong(latitude, longitude);
+        
+        // Get all verified shops
+        List<Shop> verifiedShops = shopRepository.findAll().stream()
+                .filter(Shop::isVerified)
+                .toList();
+        
+        // Calculate distance for each shop and filter by radius
+        return verifiedShops.stream()
+                .map(shop -> {
+                    if (shop.getLatitude() == null || shop.getLongitude() == null) {
+                        return null; // Skip shops without coordinates
+                    }
+                    
+                    LatLong shopLocation =
+                            new LatLong(shop.getLatitude(), shop.getLongitude());
+                    
+                    double distanceKm = goongMapService.getDistanceKm(userLocation, shopLocation);
+                    
+                    if (distanceKm == Double.MAX_VALUE || distanceKm > radiusKm) {
+                        return null; // Skip if distance calculation failed or out of radius
+                    }
+                    
+                    return com.sang.sourcepattern.dto.response.ShopNearbyResponse.builder()
+                            .id(shop.getId())
+                            .shopName(shop.getShopName())
+                            .shopType(shop.getShopType())
+                            .address(shop.getAddress())
+                            .city(shop.getCity())
+                            .latitude(shop.getLatitude())
+                            .longitude(shop.getLongitude())
+                            .logoUrl(shop.getLogoUrl())
+                            .ratingAvg(shop.getRatingAvg())
+                            .distanceKm(Math.round(distanceKm * 10.0) / 10.0) // Round to 1 decimal
+                            .build();
+                })
+                .filter(java.util.Objects::nonNull)
+                .sorted(java.util.Comparator.comparing(com.sang.sourcepattern.dto.response.ShopNearbyResponse::getDistanceKm))
+                .toList();
+    }
+
+    @Override
+    public com.sang.sourcepattern.dto.response.goong.GoongDirectionsResponse getDirectionsToShop(
+            int shopId, Double fromLat, Double fromLng) {
+        
+        Shop shop = shopRepository.findById(shopId)
+                .orElseThrow(() -> new AppException(ErrorCode.SHOP_NOT_FOUND));
+        
+        if (!shop.isVerified()) {
+            throw new AppException(ErrorCode.SHOP_NOT_FOUND);
+        }
+        
+        if (shop.getLatitude() == null || shop.getLongitude() == null) {
+            throw new AppException(ErrorCode.UNCATEGORIZED_EXCEPTION);
+        }
+        
+        LatLong origin = new LatLong(fromLat, fromLng);
+        LatLong destination =
+                new LatLong(shop.getLatitude(), shop.getLongitude());
+        
+        return goongMapService.getDirections(origin, destination);
     }
 }

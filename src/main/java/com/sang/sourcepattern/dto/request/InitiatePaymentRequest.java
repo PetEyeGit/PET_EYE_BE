@@ -19,10 +19,12 @@ import java.util.List;
 @FieldDefaults(level = AccessLevel.PRIVATE)
 public class InitiatePaymentRequest {
 
-    @NotNull Integer shopId;
+    @NotNull
+    Integer shopId;
 
     /** serviceId chính — vẫn giữ để tương thích ngược */
-    @NotNull Integer serviceId;
+    @NotNull
+    Integer serviceId;
 
     /**
      * Danh sách tất cả service IDs khi user chọn nhiều dịch vụ.
@@ -30,15 +32,16 @@ public class InitiatePaymentRequest {
      */
     List<Integer> serviceIds;
 
-    @NotNull Integer petId;
+    @NotNull
+    Integer petId;
     Integer staffId;
 
-    @NotNull @Future
+    @NotNull
+    @Future
     LocalDateTime appointmentDatetime;
 
-    String note;
-
+    LocalDateTime checkIn;
     LocalDateTime checkOut;
-    String cageSize;
-    String roomType;
+
+    String note;
 }

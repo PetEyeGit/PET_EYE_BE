@@ -16,6 +16,7 @@ import com.sang.sourcepattern.repository.ShopRepository;
 import com.sang.sourcepattern.repository.StaffChangeRequestRepository;
 import com.sang.sourcepattern.repository.StaffRepository;
 import com.sang.sourcepattern.repository.UserRepository;
+import com.sang.sourcepattern.repository.PetMedicalRecordRepository;
 import com.sang.sourcepattern.service.TaskService;
 import com.sang.sourcepattern.service.WalletService;
 import lombok.AccessLevel;
@@ -43,6 +44,8 @@ public class TaskServiceImpl implements TaskService {
     WalletService     walletService;
     StaffChangeRequestRepository staffChangeRequestRepository;
     NotificationRepository notificationRepository;
+    com.sang.sourcepattern.service.CameraService cameraService;
+    PetMedicalRecordRepository petMedicalRecordRepository;
 
     // Valid status transition chain for Staff
     private static final Set<String> VALID_STATUSES = Set.of("CONFIRMED", "IN_PROGRESS", "COMPLETED", "CANCELLED", "CANCEL_REQUESTED");
@@ -102,11 +105,15 @@ public class TaskServiceImpl implements TaskService {
                 .staffId(b.getStaff() != null ? b.getStaff().getId() : null)
                 .staffName(b.getStaff() != null ? b.getStaff().getFullName() : null)
                 .appointmentDatetime(b.getAppointmentDatetime())
+<<<<<<< HEAD
                 .checkOutDatetime(b.getCheckOutDatetime())
                 .serviceStartDatetime(b.getServiceStartDatetime())
                 .serviceEndDatetime(b.getServiceEndDatetime())
                 .cageSize(b.getCageSize())
                 .roomType(b.getRoomType())
+=======
+                .checkOut(b.getCheckOut())
+>>>>>>> 0ece44c8dcde72d4790872899b24d840a3407aec
                 .status(b.getStatus())
                 .cameraEnabled(b.getService().isCameraEnabled())
                 .rtspLink(b.getRtspLink())
@@ -342,6 +349,16 @@ public class TaskServiceImpl implements TaskService {
         String current = booking.getStatus();
         if (!isValidTransition(current, newStatus))
             throw new AppException(ErrorCode.BOOKING_STATUS_INVALID);
+            
+        // Check medical record constraint for CLINIC services when completing
+        if ("COMPLETED".equals(newStatus)) {
+            if ("CLINIC".equalsIgnoreCase(booking.getService().getCategory())) {
+                int count = petMedicalRecordRepository.countByBookingId(bookingId);
+                if (count == 0) {
+                    throw new AppException(ErrorCode.MISSING_MEDICAL_RECORD);
+                }
+            }
+        }
 
         booking.setStatus(newStatus);
         if ("IN_PROGRESS".equals(newStatus) && booking.getServiceStartDatetime() == null) {
@@ -389,6 +406,10 @@ public class TaskServiceImpl implements TaskService {
             }
         }
         // ------------------------------
+
+        if ("COMPLETED".equals(newStatus) || "CANCELLED".equals(newStatus)) {
+            cameraService.stopStream(bookingId);
+        }
 
         // Cập nhật ví khi booking hoàn thành
         if ("COMPLETED".equals(newStatus)) {

@@ -63,6 +63,16 @@ public class Booking {
     /** PayOS order code — unique long used to match webhook callback */
     Long payosOrderCode;
 
+    String cameraRtspUrl;
+    String cameraStreamUrl;
+    LocalDateTime cameraConfiguredAt;
+
+    LocalDateTime checkIn;
+    LocalDateTime checkOut;
+
     @Builder.Default
     LocalDateTime createdAt = LocalDateTime.now();
+
+    String cageSize;
+    String roomType;
 }

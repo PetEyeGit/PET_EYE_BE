@@ -117,7 +117,7 @@ INSERT INTO shop (id, owner_id, shop_name, shop_type, email, phone,
  'MANUAL');  -- MANUAL: shop owner tự assign staff
 
 -- ============================================================
--- SERVICES (3 dịch vụ)
+-- SERVICES (4 dịch vụ)
 -- ============================================================
 INSERT INTO pet_service (id, shop_id, service_name, category, price, duration_minutes,
                          description, active, camera_enabled, created_at) VALUES
@@ -143,7 +143,15 @@ INSERT INTO pet_service (id, shop_id, service_name, category, price, duration_mi
  450000,
  120,
  'Tắm thơm, massage toàn thân, dưỡng lông mềm mượt, cắt móng, vệ sinh tai, xịt nước hoa.',
- true, false, NOW());
+ true, false, NOW()),
+
+(4, 1,
+ 'Lưu trú thú cưng kèm Camera',
+ 'BOARDING',
+ 300000,
+ 1440,
+ 'Dịch vụ lưu trú cao cấp có camera giám sát 24/7 giúp chủ nuôi dễ dàng theo dõi thú cưng.',
+ true, true, NOW());
 
 -- ============================================================
 -- STAFF (1 nhân viên)
@@ -214,6 +222,18 @@ INSERT INTO staff (id, shop_id, user_id, full_name, role, phone, specialization,
      true);
 
 -- ============================================================
+-- CAGES & CAMERAS (Lưu trú sử dụng camera)
+-- ============================================================
+INSERT INTO cage (id, shop_id, cage_code, type, is_available) VALUES
+(1, 1, 'C101', 'NORMAL', true),
+(2, 1, 'C102', 'NORMAL', true),
+(3, 1, 'VIP01', 'VIP', true);
+
+INSERT INTO camera (id, cage_id, model_type, stream_url, access_token, status) VALUES
+(1, 3, 'KBONE-H21W', 'rtsp://admin:123456@192.168.1.100:554/live', 'token123', 'ONLINE'),
+(2, 1, 'EZVIZ-C6N', 'rtsp://admin:123456@192.168.1.101:554/live', 'token456', 'ONLINE');
+
+-- ============================================================
 -- BOOKINGS - Các đơn hàng với các trạng thái khác nhau
 -- ============================================================
 
@@ -279,3 +299,16 @@ INSERT INTO booking (id, user_id, shop_id, service_id, pet_id, staff_id, appoint
  'WAITING_SHOP_APPROVAL',
  'Tắm & sấy cơ bản - Chờ phê duyệt từ shop',
  NOW());
+
+
+-- ============================================================
+-- PAYMENTS
+-- ============================================================
+INSERT INTO payment (id, booking_id, amount, method, status, description, payment_time) VALUES
+(1, 8, 300000.00, 'PAYOS', 'SUCCESS', 'Payment for camera boarding booking 8', NOW());
+
+-- ============================================================
+-- BOARDING DETAILS
+-- ============================================================
+INSERT INTO boarding_detail (id, booking_id, cage_id, check_in, check_out) VALUES
+(1, 8, 3, DATE_ADD(CURDATE(), INTERVAL 1 DAY) + INTERVAL 10 HOUR, DATE_ADD(CURDATE(), INTERVAL 2 DAY) + INTERVAL 10 HOUR);

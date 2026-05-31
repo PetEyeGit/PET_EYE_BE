@@ -68,8 +68,32 @@ public interface BookingRepository extends JpaRepository<Booking, Integer> {
           AND b.status IN ('WAITING_SHOP_APPROVAL', 'CONFIRMED', 'IN_PROGRESS')
           AND b.appointment_datetime < :windowEnd
           AND DATE_ADD(b.appointment_datetime, INTERVAL s.duration_minutes MINUTE) > :windowStart
+          AND (
+                b.shop_id != :shopId
+                OR NOT (
+                    (:isNewBoarding = true AND LOWER(s.category) NOT IN ('boarding', 'hotel'))
+                    OR
+                    (:isNewBoarding = false AND LOWER(s.category) IN ('boarding', 'hotel'))
+                )
+          )
     """, nativeQuery = true)
     int countConflictingBookingForPet(
+            @Param("petId") int petId,
+            @Param("windowStart") LocalDateTime windowStart,
+            @Param("windowEnd") LocalDateTime windowEnd,
+            @Param("shopId") int shopId,
+            @Param("isNewBoarding") boolean isNewBoarding
+    );
+
+    @Query(value = """
+        SELECT COUNT(*) FROM booking b
+        JOIN pet_service s ON b.service_id = s.id
+        WHERE b.pet_id = :petId
+          AND b.status IN ('WAITING_SHOP_APPROVAL', 'CONFIRMED', 'IN_PROGRESS')
+          AND b.appointment_datetime < :windowEnd
+          AND DATE_ADD(b.appointment_datetime, INTERVAL s.duration_minutes MINUTE) > :windowStart
+    """, nativeQuery = true)
+    int countStrictConflictingBookingForPet(
             @Param("petId") int petId,
             @Param("windowStart") LocalDateTime windowStart,
             @Param("windowEnd") LocalDateTime windowEnd
@@ -83,6 +107,7 @@ public interface BookingRepository extends JpaRepository<Booking, Integer> {
         JOIN pet_service s ON b.service_id = s.id
         WHERE b.staff_id = :staffId
           AND b.status IN ('WAITING_SHOP_APPROVAL', 'CONFIRMED', 'IN_PROGRESS')
+          AND LOWER(s.category) NOT IN ('boarding', 'hotel')
           AND b.appointment_datetime < :windowEnd
           AND DATE_ADD(b.appointment_datetime, INTERVAL s.duration_minutes MINUTE) > :windowStart
     """, nativeQuery = true)

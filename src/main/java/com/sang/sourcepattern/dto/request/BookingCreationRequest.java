@@ -42,6 +42,9 @@ public class BookingCreationRequest {
     @Future(message = "APPOINTMENT_MUST_BE_FUTURE")
     LocalDateTime appointmentDatetime;
 
+    LocalDateTime checkIn;
+    LocalDateTime checkOut;
+
     String note;
 
     LocalDateTime checkIn;
@@ -55,4 +58,7 @@ public class BookingCreationRequest {
      */
     @Builder.Default
     String paymentMethod = "PAYOS";
+
+    String cageSize;
+    String roomType;
 }

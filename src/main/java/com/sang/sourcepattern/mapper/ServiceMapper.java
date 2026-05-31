@@ -62,6 +62,8 @@ public interface ServiceMapper {
     @Mapping(target = "cameraTiers",      expression = "java(listToJson(request.getCameraTiers()))")
     @Mapping(target = "cameraTierPrices", expression = "java(mapIntToJson(request.getCameraTierPrices()))")
     @Mapping(target = "cameraTierLabels", expression = "java(mapStrToJson(request.getCameraTierLabels()))")
+    @Mapping(target = "cageSize",         expression = "java(listToJson(request.getCageSize()))")
+    @Mapping(target = "roomType",         expression = "java(listToJson(request.getRoomType()))")
     Service toService(ServiceCreationRequest request);
 
     // ── toServiceResponse ─────────────────────────────────────────────────────
@@ -71,6 +73,8 @@ public interface ServiceMapper {
     @Mapping(target = "cameraTiers",      expression = "java(jsonToList(service.getCameraTiers()))")
     @Mapping(target = "cameraTierPrices", expression = "java(jsonToMapInt(service.getCameraTierPrices()))")
     @Mapping(target = "cameraTierLabels", expression = "java(jsonToMapStr(service.getCameraTierLabels()))")
+    @Mapping(target = "cageSize",         expression = "java(jsonToList(service.getCageSize()))")
+    @Mapping(target = "roomType",         expression = "java(jsonToList(service.getRoomType()))")
     ServiceResponse toServiceResponse(Service service);
 
     // ── updateService ─────────────────────────────────────────────────────────
@@ -82,5 +86,7 @@ public interface ServiceMapper {
     @Mapping(target = "cameraTiers",      expression = "java(request.getCameraTiers() != null ? listToJson(request.getCameraTiers()) : service.getCameraTiers())")
     @Mapping(target = "cameraTierPrices", expression = "java(request.getCameraTierPrices() != null ? mapIntToJson(request.getCameraTierPrices()) : service.getCameraTierPrices())")
     @Mapping(target = "cameraTierLabels", expression = "java(request.getCameraTierLabels() != null ? mapStrToJson(request.getCameraTierLabels()) : service.getCameraTierLabels())")
+    @Mapping(target = "cageSize",         expression = "java(request.getCageSize() != null ? listToJson(request.getCageSize()) : service.getCageSize())")
+    @Mapping(target = "roomType",         expression = "java(request.getRoomType() != null ? listToJson(request.getRoomType()) : service.getRoomType())")
     void updateService(@MappingTarget Service service, ServiceUpdateRequest request);
 }

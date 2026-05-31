@@ -22,6 +22,9 @@ public enum ErrorCode {
 
 //   Pet errors
     PET_NOT_EXISTED(2001, "Pet not existed", HttpStatus.NOT_FOUND),
+    CARE_LOG_NOT_FOUND(2002, "Care log not found", HttpStatus.NOT_FOUND),
+    NO_IMAGE_IN_CARE_LOG(2003, "This care log does not contain an image", HttpStatus.BAD_REQUEST),
+    CARE_LOG_NOT_BELONG_TO_PET(2004, "Care log does not belong to this pet", HttpStatus.BAD_REQUEST),
     OLD_PASSWORD_INVALID(1011, "Old password is incorrect", HttpStatus.BAD_REQUEST),
     WRONG_PASSWORD(1012, "Incorrect password", HttpStatus.UNAUTHORIZED),
     SHOP_EXISTED(3001, "Shop already exists", HttpStatus.BAD_REQUEST),
@@ -96,6 +99,7 @@ public enum ErrorCode {
     PET_BOOKING_CONFLICT(5013, "This pet already has an active booking at the requested time", HttpStatus.CONFLICT),
     STAFF_BOOKING_CONFLICT(5014, "This staff member is already booked at the requested time", HttpStatus.CONFLICT),
     NO_STAFF_AVAILABLE(5015, "No staff available for the selected time slot. Please choose a different time.", HttpStatus.CONFLICT),
+    MISSING_MEDICAL_RECORD(5016, "Must fill medical record before completing a clinic booking", HttpStatus.BAD_REQUEST),
 
     // Request errors
     REQUEST_NOT_FOUND(10001, "Request not found", HttpStatus.NOT_FOUND),
@@ -104,6 +108,8 @@ public enum ErrorCode {
     CANNOT_UPDATE_STATUS_WHILE_REQUEST_PENDING(10004, "Cannot update status while a staff change request is pending", HttpStatus.BAD_REQUEST),
     CANNOT_CHANGE_STAFF_DIRECTLY(10005, "Cannot change staff directly when a staff is already assigned. Please use the request flow.", HttpStatus.BAD_REQUEST),
     INVALID_REQUEST(10006,"Invalid request",HttpStatus.BAD_REQUEST),
+    DOCKER_NOT_RUNNING(10007, "Docker daemon is not running or failed to start the camera stream", HttpStatus.INTERNAL_SERVER_ERROR),
+    INVALID_TIME_FORMAT(10008, "Invalid time format. Please use ISO 8601 format (e.g., 2024-12-31T23:59:59)", HttpStatus.BAD_REQUEST)
     ;
 
 

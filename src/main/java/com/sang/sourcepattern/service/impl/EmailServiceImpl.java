@@ -9,9 +9,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
-import org.springframework.scheduling.annotation.Async;
 import jakarta.mail.internet.MimeMessage;
 
 @Service
@@ -26,18 +26,23 @@ public class EmailServiceImpl implements EmailService {
     @NonFinal
     String fromEmail;
 
+    // ─── @Async trên từng method interface để Spring proxy intercept đúng ─────
+
+    @Async
     @Override
     public void sendVerificationEmail(String toEmail, String fullName, String otp) {
         String subject = "[PET EYE] Mã xác thực OTP của bạn";
-        sendHtmlEmail(toEmail, subject, buildOtpEmailHtml(fullName, otp, "xác thực email", 10));
+        doSend(toEmail, subject, buildOtpEmailHtml(fullName, otp, "xác thực email", 10));
     }
 
+    @Async
     @Override
     public void sendPasswordResetEmail(String toEmail, String fullName, String otp) {
         String subject = "[PET EYE] Mã OTP đặt lại mật khẩu";
-        sendHtmlEmail(toEmail, subject, buildOtpEmailHtml(fullName, otp, "đặt lại mật khẩu", 15));
+        doSend(toEmail, subject, buildOtpEmailHtml(fullName, otp, "đặt lại mật khẩu", 15));
     }
 
+    @Async
     @Override
     public void sendShopApprovedEmail(String toEmail, String shopName) {
         String subject = "[PET EYE] Cửa hàng của bạn đã được duyệt";
@@ -51,9 +56,10 @@ public class EmailServiceImpl implements EmailService {
                     <p style="color: #aaa; font-size: 12px;">PET EYE — Nền tảng chăm sóc thú cưng</p>
                 </div>
                 """.formatted(shopName, shopName);
-        sendHtmlEmail(toEmail, subject, html);
+        doSend(toEmail, subject, html);
     }
 
+    @Async
     @Override
     public void sendShopRejectedEmail(String toEmail, String shopName, String reason) {
         String subject = "[PET EYE] Đơn đăng ký cửa hàng bị từ chối";
@@ -71,11 +77,12 @@ public class EmailServiceImpl implements EmailService {
                     <p style="color: #aaa; font-size: 12px;">PET EYE — Nền tảng chăm sóc thú cưng</p>
                 </div>
                 """.formatted(shopName, shopName, reasonHtml);
-        sendHtmlEmail(toEmail, subject, html);
+        doSend(toEmail, subject, html);
     }
 
-    @Async
-    public void sendHtmlEmail(String to, String subject, String htmlContent) {
+    // ─── Internal helper — không @Async, gọi nội bộ an toàn ─────────────────
+
+    private void doSend(String to, String subject, String htmlContent) {
         try {
             MimeMessage message = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");

@@ -27,6 +27,18 @@ public interface BookingService {
     BookingResponse confirmPayment(long orderCode, String userEmail);
 
     /**
+     * MOCK flow:
+     * Bypass PayOS verification and confirm the booking immediately.
+     */
+    BookingResponse mockConfirmPayment(long orderCode, String userEmail);
+
+    /**
+     * MOCK CASH flow:
+     * Bypass PayOS verification and confirm the cash deposit directly.
+     */
+    BookingResponse mockConfirmCashDeposit(long orderCode, String userEmail);
+
+    /**
      * CASH flow — STEP 1:
      * Validate inputs, create PayOS payment link for 10% deposit (= admin commission).
      * NO booking is saved to DB yet.

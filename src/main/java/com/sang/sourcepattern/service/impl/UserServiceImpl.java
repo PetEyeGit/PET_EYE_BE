@@ -193,7 +193,7 @@ public class UserServiceImpl implements UserService {
         userTokenRepository.deleteByUserIdAndType(user.getId(), "RESET_PASSWORD");
 
         String otp = String.format("%06d", new java.util.Random().nextInt(1_000_000));
-        userTokenRepository.save(UserToken.builder()
+        userTokenRepository.saveAndFlush(UserToken.builder()
                 .token(otp)
                 .type("RESET_PASSWORD")
                 .user(user)
@@ -236,15 +236,15 @@ public class UserServiceImpl implements UserService {
 
     // ---- helper ----
     private void sendVerificationToken(User user) {
-        // OTP 6 số random
         String otp = String.format("%06d", new java.util.Random().nextInt(1_000_000));
-        // saveAndFlush đảm bảo token được ghi xuống DB trước khi gửi email
         userTokenRepository.saveAndFlush(UserToken.builder()
                 .token(otp)
                 .type("VERIFY_EMAIL")
                 .user(user)
                 .expiresAt(LocalDateTime.now().plusMinutes(10))
                 .build());
+        // Gửi email đồng bộ — token đã flush xuống DB, transaction chưa commit
+        // nhưng email gửi async (@Async trong EmailServiceImpl) nên không block response
         emailService.sendVerificationEmail(user.getEmail(), user.getFullName(), otp);
     }
 }
