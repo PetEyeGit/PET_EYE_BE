@@ -64,6 +64,7 @@ public class TaskResponse {
     String bankAccount;
     String accountHolder;
     LocalDateTime createdAt;
+    LocalDateTime updatedAt;
 
     @Data
     @Builder

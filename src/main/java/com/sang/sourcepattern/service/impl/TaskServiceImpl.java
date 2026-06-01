@@ -153,6 +153,7 @@ public class TaskServiceImpl implements TaskService {
                 .bankAccount(b.getBankAccount())
                 .accountHolder(b.getAccountHolder())
                 .createdAt(b.getCreatedAt())
+                .updatedAt(b.getUpdatedAt())
                 .build();
     }
 
