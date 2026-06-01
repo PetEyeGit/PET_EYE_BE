@@ -896,10 +896,8 @@ public class BookingServiceImpl implements BookingService {
             checkShopHasAvailableStaff(request.getShopId(), request.getAppointmentDatetime(), totalDuration, isBoarding);
         }
 
-        // ── Tính tiền cọc = 10% tổng giá dịch vụ ────────────────────────────
-        BigDecimal depositRate = walletService.getAdminFeeRate();
-        BigDecimal totalPrice  = resolveTotalPrice(effectiveServiceIds);
-        BigDecimal rawDeposit  = totalPrice.multiply(depositRate);
+        // ── Tính tiền cọc = tổng phí hoa hồng admin cho các dịch vụ ─────────
+        BigDecimal rawDeposit = walletService.calculateAdminCommission(effectiveServiceIds);
         int depositVnd = rawDeposit.setScale(0, java.math.RoundingMode.CEILING).intValue();
         depositVnd = Math.max(depositVnd, 2000);
         if (depositVnd % 1000 != 0) depositVnd = ((depositVnd / 1000) + 1) * 1000;
@@ -1084,7 +1082,7 @@ public class BookingServiceImpl implements BookingService {
                 .build();
         booking = bookingRepository.save(booking);
 
-        // ── Tạo Payment: ghi nhận tiền cọc 10% đã thanh toán qua PayOS ───────
+        // ── Tạo Payment: ghi nhận tiền cọc đã thanh toán qua PayOS ───────
         BigDecimal depositAmount = new BigDecimal(pending.getAmountVnd());
         Payment payment = Payment.builder()
                 .booking(booking)
@@ -1093,13 +1091,13 @@ public class BookingServiceImpl implements BookingService {
                 .status("SUCCESS")
                 .payosOrderCode(orderCode)
                 .description(String.format(
-                        "10%% deposit (PayOS) for cash booking #%d — full price: %s VND",
+                        "Deposit (PayOS) for cash booking #%d — full price: %s VND",
                         booking.getId(), service.getPrice().toPlainString()))
                 .gatewayTransactionId(gatewayTxId)
                 .build();
         paymentRepository.save(payment);
 
-        // ── Ghi Transaction: tiền cọc 10% ─────────────────────────────────────
+        // ── Ghi Transaction: tiền cọc ─────────────────────────────────────
         transactionRepository.save(Transaction.builder()
                 .booking(booking)
                 .shop(shop)
@@ -1110,7 +1108,7 @@ public class BookingServiceImpl implements BookingService {
                 .payosOrderCode(orderCode)
                 .gatewayTransactionId(gatewayTxId)
                 .description(String.format(
-                        "10%% deposit paid (PayOS) for cash booking #%d", booking.getId()))
+                        "Deposit paid (PayOS) for cash booking #%d", booking.getId()))
                 .completedAt(LocalDateTime.now())
                 .build());
 
@@ -1139,7 +1137,7 @@ public class BookingServiceImpl implements BookingService {
         }
         // ------------------------------------------
 
-        log.info("Cash booking {} CONFIRMED — deposit={}VND (10%), remaining {}VND (90%) to be collected in cash",
+        log.info("Cash booking {} CONFIRMED — deposit={}VND, remaining {}VND to be collected in cash",
                 booking.getId(), depositAmount, service.getPrice().subtract(depositAmount));
         return toResponse(booking);
     }
@@ -1620,7 +1618,7 @@ public class BookingServiceImpl implements BookingService {
                 .build();
         booking = bookingRepository.save(booking);
 
-        // ── Tạo Payment: ghi nhận tiền cọc 10% (MOCK) ───────
+        // ── Tạo Payment: ghi nhận tiền cọc (MOCK) ───────
         BigDecimal depositAmount = new BigDecimal(pending.getAmountVnd());
         Payment payment = Payment.builder()
                 .booking(booking)
@@ -1629,13 +1627,13 @@ public class BookingServiceImpl implements BookingService {
                 .status("SUCCESS")
                 .payosOrderCode(orderCode)
                 .description(String.format(
-                        "10%% deposit (MOCK) for cash booking #%d — full price: %s VND",
+                        "Deposit (MOCK) for cash booking #%d — full price: %s VND",
                         booking.getId(), service.getPrice().toPlainString()))
                 .gatewayTransactionId("MOCK-" + orderCode)
                 .build();
         paymentRepository.save(payment);
 
-        // ── Ghi Transaction: tiền cọc 10% ─────────────────────────────────────
+        // ── Ghi Transaction: tiền cọc ─────────────────────────────────────
         transactionRepository.save(Transaction.builder()
                 .booking(booking)
                 .shop(shop)
@@ -1646,7 +1644,7 @@ public class BookingServiceImpl implements BookingService {
                 .payosOrderCode(orderCode)
                 .gatewayTransactionId("MOCK-" + orderCode)
                 .description(String.format(
-                        "10%% deposit paid (MOCK) for cash booking #%d", booking.getId()))
+                        "Deposit paid (MOCK) for cash booking #%d", booking.getId()))
                 .completedAt(LocalDateTime.now())
                 .build());
 
