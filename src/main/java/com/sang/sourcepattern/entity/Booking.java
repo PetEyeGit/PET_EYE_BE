@@ -85,5 +85,8 @@ public class Booking {
     @Builder.Default
     LocalDateTime createdAt = LocalDateTime.now();
 
+    @org.hibernate.annotations.UpdateTimestamp
+    LocalDateTime updatedAt;
+
 
 }

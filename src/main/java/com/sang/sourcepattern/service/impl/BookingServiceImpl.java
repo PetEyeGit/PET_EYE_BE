@@ -1264,6 +1264,28 @@ public class BookingServiceImpl implements BookingService {
 
     @Override
     @Transactional
+    public BookingResponse updateBankInfo(int bookingId, String bankName, String bankAccount, String accountHolder, String userEmail) {
+        User user = userRepository.findByEmail(userEmail)
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
+
+        Booking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new AppException(ErrorCode.BOOKING_NOT_FOUND));
+
+        if (user.getId() != booking.getUser().getId()) {
+            throw new AppException(ErrorCode.BOOKING_NOT_BELONG_TO_USER);
+        }
+
+        if (!"WAITING_REFUND".equals(booking.getStatus())) {
+            throw new AppException(ErrorCode.INVALID_REQUEST); // Only allow when WAITING_REFUND
+        }
+
+        booking.setBankName(bankName);
+        booking.setBankAccount(bankAccount);
+        booking.setAccountHolder(accountHolder);
+
+        booking = bookingRepository.save(booking);
+        return toResponse(booking);
+    }
     public BookingResponse requestBookingCancellation(int bookingId, String reason, String bankName, String bankAccount, String accountHolder, String userEmail) {
         if (reason == null || reason.isBlank() || bankName == null || bankName.isBlank() || bankAccount == null || bankAccount.isBlank() || accountHolder == null || accountHolder.isBlank()) {
             throw new AppException(ErrorCode.INVALID_REQUEST);

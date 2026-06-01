@@ -41,6 +41,9 @@ public interface BookingRepository extends JpaRepository<Booking, Integer> {
     List<Booking> findByShopId(int shopId);
     Optional<Booking> findByPayosOrderCode(Long payosOrderCode);
 
+    @Query("SELECT DISTINCT b FROM Booking b LEFT JOIN FETCH b.services WHERE b.status = :status")
+    List<Booking> findByStatusWithServices(@Param("status") String status);
+
     /** Tong doanh thu toan he thong tu bookings (CONFIRMED / IN_PROGRESS / COMPLETED) */
     @Query("SELECT COALESCE(SUM(s.price), 0) FROM Booking b JOIN b.services s WHERE b.status IN ('CONFIRMED', 'IN_PROGRESS', 'COMPLETED')")
     BigDecimal sumTotalRevenue();

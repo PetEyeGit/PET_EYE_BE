@@ -25,4 +25,5 @@ public class WithdrawalRequestResponse {
     String checkoutUrl;
     String createdAt;
     String processedAt;
+    String type;
 }

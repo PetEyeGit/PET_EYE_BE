@@ -51,6 +51,8 @@ public interface WalletService {
     /** Admin: lấy yêu cầu rút tiền theo trạng thái */
     List<WithdrawalRequestResponse> getWithdrawalRequestsByStatus(String status);
 
+    List<WithdrawalRequestResponse> getWaitingRefundsAsWithdrawals();
+
     /** Admin duyệt yêu cầu rút tiền */
     WithdrawalRequestResponse approveWithdrawal(int requestId, String adminNote);
 
@@ -84,6 +86,9 @@ public interface WalletService {
      *  Trừ `availableBalance` và `totalEarned` của shop, ghi Transaction type=REFUND.
      */
     void confirmRefundForBooking(int bookingId);
+
+    /** Cộng tiền bồi thường cho Shop khi khách hàng bị phạt (e.g., LATE_NO_SHOW). */
+    void creditShopPenalty(int bookingId, BigDecimal penaltyAmount);
 
     /** Admin từ chối yêu cầu rút tiền */
     WithdrawalRequestResponse rejectWithdrawal(int requestId, String adminNote);

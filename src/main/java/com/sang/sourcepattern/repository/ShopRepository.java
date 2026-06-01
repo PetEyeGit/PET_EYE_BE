@@ -13,8 +13,16 @@ import java.util.Optional;
 public interface ShopRepository extends JpaRepository<Shop, Integer> {
     Optional<Shop> findByEmail(String email);
     boolean existsByEmail(String email);
-    Optional<Shop> findByOwnerId(int ownerId);
-    Optional<Shop> findByOwnerEmail(String email);
+    Optional<Shop> findFirstByOwnerId(int ownerId);
+    Optional<Shop> findFirstByOwnerEmail(String email);
+
+    default Optional<Shop> findByOwnerId(int ownerId) {
+        return findFirstByOwnerId(ownerId);
+    }
+
+    default Optional<Shop> findByOwnerEmail(String email) {
+        return findFirstByOwnerEmail(email);
+    }
 
     @Query("""
         SELECT s FROM Shop s
@@ -26,7 +34,8 @@ public interface ShopRepository extends JpaRepository<Shop, Integer> {
           AND (:city IS NULL OR :city = ''
                OR LOWER(s.city) LIKE LOWER(CONCAT('%', :city, '%')))
           AND (:shopType IS NULL OR :shopType = ''
-               OR LOWER(s.shopType) = LOWER(:shopType))
+               OR LOWER(s.shopType) = LOWER(:shopType)
+               OR LOWER(s.shopType) = 'mixed')
         ORDER BY s.ratingAvg DESC
     """)
     List<Shop> searchVerified(

@@ -59,11 +59,14 @@ public class TaskResponse {
     java.util.List<ServiceItem> services;
 
     String note;
+    String paymentMethod; // e.g. "PAYOS" or "CASH_DEPOSIT"
+    String paymentStatus; // e.g. "SUCCESS", "PENDING"
     String cancellationReason;
     String bankName;
     String bankAccount;
     String accountHolder;
     LocalDateTime createdAt;
+    LocalDateTime updatedAt;
 
     @Data
     @Builder
