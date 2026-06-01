@@ -139,6 +139,15 @@ public class WalletController {
                                 .build();
         }
 
+    @GetMapping("/admin/refunds/waiting")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Admin lấy danh sách yêu cầu hoàn tiền cho khách hàng")
+    public ApiResponse<List<WithdrawalRequestResponse>> getWaitingRefunds() {
+        return ApiResponse.<List<WithdrawalRequestResponse>>builder()
+                .result(walletService.getWaitingRefundsAsWithdrawals())
+                .build();
+    }
+
     @PostMapping("/admin/withdrawals/{id}/regenerate-payout")
     @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "Tạo lại PayOS link mới khi link cũ đã bị huỷ/hết hạn (status PAYING)")

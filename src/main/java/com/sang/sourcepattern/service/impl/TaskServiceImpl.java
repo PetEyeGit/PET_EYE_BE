@@ -8,6 +8,8 @@ import com.sang.sourcepattern.entity.Staff;
 import com.sang.sourcepattern.entity.User;
 import com.sang.sourcepattern.exception.AppException;
 import com.sang.sourcepattern.exception.ErrorCode;
+import com.sang.sourcepattern.entity.Payment;
+import java.math.BigDecimal;
 import com.sang.sourcepattern.entity.Notification;
 import com.sang.sourcepattern.entity.StaffChangeRequest;
 import com.sang.sourcepattern.repository.BookingRepository;
@@ -120,6 +122,10 @@ public class TaskServiceImpl implements TaskService {
                         .collect(java.util.stream.Collectors.toList())
                 : java.util.Collections.emptyList();
 
+        Payment payment = paymentRepository.findByBookingId(b.getId()).orElse(null);
+        String paymentMethod = (payment != null) ? payment.getMethod() : "N/A";
+        String paymentStatus = (payment != null) ? payment.getStatus() : "N/A";
+
         return TaskResponse.builder()
                 .bookingId(b.getId())
                 .shopId(b.getShop().getId())
@@ -148,6 +154,8 @@ public class TaskServiceImpl implements TaskService {
                 .rtspLink(b.getRtspLink())
                 .category(category)
                 .note(b.getNote())
+                .paymentMethod(paymentMethod)
+                .paymentStatus(paymentStatus)
                 .cancellationReason(b.getCancellationReason())
                 .bankName(b.getBankName())
                 .bankAccount(b.getBankAccount())
@@ -619,52 +627,130 @@ public class TaskServiceImpl implements TaskService {
             throw new AppException(ErrorCode.NO_SHOW_TOO_EARLY);
         }
 
-        // ── Update Booking ───────────────────────────────────────────────────
+        // ── Update Booking & Payment ─────────────────────────────────────────
         String previousStatus = booking.getStatus();
-        booking.setStatus("CANCELLED");
         booking.setCancellationReason("LATE_NO_SHOW");
-        bookingRepository.save(booking);
 
-        // ── Update Payment → NO_SHOW_PENALTY (Admin giữ tiền cọc) ─────────
-        paymentRepository.findByBookingId(bookingId).ifPresent(p -> {
-            p.setStatus("NO_SHOW_PENALTY");
-            paymentRepository.save(p);
-        });
+        Payment payment = paymentRepository.findByBookingId(bookingId).orElse(null);
+        boolean isPayOS = payment != null && "PAYOS".equals(payment.getMethod());
 
-        // ── Update Transaction → NO_SHOW_PENALTY ─────────────────────────────
-        transactionRepository.findByBookingIdOrderByCreatedAtDesc(bookingId)
-                .stream().findFirst().ifPresent(t -> {
-                    t.setStatus("NO_SHOW_PENALTY");
-                    t.setNote("No-show by customer — deposit retained by Admin");
-                    transactionRepository.save(t);
-                });
+        String staffName = (staff != null) ? staff.getFullName() : (booking.getStaff() != null ? booking.getStaff().getFullName() : "Shop");
 
-        // ── Notifications ────────────────────────────────────────────────────
-        // 1. Thông báo cho Khách hàng
-        String staffName = (staff != null) ? staff.getFullName()
-                : (booking.getStaff() != null ? booking.getStaff().getFullName() : "Shop");
-        Notification notifUser = Notification.builder()
-                .user(booking.getUser())
-                .title("Lịch hẹn đã bị hủy do bạn không đến")
-                .content(String.format(
-                        "Lịch hẹn #%d của bạn đã bị hủy do bạn đến trễ quá %d phút so với giờ hẹn. "
-                        + "Phí đặt cọc sẽ không được hoàn lại.",
-                        bookingId, gracePeriod))
-                .notificationType(Notification.NotificationType.BOOKING)
-                .build();
-        notificationRepository.save(notifUser);
+        if (isPayOS) {
+            // Khách trả 100% -> Chờ hoàn tiền
+            booking.setStatus("WAITING_REFUND");
+            bookingRepository.save(booking);
 
-        // 2. Thông báo cho Shop Owner (nếu Staff hủy)
-        if (!isOwner && shop.getOwner() != null) {
-            Notification notifOwner = Notification.builder()
-                    .user(shop.getOwner())
-                    .title("Nhân viên hủy đơn do khách không đến")
+            if (payment != null) {
+                payment.setStatus("WAITING_REFUND");
+                paymentRepository.save(payment);
+            }
+
+            // Tính tiền phạt 30%
+            BigDecimal fullPrice = booking.getServices().stream()
+                    .map(s -> s.getPrice() != null ? s.getPrice() : BigDecimal.ZERO)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            List<Integer> serviceIds = booking.getServices().stream().map(com.sang.sourcepattern.entity.Service::getId).toList();
+            BigDecimal adminCommission = walletService.calculateAdminCommission(serviceIds);
+            BigDecimal shopPenalty = fullPrice.multiply(new BigDecimal("0.30")).setScale(0, java.math.RoundingMode.DOWN);
+            BigDecimal refundAmount = fullPrice.subtract(adminCommission).subtract(shopPenalty);
+            
+            // Đảm bảo refund không âm
+            if (refundAmount.compareTo(BigDecimal.ZERO) < 0) refundAmount = BigDecimal.ZERO;
+
+            // Cộng ngay 30% vào ví Shop
+            walletService.creditShopPenalty(bookingId, shopPenalty);
+
+            // Ghi Transaction
+            transactionRepository.findByBookingIdOrderByCreatedAtDesc(bookingId)
+                    .stream().findFirst().ifPresent(t -> {
+                        t.setStatus("WAITING_REFUND");
+                        t.setNote("No-show by customer — pending refund after 30% penalty");
+                        transactionRepository.save(t);
+                    });
+
+            // Thông báo Khách hàng
+            String amountText = java.text.NumberFormat.getCurrencyInstance(new java.util.Locale("vi", "VN")).format(refundAmount);
+            Notification notifUser = Notification.builder()
+                    .user(booking.getUser())
+                    .title("Lịch hẹn đã bị hủy do bạn không đến")
                     .content(String.format(
-                            "Nhân viên %s vừa hủy đơn #%d do khách hàng %s không đến sau %d phút chờ.",
-                            staffName, bookingId, booking.getUser().getFullName(), gracePeriod))
+                            "Lịch hẹn #%d bị hủy do bạn đến trễ quá %d phút. Bạn bị phạt 30%% giá trị đơn. Hệ thống sẽ hoàn lại %s sau khi trừ phí. Vui lòng chờ.",
+                            bookingId, gracePeriod, amountText))
                     .notificationType(Notification.NotificationType.BOOKING)
                     .build();
-            notificationRepository.save(notifOwner);
+            notificationRepository.save(notifUser);
+
+            // Thông báo Admin để hoàn tiền
+            List<User> admins = userRepository.findByRoleName("ADMIN");
+            String broadcastId = java.util.UUID.randomUUID().toString();
+            String bankInfo = (booking.getBankName() != null && !booking.getBankName().isBlank())
+                    ? String.format("%s | %s | %s", booking.getBankName(), booking.getAccountHolder(), booking.getBankAccount())
+                    : "Chưa có thông tin ngân hàng";
+            String adminContent = String.format("Khách hàng %s (đơn #%d) không đến. Cần hoàn trả %s về: %s.",
+                    booking.getUser().getFullName(), bookingId, bankInfo, amountText);
+            
+            admins.forEach(admin -> {
+                notificationRepository.save(Notification.builder()
+                        .user(admin)
+                        .title("Yêu cầu hoàn tiền khách hàng No-show")
+                        .content(adminContent)
+                        .broadcastId(broadcastId)
+                        .notificationType(Notification.NotificationType.SYSTEM)
+                        .build());
+            });
+
+            // Thông báo Shop Owner
+            if (!isOwner && shop.getOwner() != null) {
+                Notification notifOwner = Notification.builder()
+                        .user(shop.getOwner())
+                        .title("Nhân viên hủy đơn do khách không đến")
+                        .content(String.format(
+                                "Nhân viên %s vừa hủy đơn #%d do khách %s không đến. Ví của bạn đã được cộng %s tiền bồi thường.",
+                                staffName, bookingId, booking.getUser().getFullName(), java.text.NumberFormat.getCurrencyInstance(new java.util.Locale("vi", "VN")).format(shopPenalty)))
+                        .notificationType(Notification.NotificationType.BOOKING)
+                        .build();
+                notificationRepository.save(notifOwner);
+            }
+
+        } else {
+            // Khách trả CASH_DEPOSIT -> Hủy luôn
+            booking.setStatus("CANCELLED");
+            bookingRepository.save(booking);
+
+            if (payment != null) {
+                payment.setStatus("NO_SHOW_PENALTY");
+                paymentRepository.save(payment);
+            }
+
+            transactionRepository.findByBookingIdOrderByCreatedAtDesc(bookingId)
+                    .stream().findFirst().ifPresent(t -> {
+                        t.setStatus("NO_SHOW_PENALTY");
+                        t.setNote("No-show by customer — deposit retained by Admin");
+                        transactionRepository.save(t);
+                    });
+
+            Notification notifUser = Notification.builder()
+                    .user(booking.getUser())
+                    .title("Lịch hẹn đã bị hủy do bạn không đến")
+                    .content(String.format(
+                            "Lịch hẹn #%d của bạn đã bị hủy do bạn đến trễ quá %d phút so với giờ hẹn. Phí đặt cọc sẽ không được hoàn lại.",
+                            bookingId, gracePeriod))
+                    .notificationType(Notification.NotificationType.BOOKING)
+                    .build();
+            notificationRepository.save(notifUser);
+
+            if (!isOwner && shop.getOwner() != null) {
+                Notification notifOwner = Notification.builder()
+                        .user(shop.getOwner())
+                        .title("Nhân viên hủy đơn do khách không đến")
+                        .content(String.format(
+                                "Nhân viên %s vừa hủy đơn #%d do khách hàng %s không đến sau %d phút chờ. Tiền cọc do Admin giữ theo chính sách.",
+                                staffName, bookingId, booking.getUser().getFullName(), gracePeriod))
+                        .notificationType(Notification.NotificationType.BOOKING)
+                        .build();
+                notificationRepository.save(notifOwner);
+            }
         }
 
         // Tắt camera stream nếu đang chạy

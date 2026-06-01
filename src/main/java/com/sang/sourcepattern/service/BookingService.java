@@ -62,6 +62,8 @@ public interface BookingService {
     /** Cancel a booking */
     BookingResponse cancelBooking(int bookingId, String userEmail);
 
+    BookingResponse updateBankInfo(int bookingId, String bankName, String bankAccount, String accountHolder, String userEmail);
+
     /** Request cancellation and send to shop approval */
     BookingResponse requestBookingCancellation(int bookingId, String reason, String bankName, String bankAccount, String accountHolder, String userEmail);
 

@@ -173,6 +173,26 @@ public class BookingController {
                 .build();
     }
 
+    @PutMapping("/{id}/bank-info")
+    @PreAuthorize("hasRole('USER')")
+    @Operation(summary = "Update bank info for refund when status is WAITING_REFUND")
+    public ApiResponse<BookingResponse> updateBankInfo(
+            @PathVariable int id,
+            @RequestBody @Valid com.sang.sourcepattern.dto.request.UpdateBankInfoRequest request,
+            @AuthenticationPrincipal Jwt jwt) {
+
+        return ApiResponse.<BookingResponse>builder()
+                .result(bookingService.updateBankInfo(
+                        id,
+                        request.getBankName(),
+                        request.getBankAccount(),
+                        request.getAccountHolder(),
+                        jwt.getClaim("email")
+                ))
+                .message("Bank info updated successfully")
+                .build();
+    }
+
     // ─── Public helpers ───────────────────────────────────────────────────────
 
     @GetMapping("/staff/{shopId}")

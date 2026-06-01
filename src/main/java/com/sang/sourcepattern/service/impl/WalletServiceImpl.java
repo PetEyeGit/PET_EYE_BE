@@ -110,8 +110,9 @@ public class WalletServiceImpl implements WalletService {
                 .adminNote(r.getAdminNote())
                 .payosOrderCode(r.getPayosOrderCode())
                 .checkoutUrl(r.getCheckoutUrl())
-                .createdAt(r.getCreatedAt().format(FMT))
+                .createdAt(r.getCreatedAt() != null ? r.getCreatedAt().format(FMT) : "")
                 .processedAt(r.getProcessedAt() != null ? r.getProcessedAt().format(FMT) : null)
+                .type("WITHDRAWAL")
                 .build();
     }
 
@@ -365,6 +366,32 @@ public class WalletServiceImpl implements WalletService {
     }
 
     @Override
+    public List<WithdrawalRequestResponse> getWaitingRefundsAsWithdrawals() {
+        return bookingRepository.findByStatusWithServices("WAITING_REFUND")
+                .stream()
+                .map(b -> {
+                    BigDecimal refundAmount = (b.getServices() != null && !b.getServices().isEmpty())
+                            ? b.getServices().stream().map(s -> s.getPrice() != null ? s.getPrice() : BigDecimal.ZERO).reduce(BigDecimal.ZERO, BigDecimal::add)
+                            : BigDecimal.ZERO;
+                    
+                    return WithdrawalRequestResponse.builder()
+                            .id(b.getId()) // use booking id
+                            .shopId(b.getShop().getId())
+                            .shopName("Khách hàng: " + (b.getUser() != null ? b.getUser().getFullName() : "Unknown"))
+                            .amount(refundAmount)
+                            .bankName(b.getBankName())
+                            .bankAccount(b.getBankAccount())
+                            .accountHolder(b.getAccountHolder())
+                            .note("Lý do huỷ: " + b.getNote())
+                            .status("PENDING") // Map WAITING_REFUND to PENDING so UI shows it in pending tab
+                            .createdAt(b.getUpdatedAt() != null ? b.getUpdatedAt().format(FMT) : "")
+                            .type("REFUND")
+                            .build();
+                })
+                .collect(Collectors.toList());
+    }
+
+    @Override
     @Transactional
     public WithdrawalRequestResponse approveWithdrawal(int requestId, String adminNote) {
         // Kept for backward-compat — delegates to initiatePayoutPayOS
@@ -582,15 +609,10 @@ public class WalletServiceImpl implements WalletService {
 
         ShopWallet wallet = getOrCreateWallet(booking.getShop());
 
-        if (safe(wallet.getAvailableBalance()).compareTo(refundAmount) < 0) {
-            throw new AppException(ErrorCode.INSUFFICIENT_BALANCE);
-        }
-
-        // Trừ tiền khỏi availableBalance và giảm totalEarned
-        wallet.setAvailableBalance(safe(wallet.getAvailableBalance()).subtract(refundAmount));
-        wallet.setTotalEarned(safe(wallet.getTotalEarned()).subtract(refundAmount));
-        wallet.setUpdatedAt(LocalDateTime.now());
-        walletRepository.save(wallet);
+        // LỖI CŨ CỦA HỆ THỐNG: Luôn trừ tiền ví Shop khi hoàn tiền.
+        // Thực tế, nếu đơn ở trạng thái WAITING_REFUND, tức là chưa COMPLETED, Shop chưa nhận được đồng nào.
+        // Do đó KHÔNG ĐƯỢC trừ tiền trong ví Shop. Việc trả tiền là Admin tự chuyển khoản từ tiền Admin đang giữ.
+        // Đã gỡ bỏ: wallet.setAvailableBalance(...); wallet.setTotalEarned(...);
 
         // Ghi Transaction REFUND
         transactionRepository.save(Transaction.builder()
@@ -613,6 +635,36 @@ public class WalletServiceImpl implements WalletService {
         }
 
         log.info("Refund for booking {} processed — shop={} amount={}", bookingId, booking.getShop().getShopName(), refundAmount);
+    }
+
+    @Override
+    @Transactional
+    public void creditShopPenalty(int bookingId, BigDecimal penaltyAmount) {
+        Booking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new AppException(ErrorCode.BOOKING_NOT_FOUND));
+
+        if (penaltyAmount == null || penaltyAmount.compareTo(BigDecimal.ZERO) <= 0) {
+            return;
+        }
+
+        ShopWallet wallet = getOrCreateWallet(booking.getShop());
+        
+        wallet.setAvailableBalance(safe(wallet.getAvailableBalance()).add(penaltyAmount));
+        wallet.setTotalEarned(safe(wallet.getTotalEarned()).add(penaltyAmount));
+        wallet.setUpdatedAt(LocalDateTime.now());
+        walletRepository.save(wallet);
+
+        transactionRepository.save(Transaction.builder()
+                .shop(booking.getShop())
+                .type("WALLET_CREDIT")
+                .amount(penaltyAmount)
+                .status("SUCCESS")
+                .description(String.format("Tiền bồi thường do khách hàng No-show đơn #%d", bookingId))
+                .completedAt(LocalDateTime.now())
+                .build());
+
+        log.info("Credited NO_SHOW penalty to Shop {} for booking {} - Amount: {}", 
+                booking.getShop().getShopName(), bookingId, penaltyAmount);
     }
 
     @Override
