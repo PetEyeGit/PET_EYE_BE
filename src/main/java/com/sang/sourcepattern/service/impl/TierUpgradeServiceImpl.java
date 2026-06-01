@@ -59,6 +59,7 @@ public class TierUpgradeServiceImpl implements TierUpgradeService {
             
             if (isUpgraded) {
                 user.setCurrentTier(newTier);
+                user.setJustUpgraded(true);
                 log.info("User {} upgraded to tier {}", user.getEmail(), newTier.getName());
 
                 // Issue vouchers for the new tier

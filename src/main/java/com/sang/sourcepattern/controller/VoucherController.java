@@ -20,20 +20,28 @@ import java.util.List;
 @RequestMapping("/admin/vouchers")
 @RequiredArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
-@PreAuthorize("hasRole('ADMIN')")
 public class VoucherController {
 
     VoucherRepository voucherRepository;
     MembershipTierRepository membershipTierRepository;
 
     @GetMapping
+    @PreAuthorize("hasRole('ADMIN')")
     public ApiResponse<List<Voucher>> getAllVouchers() {
         return ApiResponse.<List<Voucher>>builder()
                 .result(voucherRepository.findAll())
                 .build();
     }
 
+    @GetMapping("/public")
+    public ApiResponse<List<Voucher>> getPublicVouchers() {
+        return ApiResponse.<List<Voucher>>builder()
+                .result(voucherRepository.findAll())
+                .build();
+    }
+
     @PostMapping
+    @PreAuthorize("hasRole('ADMIN')")
     public ApiResponse<Voucher> createVoucher(@RequestBody VoucherCreationRequest request) {
         MembershipTier targetTier = membershipTierRepository.findByName(request.getTargetTierName())
                 .orElseGet(() -> membershipTierRepository.save(
@@ -60,6 +68,7 @@ public class VoucherController {
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ApiResponse<Voucher> updateVoucher(@PathVariable Integer id, @RequestBody VoucherCreationRequest request) {
         Voucher voucher = voucherRepository.findById(id)
                 .orElseThrow(() -> new AppException(ErrorCode.UNCATEGORIZED_EXCEPTION));
@@ -87,6 +96,7 @@ public class VoucherController {
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ApiResponse<Void> deleteVoucher(@PathVariable Integer id) {
         voucherRepository.deleteById(id);
         return ApiResponse.<Void>builder()

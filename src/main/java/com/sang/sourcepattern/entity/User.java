@@ -45,6 +45,9 @@ public class User {
     @Builder.Default
     boolean emailVerified = false;
 
+    @Builder.Default
+    Boolean justUpgraded = false;
+
     @ManyToOne
     @JoinColumn(name = "tier_id")
     MembershipTier currentTier;

@@ -38,6 +38,7 @@ public class UserController {
     UserService userService;
     NotificationRepository notificationRepository;
     UserRepository userRepository;
+    com.sang.sourcepattern.repository.UserVoucherRepository userVoucherRepository;
 
     @PostMapping("/register")
     ApiResponse<UserResponse> createUser(@RequestBody @Valid UserCreationRequest request) {
@@ -74,6 +75,46 @@ public class UserController {
         userService.changePassword(id, request);
         return ApiResponse.<Void>builder()
                 .message("Password changed successfully")
+                .build();
+    }
+
+    @PatchMapping("/me/acknowledge-upgrade")
+    @Transactional
+    ApiResponse<Void> acknowledgeUpgrade(@AuthenticationPrincipal Jwt jwt) {
+        String identifier = jwt.getSubject();
+        User user;
+        if (identifier.contains("@")) {
+            user = userRepository.findByEmail(identifier)
+                    .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
+        } else {
+            user = userRepository.findById(Integer.parseInt(identifier))
+                    .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
+        }
+
+        user.setJustUpgraded(false);
+        userRepository.save(user);
+
+        return ApiResponse.<Void>builder()
+                .message("Upgrade acknowledged")
+                .build();
+    }
+
+    @GetMapping("/me/vouchers")
+    @Transactional(readOnly = true)
+    public ApiResponse<List<com.sang.sourcepattern.entity.UserVoucher>> getMyVouchers(@AuthenticationPrincipal Jwt jwt) {
+        String identifier = jwt.getSubject();
+        User user;
+        if (identifier.contains("@")) {
+            user = userRepository.findByEmail(identifier)
+                    .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
+        } else {
+            user = userRepository.findById(Integer.parseInt(identifier))
+                    .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
+        }
+
+        List<com.sang.sourcepattern.entity.UserVoucher> vouchers = userVoucherRepository.findByUserIdAndIsUsedFalse(user.getId());
+        return ApiResponse.<List<com.sang.sourcepattern.entity.UserVoucher>>builder()
+                .result(vouchers)
                 .build();
     }
 

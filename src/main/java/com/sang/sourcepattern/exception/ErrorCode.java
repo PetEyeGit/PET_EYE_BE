@@ -113,7 +113,8 @@ public enum ErrorCode {
 
     // No-Show cancellation errors
     NO_SHOW_TOO_EARLY(10009, "Cannot cancel as no-show yet. The grace period has not elapsed.", HttpStatus.BAD_REQUEST),
-    INVALID_GRACE_PERIOD(10010, "Late grace period must be between 5 and 30 minutes", HttpStatus.BAD_REQUEST)
+    INVALID_GRACE_PERIOD(10010, "Late grace period must be between 5 and 30 minutes", HttpStatus.BAD_REQUEST),
+    VOUCHER_NOT_FOUND(10011, "Voucher not found", HttpStatus.NOT_FOUND)
     ;
 
 

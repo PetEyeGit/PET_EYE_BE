@@ -1,4 +1,4 @@
-﻿
+
 -- ============================================================
 -- PETEYE — SEED DATA
 -- Chạy: USE PET_EYE; source seed_data.sql;
@@ -123,36 +123,36 @@ INSERT INTO user_roles (user_id, roles_id) VALUES
 INSERT INTO shop (id, owner_id, shop_name, shop_type, email, phone,
                   address, city, description, license_number,
                   is_verified, rating_avg, open_time, close_time,
-                  working_days, assignment_mode) VALUES
+                  working_days, assignment_mode, late_grace_period) VALUES
 (1, 2, 'Shop 1', 'SPA',
    'shop1@peteye.com', '0281000001',
    '123 Nguyễn Trãi, Quận 5', 'TP.HCM',
    'Shop 1 chuyên dịch vụ Spa & Grooming cho thú cưng tại Quận 5. Đội ngũ nhân viên tận tình, sản phẩm cao cấp.',
-   'SP-001', true, 4.7, '08:00', '20:00', 'Mon,Tue,Wed,Thu,Fri,Sat,Sun', 'MANUAL'),
+   'SP-001', true, 4.7, '08:00', '20:00', 'Mon,Tue,Wed,Thu,Fri,Sat,Sun', 'MANUAL', 15),
 
 (2, 3, 'Shop 2', 'CLINIC',
    'shop2@peteye.com', '0281000002',
    '45 Lê Văn Sỹ, Quận 3', 'TP.HCM',
    'Shop 2 là phòng khám thú y uy tín tại Quận 3. Bác sĩ 10 năm kinh nghiệm, trang thiết bị hiện đại.',
-   'CL-002', true, 4.8, '07:00', '21:00', 'Mon,Tue,Wed,Thu,Fri,Sat,Sun', 'AUTO'),
+   'CL-002', true, 4.8, '07:00', '21:00', 'Mon,Tue,Wed,Thu,Fri,Sat,Sun', 'AUTO', 15),
 
 (3, 4, 'Shop 3', 'BOARDING',
    'shop3@peteye.com', '0281000003',
    '78 Đinh Tiên Hoàng, Quận Bình Thạnh', 'TP.HCM',
    'Shop 3 cung cấp dịch vụ lưu trú & khách sạn thú cưng tại Bình Thạnh. Camera 24/7, phòng riêng thoáng mát.',
-   'BD-003', true, 4.6, '06:00', '22:00', 'Mon,Tue,Wed,Thu,Fri,Sat,Sun', 'OPEN_POOL'),
+   'BD-003', true, 4.6, '06:00', '22:00', 'Mon,Tue,Wed,Thu,Fri,Sat,Sun', 'OPEN_POOL', 15),
 
 (4, 5, 'Shop 4', 'SPA',
    'shop4@peteye.com', '0281000004',
    '200 Hoàng Văn Thụ, Quận Phú Nhuận', 'TP.HCM',
    'Shop 4 chuyên làm đẹp và grooming cao cấp tại Phú Nhuận. Nhuộm lông nghệ thuật, spa thư giãn.',
-   'SP-004', true, 4.5, '09:00', '19:00', 'Mon,Tue,Wed,Thu,Fri,Sat', 'MANUAL'),
+   'SP-004', true, 4.5, '09:00', '19:00', 'Mon,Tue,Wed,Thu,Fri,Sat', 'MANUAL', 15),
 
 (5, 6, 'Shop 5', 'MIXED',
    'shop5@peteye.com', '0281000005',
    '15 Nguyễn Đình Chiểu, Quận 1', 'TP.HCM',
    'Shop 5 là trung tâm chăm sóc thú cưng cao cấp tổng hợp tại Quận 1. Đầy đủ dịch vụ: khám, spa, boarding.',
-   'MX-005', true, 4.9, '07:00', '22:00', 'Mon,Tue,Wed,Thu,Fri,Sat,Sun', 'AUTO');
+   'MX-005', true, 4.9, '07:00', '22:00', 'Mon,Tue,Wed,Thu,Fri,Sat,Sun', 'AUTO', 15);
 
 -- ============================================================
 -- SERVICES (6 dịch vụ × 5 shop = 30 dịch vụ)

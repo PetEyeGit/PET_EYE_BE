@@ -53,6 +53,7 @@ public class BookingServiceImpl implements BookingService {
     WalletServiceImpl     walletService;
     NotificationRepository notificationRepository;
     com.sang.sourcepattern.service.CameraService cameraService;
+    UserVoucherRepository userVoucherRepository;
     /** Redis template để lưu PendingBooking thay vì in-memory */
     RedisTemplate<String, Object> redisTemplate;
 
@@ -99,6 +100,7 @@ public class BookingServiceImpl implements BookingService {
         LocalDateTime checkOutDatetime;
         String cageSize;
         String roomType;
+        Integer userVoucherId;
     }
 
     // ─── Redis helpers ────────────────────────────────────────────────────────
@@ -389,6 +391,32 @@ public class BookingServiceImpl implements BookingService {
         String description = "Booking" + orderCode % 100000;
         // Tổng giá tất cả services
         int rawAmount = resolveTotalPrice(effectiveServiceIds).intValue();
+
+        // --- Voucher Logic ---
+        if (request.getUserVoucherId() != null) {
+            UserVoucher uv = userVoucherRepository.findById(request.getUserVoucherId())
+                .orElseThrow(() -> new AppException(ErrorCode.VOUCHER_NOT_FOUND));
+            
+            if (uv.getUser().getId() != user.getId() || uv.isUsed()) {
+                throw new AppException(ErrorCode.INVALID_REQUEST);
+            }
+            
+            Voucher v = uv.getVoucher();
+            if (v.getMinOrderValue() != null && rawAmount < v.getMinOrderValue()) {
+                throw new AppException(ErrorCode.INVALID_REQUEST);
+            }
+            
+            double discount = 0;
+            if ("PERCENTAGE".equalsIgnoreCase(v.getDiscountType())) {
+                discount = rawAmount * (v.getDiscountValue() / 100.0);
+            } else {
+                discount = v.getDiscountValue();
+            }
+            
+            rawAmount -= discount;
+        }
+        // ---------------------
+
         int amountVnd = Math.max(rawAmount, 2000);
         if (amountVnd % 1000 != 0) amountVnd = ((amountVnd / 1000) + 1) * 1000;
 
@@ -399,7 +427,8 @@ public class BookingServiceImpl implements BookingService {
                 request.getPetId(), request.getStaffId(),
                 request.getAppointmentDatetime(), request.getCheckIn(), request.getCheckOut(),
                 request.getNote(), amountVnd, description,
-                request.getCheckOut(), request.getCageSize(), request.getRoomType()
+                request.getCheckOut(), request.getCageSize(), request.getRoomType(),
+                request.getUserVoucherId()
         );
         savePending(orderCode, pending);
 
@@ -537,6 +566,25 @@ public class BookingServiceImpl implements BookingService {
             }
         }
 
+        Double discountAmount = null;
+        Voucher appliedVoucher = null;
+        if (pending.getUserVoucherId() != null) {
+            UserVoucher uv = userVoucherRepository.findById(pending.getUserVoucherId()).orElse(null);
+            if (uv != null && !uv.isUsed()) {
+                uv.setUsed(true);
+                uv.setUsedAt(LocalDateTime.now());
+                userVoucherRepository.save(uv);
+                appliedVoucher = uv.getVoucher();
+                
+                int rawAmount = resolveTotalPrice(pendingServiceIds).intValue();
+                if ("PERCENTAGE".equalsIgnoreCase(appliedVoucher.getDiscountType())) {
+                    discountAmount = rawAmount * (appliedVoucher.getDiscountValue() / 100.0);
+                } else {
+                    discountAmount = appliedVoucher.getDiscountValue();
+                }
+            }
+        }
+
         // ── Tạo Booking ───────────────────────────────────────────────────────
         Booking booking = Booking.builder()
                 .user(user).shop(shop).service(service).pet(pet).staff(staff)
@@ -547,17 +595,17 @@ public class BookingServiceImpl implements BookingService {
                 .checkIn(pending.getCheckIn())
                 .checkOut(pending.getCheckOut())
                 .note(pending.getNote())
-                .cageSize(pending.getCageSize())
-                .roomType(pending.getRoomType())
                 .status((staff != null && !"AUTO".equals(shop.getAssignmentMode())) ? "WAITING_SHOP_APPROVAL" : "CONFIRMED")
                 .payosOrderCode(orderCode)
+                .appliedVoucher(appliedVoucher)
+                .discountAmount(discountAmount)
                 .build();
         booking = bookingRepository.save(booking);
 
         // ── Tạo Payment ───────────────────────────────────────────────────────
         Payment payment = Payment.builder()
                 .booking(booking)
-                .amount(service.getPrice())
+                .amount(new BigDecimal(pending.getAmountVnd()))
                 .method("PAYOS")
                 .status("SUCCESS")
                 .payosOrderCode(orderCode)
@@ -571,7 +619,7 @@ public class BookingServiceImpl implements BookingService {
                 .booking(booking)
                 .shop(shop)
                 .type("BOOKING_PAYMENT")
-                .amount(service.getPrice())
+                .amount(new BigDecimal(pending.getAmountVnd()))
                 .paymentMethod("PAYOS")
                 .status("SUCCESS")
                 .payosOrderCode(orderCode)
@@ -679,6 +727,25 @@ public class BookingServiceImpl implements BookingService {
             }
         }
 
+        Double discountAmount = null;
+        Voucher appliedVoucher = null;
+        if (pending.getUserVoucherId() != null) {
+            UserVoucher uv = userVoucherRepository.findById(pending.getUserVoucherId()).orElse(null);
+            if (uv != null && !uv.isUsed()) {
+                uv.setUsed(true);
+                uv.setUsedAt(LocalDateTime.now());
+                userVoucherRepository.save(uv);
+                appliedVoucher = uv.getVoucher();
+                
+                int rawAmount = resolveTotalPrice(pendingServiceIds).intValue();
+                if ("PERCENTAGE".equalsIgnoreCase(appliedVoucher.getDiscountType())) {
+                    discountAmount = rawAmount * (appliedVoucher.getDiscountValue() / 100.0);
+                } else {
+                    discountAmount = appliedVoucher.getDiscountValue();
+                }
+            }
+        }
+
         // ── Tạo Booking ───────────────────────────────────────────────────────
         Booking booking = Booking.builder()
                 .user(user).shop(shop).service(service).pet(pet).staff(staff)
@@ -690,13 +757,15 @@ public class BookingServiceImpl implements BookingService {
                 .roomType(pending.getRoomType())
                 .status((staff != null && !"AUTO".equals(shop.getAssignmentMode())) ? "WAITING_SHOP_APPROVAL" : "CONFIRMED")
                 .payosOrderCode(orderCode)
+                .appliedVoucher(appliedVoucher)
+                .discountAmount(discountAmount)
                 .build();
         booking = bookingRepository.save(booking);
 
         // ── Tạo Payment ───────────────────────────────────────────────────────
         Payment payment = Payment.builder()
                 .booking(booking)
-                .amount(service.getPrice())
+                .amount(new BigDecimal(pending.getAmountVnd()))
                 .method("MOCK")
                 .status("SUCCESS")
                 .payosOrderCode(orderCode)
@@ -710,7 +779,7 @@ public class BookingServiceImpl implements BookingService {
                 .booking(booking)
                 .shop(shop)
                 .type("BOOKING_PAYMENT")
-                .amount(service.getPrice())
+                .amount(new BigDecimal(pending.getAmountVnd()))
                 .paymentMethod("MOCK")
                 .status("SUCCESS")
                 .payosOrderCode(orderCode)
@@ -803,7 +872,7 @@ public class BookingServiceImpl implements BookingService {
                 request.getPetId(), request.getStaffId(),
                 request.getAppointmentDatetime(), request.getCheckIn(), request.getCheckOut(),
                 request.getNote(), depositVnd, description,
-                request.getCheckOut(), request.getCageSize(), request.getRoomType()
+                request.getCheckOut(), request.getCageSize(), request.getRoomType(), null
         );
         redisTemplate.opsForValue().set(
                 CASH_PENDING_PREFIX + orderCode, pending,

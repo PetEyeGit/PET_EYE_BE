@@ -42,6 +42,7 @@ public class UserServiceImpl implements UserService {
     EmailService emailService;
     UserTokenRepository userTokenRepository;
     com.sang.sourcepattern.repository.UserVoucherRepository userVoucherRepository;
+    com.sang.sourcepattern.service.TierUpgradeService tierUpgradeService;
 
     @Override
     @Transactional
@@ -85,6 +86,7 @@ public class UserServiceImpl implements UserService {
     public UserResponse getUserById(Integer userId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
+        
         return mapUserWithVouchers(user);
     }
 

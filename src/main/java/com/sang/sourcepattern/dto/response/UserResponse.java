@@ -20,6 +20,7 @@ public class UserResponse {
     boolean active;
     boolean isBanned;
     Double totalSpending;
+    Boolean justUpgraded;
     MembershipTierResponse currentTier;
     List<VoucherResponse> vouchers;
     Set<RoleResponse> roles;

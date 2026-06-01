@@ -55,11 +55,11 @@ INSERT IGNORE INTO user_roles (user_id, roles_id) VALUES (9, 4);
 -- ==========================================
 -- SHOPS
 -- ==========================================
-INSERT IGNORE INTO shop (id, owner_id, shop_name, email, phone, address, city, shop_type, is_verified)
-VALUES (1, 2, 'Pet Paradise Spa & Clinic', 'owner1@peteye.com', '0901111111', '123 Đường số 7, Tân Phong', 'Hồ Chí Minh', 'CLINIC', 1);
+INSERT IGNORE INTO shop (id, owner_id, shop_name, email, phone, address, city, shop_type, is_verified, late_grace_period)
+VALUES (1, 2, 'Pet Paradise Spa & Clinic', 'owner1@peteye.com', '0901111111', '123 Đường số 7, Tân Phong', 'Hồ Chí Minh', 'CLINIC', 1, 15);
 
-INSERT IGNORE INTO shop (id, owner_id, shop_name, email, phone, address, city, shop_type, is_verified)
-VALUES (2, 3, 'Paws & Whiskers Care', 'owner2@peteye.com', '0902222222', '45 Song Hành, Thảo Điền', 'Hồ Chí Minh', 'SPA', 1);
+INSERT IGNORE INTO shop (id, owner_id, shop_name, email, phone, address, city, shop_type, is_verified, late_grace_period)
+VALUES (2, 3, 'Paws & Whiskers Care', 'owner2@peteye.com', '0902222222', '45 Song Hành, Thảo Điền', 'Hồ Chí Minh', 'SPA', 1, 15);
 
 -- ==========================================
 -- STAFF (Cột đúng: is_active, không có created_at)

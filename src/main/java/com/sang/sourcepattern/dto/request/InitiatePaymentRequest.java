@@ -47,4 +47,5 @@ public class InitiatePaymentRequest {
     String cageSize;
     String roomType;
 
+    Integer userVoucherId;
 }

@@ -99,7 +99,7 @@ INSERT INTO user_roles (user_id, roles_id) VALUES
 INSERT INTO shop (id, owner_id, shop_name, shop_type, email, phone,
                   address, city, description, license_number,
                   is_verified, rating_avg, open_time, close_time,
-                  working_days, assignment_mode) VALUES
+                  working_days, assignment_mode, late_grace_period) VALUES
 (1, 2,
  'Dev Pet Spa',
  'SPA',
@@ -114,7 +114,7 @@ INSERT INTO shop (id, owner_id, shop_name, shop_type, email, phone,
  '08:00',
  '20:00',
  'Mon,Tue,Wed,Thu,Fri,Sat,Sun',
- 'MANUAL');  -- MANUAL: shop owner tự assign staff
+ 'MANUAL', 15);  -- MANUAL: shop owner tự assign staff
 
 -- ============================================================
 -- SERVICES (4 dịch vụ)
@@ -298,6 +298,14 @@ INSERT INTO booking (id, user_id, shop_id, service_id, pet_id, staff_id, appoint
  DATE_ADD(CURDATE(), INTERVAL 1 DAY) + INTERVAL 16 HOUR,
  'WAITING_SHOP_APPROVAL',
  'Tắm & sấy cơ bản - Chờ phê duyệt từ shop',
+ NOW());
+
+-- Booking 8: CONFIRMED - Dành cho Boarding kèm Camera
+INSERT INTO booking (id, user_id, shop_id, service_id, pet_id, staff_id, appointment_datetime, status, note, created_at) VALUES
+(8, 3, 1, 4, 1, 1,
+ DATE_ADD(CURDATE(), INTERVAL 1 DAY) + INTERVAL 10 HOUR,
+ 'CONFIRMED',
+ 'Lưu trú thú cưng kèm Camera',
  NOW());
 
 
