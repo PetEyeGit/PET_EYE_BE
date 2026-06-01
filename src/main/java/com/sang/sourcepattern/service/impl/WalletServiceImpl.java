@@ -42,6 +42,7 @@ public class WalletServiceImpl implements WalletService {
     NotificationRepository      notificationRepository;
     PayOSService                payOSService;
     com.sang.sourcepattern.service.CameraService cameraService;
+    ServiceRepository           serviceRepository;
 
     /** Phí admin: 10% */
     @NonFinal
@@ -132,10 +133,60 @@ public class WalletServiceImpl implements WalletService {
     }
 
     @Override
+    public BigDecimal getCommissionRateForService(com.sang.sourcepattern.entity.Service s) {
+        if (s == null || s.getCategory() == null) {
+            return adminFeeRate;
+        }
+        String category = s.getCategory().toUpperCase();
+        if (category.contains("GROOMING") || category.contains("SPA")) {
+            return new BigDecimal("0.18");
+        } else if ((category.contains("BOARDING") || category.contains("HOTEL")) && s.isCameraEnabled()) {
+            return new BigDecimal("0.25");
+        } else if (category.contains("CLINIC")) {
+            return new BigDecimal("0.10");
+        }
+        return adminFeeRate;
+    }
+
+    @Override
+    public BigDecimal calculateAdminCommission(List<Integer> serviceIds) {
+        if (serviceIds == null || serviceIds.isEmpty()) {
+            return BigDecimal.ZERO;
+        }
+        BigDecimal totalCommission = BigDecimal.ZERO;
+        for (Integer id : serviceIds) {
+            com.sang.sourcepattern.entity.Service s = serviceRepository.findById(id).orElse(null);
+            if (s != null && s.getPrice() != null) {
+                BigDecimal rate = getCommissionRateForService(s);
+                totalCommission = totalCommission.add(s.getPrice().multiply(rate));
+            }
+        }
+        return totalCommission;
+    }
+
+    private BigDecimal calculateAdminCommissionForBooking(Booking booking) {
+        BigDecimal totalCommission = BigDecimal.ZERO;
+        if (booking.getServices() == null || booking.getServices().isEmpty()) {
+            return totalCommission;
+        }
+        for (com.sang.sourcepattern.entity.Service s : booking.getServices()) {
+            if (s.getPrice() != null) {
+                BigDecimal rate = getCommissionRateForService(s);
+                totalCommission = totalCommission.add(s.getPrice().multiply(rate));
+            }
+        }
+        return totalCommission;
+    }
+
+    @Override
     public BigDecimal getAdminBalance() {
-        // Tổng phí admin = 10% từ tất cả booking COMPLETED
-        BigDecimal completedRevenue = bookingRepository.sumTotalCompletedRevenue();
-        return completedRevenue.multiply(adminFeeRate).setScale(0, RoundingMode.DOWN);
+        // Tổng phí admin từ tất cả booking COMPLETED (tính riêng biệt theo dịch vụ)
+        List<Booking> completedBookings = bookingRepository.findCompletedBookingsWithServices();
+        BigDecimal totalCommission = BigDecimal.ZERO;
+        for (Booking booking : completedBookings) {
+            totalCommission = totalCommission.add(calculateAdminCommissionForBooking(booking));
+        }
+        return totalCommission.setScale(0, RoundingMode.DOWN);
     }
 
     @Override
@@ -156,26 +207,28 @@ public class WalletServiceImpl implements WalletService {
         BigDecimal fullPrice = (booking.getServices() != null && !booking.getServices().isEmpty())
                 ? booking.getServices().stream().map(s -> s.getPrice() != null ? s.getPrice() : BigDecimal.ZERO).reduce(BigDecimal.ZERO, BigDecimal::add)
                 : BigDecimal.ZERO;
+
+        BigDecimal adminCommission = calculateAdminCommissionForBooking(booking);
+        BigDecimal shopShare = fullPrice.subtract(adminCommission).setScale(0, RoundingMode.DOWN);
+
         String paymentMethod;
 
         if (payment != null && "CASH_DEPOSIT".equals(payment.getMethod())
                 && "SUCCESS".equals(payment.getStatus())) {
-            // ── Cash-deposit booking: cọc 10% đã thu qua PayOS ──────────────
-            // Admin đã nhận 10% (deposit). Shop nhận 90% từ tiền mặt thu tại chỗ.
-            // Ghi thêm 1 transaction BOOKING_PAYMENT CASH cho phần 90% còn lại.
+            // ── Cash-deposit booking: cọc đã thu qua PayOS ──────────────
+            // Admin đã nhận (deposit = adminCommission). Shop nhận phần còn lại từ tiền mặt thu tại chỗ.
+            // Ghi thêm 1 transaction BOOKING_PAYMENT CASH cho phần còn lại.
             paymentMethod = "CASH_DEPOSIT";
-            BigDecimal cashPart = fullPrice.multiply(BigDecimal.ONE.subtract(adminFeeRate))
-                    .setScale(0, RoundingMode.DOWN);
 
             transactionRepository.save(Transaction.builder()
                     .booking(booking)
                     .shop(booking.getShop())
                     .type("BOOKING_PAYMENT")
-                    .amount(cashPart)
+                    .amount(shopShare)
                     .paymentMethod("CASH")
                     .status("SUCCESS")
                     .description(String.format(
-                            "Cash collected at venue for booking #%d (90%% of %s VND)",
+                            "Cash collected at venue for booking #%d (shop share of %s VND)",
                             bookingId, fullPrice.toPlainString()))
                     .completedAt(LocalDateTime.now())
                     .build());
@@ -200,11 +253,6 @@ public class WalletServiceImpl implements WalletService {
             // ── PayOS booking ─────────────────────────────────────────────────
             paymentMethod = payment.getMethod();
         }
-
-        // Tính phần shop nhận (90% của full price)
-        BigDecimal shopShare = fullPrice
-                .multiply(BigDecimal.ONE.subtract(adminFeeRate))
-                .setScale(0, RoundingMode.DOWN);
 
         // Cộng TRỰC TIẾP vào available + totalEarned
         ShopWallet wallet = getOrCreateWallet(booking.getShop());
@@ -234,12 +282,12 @@ public class WalletServiceImpl implements WalletService {
                     .amount(shopShare)
                     .paymentMethod(paymentMethod)
                     .status("SUCCESS")
-                    .description(String.format("Wallet credit for booking #%d (90%% of %s VND)",
+                    .description(String.format("Wallet credit for booking #%d (shop share of %s VND)",
                             bookingId, fullPrice.toPlainString()))
                     .completedAt(LocalDateTime.now())
                     .build());
 
-            log.info("Wallet credited for COMPLETED booking {} — shopShare={} (90% of {})",
+            log.info("Wallet credited for COMPLETED booking {} — shopShare={} (full price {})",
                     bookingId, shopShare, fullPrice);
         } else {
             log.info("Cash booking completed {} — no wallet credit. Shop received cash directly.", bookingId);

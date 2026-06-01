@@ -21,6 +21,12 @@ public interface WalletService {
     /** Lấy tỷ lệ phí hoa hồng admin (mặc định 10%) */
     BigDecimal getAdminFeeRate();
 
+    /** Tính tổng phí hoa hồng admin cho danh sách service IDs */
+    BigDecimal calculateAdminCommission(List<Integer> serviceIds);
+
+    /** Lấy tỷ lệ phí hoa hồng admin cho 1 dịch vụ cụ thể */
+    BigDecimal getCommissionRateForService(com.sang.sourcepattern.entity.Service service);
+
     /**
      * Khi booking COMPLETED: chuyển tiền từ frozen → available (90%) và ghi nhận phí admin (10%).
      * Gọi từ TaskServiceImpl khi status → COMPLETED.

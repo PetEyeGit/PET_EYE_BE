@@ -45,6 +45,9 @@ public interface BookingRepository extends JpaRepository<Booking, Integer> {
     @Query("SELECT COALESCE(SUM(s.price), 0) FROM Booking b JOIN b.services s WHERE b.status IN ('CONFIRMED', 'IN_PROGRESS', 'COMPLETED')")
     BigDecimal sumTotalRevenue();
 
+    @Query("SELECT DISTINCT b FROM Booking b LEFT JOIN FETCH b.services WHERE b.status = 'COMPLETED'")
+    List<Booking> findCompletedBookingsWithServices();
+
     /** Tong doanh thu cua cac booking da hoan thanh */
     @Query("SELECT COALESCE(SUM(s.price), 0) FROM Booking b JOIN b.services s WHERE b.status = 'COMPLETED'")
     BigDecimal sumTotalCompletedRevenue();
@@ -57,9 +60,19 @@ public interface BookingRepository extends JpaRepository<Booking, Integer> {
 
     List<Booking> findByShopIdAndAppointmentDatetimeBetween(int shopId, LocalDateTime start, LocalDateTime end);
 
-    /** Doanh thu theo thang trong nam: SUM(s.price * 0.9) cho booking COMPLETED */
+    /** Doanh thu theo thang trong nam cho shop (sau khi tru phi admin tuong ung) cho booking COMPLETED */
     @Query("""
-        SELECT MONTH(b.appointmentDatetime), COALESCE(SUM(s.price * 0.9), 0)
+        SELECT MONTH(b.appointmentDatetime),
+               COALESCE(SUM(
+                   s.price * (
+                       CASE 
+                           WHEN (LOWER(s.category) LIKE '%grooming%' OR LOWER(s.category) LIKE '%spa%') THEN 0.82
+                           WHEN (LOWER(s.category) LIKE '%boarding%' OR LOWER(s.category) LIKE '%hotel%') AND s.cameraEnabled = true THEN 0.75
+                           WHEN LOWER(s.category) LIKE '%clinic%' THEN 0.90
+                           ELSE 0.90
+                       END
+                   )
+               ), 0)
         FROM Booking b JOIN b.services s
         WHERE b.status = 'COMPLETED'
           AND YEAR(b.appointmentDatetime) = :year
