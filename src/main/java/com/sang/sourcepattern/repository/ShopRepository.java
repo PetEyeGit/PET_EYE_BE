@@ -26,7 +26,8 @@ public interface ShopRepository extends JpaRepository<Shop, Integer> {
           AND (:city IS NULL OR :city = ''
                OR LOWER(s.city) LIKE LOWER(CONCAT('%', :city, '%')))
           AND (:shopType IS NULL OR :shopType = ''
-               OR LOWER(s.shopType) = LOWER(:shopType))
+               OR LOWER(s.shopType) = LOWER(:shopType)
+               OR LOWER(s.shopType) = 'mixed')
         ORDER BY s.ratingAvg DESC
     """)
     List<Shop> searchVerified(
