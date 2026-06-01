@@ -134,43 +134,43 @@ VALUES (992, 5, 'Mimi', 'CAT', 'Anh lông ngắn', 'FEMALE', 'Xám', 'https://im
 -- BOOKINGS (for refund testing)
 -- ==========================================
 -- Booking 1: WAITING_REFUND (Shop approved cancel, waiting admin to refund) for Customer 1, Shop 1, Service 1 (Price: 250000)
-INSERT IGNORE INTO booking (id, user_id, shop_id, service_id, pet_id, staff_id, appointment_datetime, status, note, cancellation_reason, bank_name, bank_account, account_holder, payos_order_code, created_at)
-VALUES (991, 4, 1, 1, 991, 1, DATE_ADD(NOW(), INTERVAL 2 DAY), 'WAITING_REFUND', 'Test Refund 1', 'Đổi ý phút chót', 'Vietcombank', '0123456789', 'NGUYEN VAN KHACH 1', 100001, DATE_ADD(NOW(), INTERVAL -1 DAY));
+INSERT IGNORE INTO booking (id, user_id, shop_id, pet_id, staff_id, appointment_datetime, status, note, cancellation_reason, bank_name, bank_account, account_holder, payos_order_code, created_at)
+VALUES (991, 4, 1, 991, 1, DATE_ADD(NOW(), INTERVAL 2 DAY), 'WAITING_REFUND', 'Test Refund 1', 'Đổi ý phút chót', 'Vietcombank', '0123456789', 'NGUYEN VAN KHACH 1', 100001, DATE_ADD(NOW(), INTERVAL -1 DAY));
 
 -- Booking 2: CANCEL_REQUESTED (Customer requested cancel, waiting shop to approve) for Customer 2, Shop 2, Service 5 (Price: 120000)
-INSERT IGNORE INTO booking (id, user_id, shop_id, service_id, pet_id, staff_id, appointment_datetime, status, note, cancellation_reason, bank_name, bank_account, account_holder, payos_order_code, created_at)
-VALUES (992, 5, 2, 5, 992, 3, DATE_ADD(NOW(), INTERVAL 3 DAY), 'CANCEL_REQUESTED', 'Test Cancel Request', 'Kẹt lịch trình', 'MBBank', '9876543210', 'TRAN THI KHACH 2', 100002, NOW());
+INSERT IGNORE INTO booking (id, user_id, shop_id, pet_id, staff_id, appointment_datetime, status, note, cancellation_reason, bank_name, bank_account, account_holder, payos_order_code, created_at)
+VALUES (992, 5, 2, 992, 3, DATE_ADD(NOW(), INTERVAL 3 DAY), 'CANCEL_REQUESTED', 'Test Cancel Request', 'Kẹt lịch trình', 'MBBank', '9876543210', 'TRAN THI KHACH 2', 100002, NOW());
 
 -- Booking 3: CONFIRMED (Upcoming, can be cancelled) for Customer 1, Shop 1, Service 2 (Price: 450000)
-INSERT IGNORE INTO booking (id, user_id, shop_id, service_id, pet_id, staff_id, appointment_datetime, status, note, cancellation_reason, bank_name, bank_account, account_holder, payos_order_code, created_at)
-VALUES (993, 4, 1, 2, 991, 2, DATE_ADD(NOW(), INTERVAL 5 DAY), 'CONFIRMED', 'Test hủy lịch mới', NULL, NULL, NULL, NULL, 100003, NOW());
+INSERT IGNORE INTO booking (id, user_id, shop_id, pet_id, staff_id, appointment_datetime, status, note, cancellation_reason, bank_name, bank_account, account_holder, payos_order_code, created_at)
+VALUES (993, 4, 1, 991, 2, DATE_ADD(NOW(), INTERVAL 5 DAY), 'CONFIRMED', 'Test hủy lịch mới', NULL, NULL, NULL, NULL, 100003, NOW());
 
 -- Booking 4: COMPLETED (Done) for Customer 1, Shop 1, Service 3 (Price: 600000)
-INSERT IGNORE INTO booking (id, user_id, shop_id, service_id, pet_id, staff_id, appointment_datetime, status, note, cancellation_reason, bank_name, bank_account, account_holder, payos_order_code, created_at)
-VALUES (994, 4, 1, 3, 991, 1, DATE_ADD(NOW(), INTERVAL -2 DAY), 'COMPLETED', 'Đã khám', NULL, NULL, NULL, NULL, 100004, DATE_ADD(NOW(), INTERVAL -5 DAY));
+INSERT IGNORE INTO booking (id, user_id, shop_id, pet_id, staff_id, appointment_datetime, status, note, cancellation_reason, bank_name, bank_account, account_holder, payos_order_code, created_at)
+VALUES (994, 4, 1, 991, 1, DATE_ADD(NOW(), INTERVAL -2 DAY), 'COMPLETED', 'Đã khám', NULL, NULL, NULL, NULL, 100004, DATE_ADD(NOW(), INTERVAL -5 DAY));
 
 
 -- Booking 5: CONFIRMED (CASH_DEPOSIT 10%) for Customer 1, Shop 1, Service 2 (Price: 450000)
-INSERT IGNORE INTO booking (id, user_id, shop_id, service_id, pet_id, staff_id, appointment_datetime, status, note, cancellation_reason, bank_name, bank_account, account_holder, payos_order_code, created_at)
-VALUES (995, 4, 1, 2, 991, 2, DATE_ADD(NOW(), INTERVAL 4 DAY), 'CONFIRMED', 'Test CASH DEPOSIT', NULL, NULL, NULL, NULL, 100005, NOW());
+INSERT IGNORE INTO booking (id, user_id, shop_id, pet_id, staff_id, appointment_datetime, status, note, cancellation_reason, bank_name, bank_account, account_holder, payos_order_code, created_at)
+VALUES (995, 4, 1, 991, 2, DATE_ADD(NOW(), INTERVAL 4 DAY), 'CONFIRMED', 'Test CASH DEPOSIT', NULL, NULL, NULL, NULL, 100005, NOW());
 INSERT IGNORE INTO payment (id, booking_id, method, amount, status, checkout_url, payment_time)
 VALUES (995, 995, 'CASH_DEPOSIT', 45000, 'PAID', 'http://payos.vn/dummy', NOW());
 
 -- Booking 6: CONFIRMED (PAYOS 100%) for Customer 1, Shop 1, Service 2 (Price: 450000)
-INSERT IGNORE INTO booking (id, user_id, shop_id, service_id, pet_id, staff_id, appointment_datetime, status, note, payos_order_code, created_at)
-VALUES (996, 4, 1, 2, 991, 2, DATE_ADD(NOW(), INTERVAL 4 DAY), 'CONFIRMED', 'Test PAYOS 100%', 100006, NOW());
+INSERT IGNORE INTO booking (id, user_id, shop_id, pet_id, staff_id, appointment_datetime, status, note, payos_order_code, created_at)
+VALUES (996, 4, 1, 991, 2, DATE_ADD(NOW(), INTERVAL 4 DAY), 'CONFIRMED', 'Test PAYOS 100%', 100006, NOW());
 INSERT IGNORE INTO payment (id, booking_id, method, amount, status, checkout_url, payment_time)
 VALUES (996, 996, 'PAYOS', 450000, 'PAID', 'http://payos.vn/dummy', NOW());
 
 -- Booking 7: IN_PROGRESS for Customer 1, Shop 1, Service 2 (Price: 450000)
-INSERT IGNORE INTO booking (id, user_id, shop_id, service_id, pet_id, staff_id, appointment_datetime, status, note, payos_order_code, created_at)
-VALUES (997, 4, 1, 2, 991, 2, DATE_ADD(NOW(), INTERVAL -1 DAY), 'IN_PROGRESS', 'Đang thực hiện', 100007, NOW());
+INSERT IGNORE INTO booking (id, user_id, shop_id, pet_id, staff_id, appointment_datetime, status, note, payos_order_code, created_at)
+VALUES (997, 4, 1, 991, 2, DATE_ADD(NOW(), INTERVAL -1 DAY), 'IN_PROGRESS', 'Đang thực hiện', 100007, NOW());
 INSERT IGNORE INTO payment (id, booking_id, method, amount, status, checkout_url, payment_time)
 VALUES (997, 997, 'PAYOS', 450000, 'PAID', 'http://payos.vn/dummy', NOW());
 
 -- Booking 8: CANCELLED (CASH_DEPOSIT) for Customer 1, Shop 1, Service 2 (Price: 450000)
-INSERT IGNORE INTO booking (id, user_id, shop_id, service_id, pet_id, staff_id, appointment_datetime, status, note, cancellation_reason, payos_order_code, created_at)
-VALUES (998, 4, 1, 2, 991, 2, DATE_ADD(NOW(), INTERVAL 4 DAY), 'CANCELLED', 'Đã hủy', 'Bận đột xuất', 100008, NOW());
+INSERT IGNORE INTO booking (id, user_id, shop_id, pet_id, staff_id, appointment_datetime, status, note, cancellation_reason, payos_order_code, created_at)
+VALUES (998, 4, 1, 991, 2, DATE_ADD(NOW(), INTERVAL 4 DAY), 'CANCELLED', 'Đã hủy', 'Bận đột xuất', 100008, NOW());
 INSERT IGNORE INTO payment (id, booking_id, method, amount, status, checkout_url, payment_time)
 VALUES (998, 998, 'CASH_DEPOSIT', 45000, 'PAID', 'http://payos.vn/dummy', NOW());
 
@@ -178,16 +178,22 @@ VALUES (998, 998, 'CASH_DEPOSIT', 45000, 'PAID', 'http://payos.vn/dummy', NOW())
 
 
 -- Booking 9: CONFIRMED (Test No-Show: Late 10 mins -> Error TOO EARLY) for Customer 1, Shop 1, Service 2
-INSERT IGNORE INTO booking (id, user_id, shop_id, service_id, pet_id, staff_id, appointment_datetime, status, note, cancellation_reason, payos_order_code, created_at)
-VALUES (999, 4, 1, 2, 991, 2, DATE_ADD(NOW(), INTERVAL -10 MINUTE), 'CONFIRMED', 'Test No-Show Chưa tới hạn', NULL, 100009, NOW());
+INSERT IGNORE INTO booking (id, user_id, shop_id, pet_id, staff_id, appointment_datetime, status, note, cancellation_reason, payos_order_code, created_at)
+VALUES (999, 4, 1, 991, 2, DATE_ADD(NOW(), INTERVAL -10 MINUTE), 'CONFIRMED', 'Test No-Show Chưa tới hạn', NULL, 100009, NOW());
 INSERT IGNORE INTO payment (id, booking_id, method, amount, status, checkout_url, payment_time)
 VALUES (999, 999, 'PAYOS', 450000, 'PAID', 'http://payos.vn/dummy', NOW());
 
 -- Booking 10: CONFIRMED (Test No-Show: Late 20 mins -> Success) for Customer 1, Shop 1, Service 2
-INSERT IGNORE INTO booking (id, user_id, shop_id, service_id, pet_id, staff_id, appointment_datetime, status, note, cancellation_reason, payos_order_code, created_at)
-VALUES (1000, 4, 1, 2, 991, 2, DATE_ADD(NOW(), INTERVAL -20 MINUTE), 'CONFIRMED', 'Test No-Show Đã quá hạn', NULL, 100010, NOW());
+INSERT IGNORE INTO booking (id, user_id, shop_id, pet_id, staff_id, appointment_datetime, status, note, cancellation_reason, payos_order_code, created_at)
+VALUES (1000, 4, 1, 991, 2, DATE_ADD(NOW(), INTERVAL -20 MINUTE), 'CONFIRMED', 'Test No-Show Đã quá hạn', NULL, 100010, NOW());
 INSERT IGNORE INTO payment (id, booking_id, method, amount, status, checkout_url, payment_time)
 VALUES (1000, 1000, 'PAYOS', 450000, 'PAID', 'http://payos.vn/dummy', NOW());
+
+-- ==========================================
+-- BOOKING SERVICES MAPPING
+-- ==========================================
+INSERT IGNORE INTO booking_services (booking_id, service_id) VALUES
+(991, 1), (992, 5), (993, 2), (994, 3), (995, 2), (996, 2), (997, 2), (998, 2), (999, 2), (1000, 2);
 
 -- Mock Transactions for existing Bookings
 INSERT IGNORE INTO transaction (id, booking_id, shop_id, type, amount, payment_method, status, description, created_at)

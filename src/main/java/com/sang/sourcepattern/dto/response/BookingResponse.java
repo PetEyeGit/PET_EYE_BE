@@ -55,4 +55,16 @@ public class BookingResponse {
     // Service Boarding fields
     String cageSize;
     String roomType;
+
+    // Multi-service fields
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class BookingServiceDto {
+        int serviceId;
+        String serviceName;
+        BigDecimal servicePrice;
+    }
+    java.util.List<BookingServiceDto> services;
 }

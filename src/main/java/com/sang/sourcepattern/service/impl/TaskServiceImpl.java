@@ -95,6 +95,31 @@ public class TaskServiceImpl implements TaskService {
     }
 
     private TaskResponse toResponse(Booking b) {
+        // Primary service = first in Set
+        com.sang.sourcepattern.entity.Service primarySvc =
+                (b.getServices() != null && !b.getServices().isEmpty()) ? b.getServices().iterator().next() : null;
+        // Total price = sum all services
+        java.math.BigDecimal totalPrice = (b.getServices() != null)
+                ? b.getServices().stream()
+                    .map(s -> s.getPrice() != null ? s.getPrice() : java.math.BigDecimal.ZERO)
+                    .reduce(java.math.BigDecimal.ZERO, java.math.BigDecimal::add)
+                : java.math.BigDecimal.ZERO;
+        // Category: boarding if any service is boarding
+        boolean isBoarding = b.getServices() != null && b.getServices().stream()
+                .anyMatch(s -> s.getCategory() != null
+                        && (s.getCategory().equalsIgnoreCase("BOARDING") || s.getCategory().equalsIgnoreCase("Hotel")));
+        boolean isClinic = b.getServices() != null && b.getServices().stream()
+                .anyMatch(s -> "CLINIC".equalsIgnoreCase(s.getCategory()));
+        String category = isBoarding ? "BOARDING" : (isClinic ? "CLINIC" : (primarySvc != null ? primarySvc.getCategory() : null));
+        boolean cameraEnabled = b.getServices() != null && b.getServices().stream()
+                .anyMatch(com.sang.sourcepattern.entity.Service::isCameraEnabled);
+        // Services list for task
+        java.util.List<TaskResponse.ServiceItem> serviceItems = (b.getServices() != null)
+                ? b.getServices().stream().map(s -> TaskResponse.ServiceItem.builder()
+                        .serviceId(s.getId()).serviceName(s.getServiceName()).servicePrice(s.getPrice()).build())
+                        .collect(java.util.stream.Collectors.toList())
+                : java.util.Collections.emptyList();
+
         return TaskResponse.builder()
                 .bookingId(b.getId())
                 .shopId(b.getShop().getId())
@@ -105,9 +130,10 @@ public class TaskServiceImpl implements TaskService {
                 .customerName(b.getUser().getFullName())
                 .customerEmail(b.getUser().getEmail())
                 .customerPhone(b.getUser().getPhone())
-                .serviceId(b.getService().getId())
-                .serviceName(b.getService().getServiceName())
-                .servicePrice(b.getService().getPrice())
+                .serviceId(primarySvc != null ? primarySvc.getId() : 0)
+                .serviceName(primarySvc != null ? primarySvc.getServiceName() : "")
+                .servicePrice(totalPrice)
+                .services(serviceItems)
                 .staffId(b.getStaff() != null ? b.getStaff().getId() : null)
                 .staffName(b.getStaff() != null ? b.getStaff().getFullName() : null)
                 .appointmentDatetime(b.getAppointmentDatetime())
@@ -118,9 +144,9 @@ public class TaskServiceImpl implements TaskService {
                 .cageSize(b.getCageSize())
                 .roomType(b.getRoomType())
                 .status(b.getStatus())
-                .cameraEnabled(b.getService().isCameraEnabled())
+                .cameraEnabled(cameraEnabled)
                 .rtspLink(b.getRtspLink())
-                .category(b.getService().getCategory())
+                .category(category)
                 .note(b.getNote())
                 .cancellationReason(b.getCancellationReason())
                 .bankName(b.getBankName())
@@ -135,7 +161,7 @@ public class TaskServiceImpl implements TaskService {
     @Override
     public List<TaskResponse> getMyTasks(String staffEmail) {
         Staff staff = resolveStaffByEmail(staffEmail);
-        return bookingRepository.findByStaffId(staff.getId())
+        return bookingRepository.findByStaffIdWithServices(staff.getId())
                 .stream().map(this::toResponse).collect(Collectors.toList());
     }
 
@@ -158,7 +184,7 @@ public class TaskServiceImpl implements TaskService {
             shop = staff.getShop();
         }
 
-        List<Booking> unassigned = bookingRepository.findByShopIdAndStaffIsNull(shop.getId());
+        List<Booking> unassigned = bookingRepository.findByShopIdAndStaffIsNullWithServices(shop.getId());
 
         // If requester is staff and shop is in MANUAL or AUTO mode, hide unassigned tasks
         if (!isOwner && !"OPEN_POOL".equals(shop.getAssignmentMode())) {
@@ -355,7 +381,9 @@ public class TaskServiceImpl implements TaskService {
             
         // Check medical record constraint for CLINIC services when completing
         if ("COMPLETED".equals(newStatus)) {
-            if ("CLINIC".equalsIgnoreCase(booking.getService().getCategory())) {
+            boolean isClinicBooking = booking.getServices() != null && booking.getServices().stream()
+                    .anyMatch(s -> "CLINIC".equalsIgnoreCase(s.getCategory()));
+            if (isClinicBooking) {
                 int count = petMedicalRecordRepository.countByBookingId(bookingId);
                 if (count == 0) {
                     throw new AppException(ErrorCode.MISSING_MEDICAL_RECORD);
@@ -429,7 +457,7 @@ public class TaskServiceImpl implements TaskService {
     @Override
     public List<TaskResponse> getAllShopTasks(String ownerEmail) {
         Shop shop = resolveOwnerShop(ownerEmail);
-        return bookingRepository.findByShopId(shop.getId())
+        return bookingRepository.findByShopIdWithServices(shop.getId())
                 .stream().map(this::toResponse).collect(Collectors.toList());
     }
 

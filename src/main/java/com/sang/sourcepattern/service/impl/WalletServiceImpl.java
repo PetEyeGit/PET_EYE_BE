@@ -153,7 +153,9 @@ public class WalletServiceImpl implements WalletService {
 
         Payment payment = paymentRepository.findByBookingId(bookingId).orElse(null);
 
-        BigDecimal fullPrice = booking.getService().getPrice();
+        BigDecimal fullPrice = (booking.getServices() != null && !booking.getServices().isEmpty())
+                ? booking.getServices().stream().map(s -> s.getPrice() != null ? s.getPrice() : BigDecimal.ZERO).reduce(BigDecimal.ZERO, BigDecimal::add)
+                : BigDecimal.ZERO;
         String paymentMethod;
 
         if (payment != null && "CASH_DEPOSIT".equals(payment.getMethod())
@@ -523,7 +525,9 @@ public class WalletServiceImpl implements WalletService {
             throw new AppException(ErrorCode.BOOKING_CANCELLED);
         }
 
-        BigDecimal refundAmount = booking.getService() != null ? booking.getService().getPrice() : BigDecimal.ZERO;
+        BigDecimal refundAmount = (booking.getServices() != null && !booking.getServices().isEmpty())
+                ? booking.getServices().stream().map(s -> s.getPrice() != null ? s.getPrice() : BigDecimal.ZERO).reduce(BigDecimal.ZERO, BigDecimal::add)
+                : BigDecimal.ZERO;
         if (refundAmount.compareTo(BigDecimal.ZERO) <= 0) {
             throw new AppException(ErrorCode.INVALID_REQUEST);
         }

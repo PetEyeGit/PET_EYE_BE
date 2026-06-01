@@ -182,10 +182,39 @@ public class BookingServiceImpl implements BookingService {
         }
 
         boolean isAccepted = java.util.List.of("CONFIRMED", "IN_PROGRESS", "COMPLETED").contains(booking.getStatus());
-        boolean isLodging = booking.getService().getCategory() != null &&
-            (booking.getService().getCategory().equalsIgnoreCase("BOARDING") || booking.getService().getCategory().equalsIgnoreCase("Hotel"));
-        boolean cameraEnabled = isLodging && booking.getService().isCameraEnabled();
+
+        // Primary service = service dau tien trong Set (tuong thich nguoc)
+        Service primaryService = (booking.getServices() != null && !booking.getServices().isEmpty())
+                ? booking.getServices().iterator().next() : null;
+
+        // Tong gia = cong tat ca services
+        java.math.BigDecimal totalServicePrice = (booking.getServices() != null)
+                ? booking.getServices().stream()
+                        .map(s -> s.getPrice() != null ? s.getPrice() : java.math.BigDecimal.ZERO)
+                        .reduce(java.math.BigDecimal.ZERO, java.math.BigDecimal::add)
+                : java.math.BigDecimal.ZERO;
+
+        // Check category tu bat ky service nao trong list
+        boolean isLodging = booking.getServices() != null && booking.getServices().stream()
+                .anyMatch(s -> s.getCategory() != null
+                        && (s.getCategory().equalsIgnoreCase("BOARDING") || s.getCategory().equalsIgnoreCase("Hotel")));
+        boolean cameraEnabled = isLodging && booking.getServices() != null
+                && booking.getServices().stream().anyMatch(Service::isCameraEnabled);
         String streamUrl = (isAccepted && cameraEnabled) ? booking.getCameraStreamUrl() : null;
+
+        // Duration tong de tinh serviceEndDatetime
+        int totalDuration = (booking.getServices() != null)
+                ? booking.getServices().stream().mapToInt(s -> s.getDurationMinutes() != 0 ? s.getDurationMinutes() : 60).sum()
+                : 60;
+
+        // Danh sach serviceDtos
+        java.util.List<BookingResponse.BookingServiceDto> serviceDtos = (booking.getServices() != null)
+                ? booking.getServices().stream().map(s -> BookingResponse.BookingServiceDto.builder()
+                        .serviceId(s.getId())
+                        .serviceName(s.getServiceName())
+                        .servicePrice(s.getPrice())
+                        .build()).collect(Collectors.toList())
+                : new java.util.ArrayList<>();
 
         return BookingResponse.builder()
                 .id(booking.getId())
@@ -193,9 +222,10 @@ public class BookingServiceImpl implements BookingService {
                 .shopId(booking.getShop().getId())
                 .shopName(booking.getShop().getShopName())
                 .shopAddress(booking.getShop().getAddress())
-                .serviceId(booking.getService().getId())
-                .serviceName(booking.getService().getServiceName())
-                .servicePrice(booking.getService().getPrice())
+                .serviceId(primaryService != null ? primaryService.getId() : 0)
+                .serviceName(primaryService != null ? primaryService.getServiceName() : "")
+                .servicePrice(totalServicePrice)
+                .services(serviceDtos)
                 .petId(booking.getPet().getId())
                 .petName(booking.getPet().getName())
                 .staffId(booking.getStaff() != null ? booking.getStaff().getId() : null)
@@ -218,10 +248,10 @@ public class BookingServiceImpl implements BookingService {
                 .cameraConfiguredAt(booking.getCameraConfiguredAt())
                 .checkIn(booking.getCheckIn())
                 .checkOut(booking.getCheckOut())
-                .serviceEndDatetime(booking.getService() != null && "BOARDING".equalsIgnoreCase(booking.getService().getCategory()) && booking.getCheckOut() != null
+                .serviceEndDatetime(isLodging && booking.getCheckOut() != null
                         ? booking.getCheckOut()
-                        : (booking.getAppointmentDatetime() != null && booking.getService() != null
-                                ? booking.getAppointmentDatetime().plusMinutes(booking.getService().getDurationMinutes())
+                        : (booking.getAppointmentDatetime() != null
+                                ? booking.getAppointmentDatetime().plusMinutes(totalDuration)
                                 : null))
                 .cageSize(booking.getCageSize())
                 .roomType(booking.getRoomType())
@@ -586,8 +616,14 @@ public class BookingServiceImpl implements BookingService {
         }
 
         // ── Tạo Booking ───────────────────────────────────────────────────────
+        java.util.Set<Service> servicesSet = pendingServiceIds.stream()
+                .map(id -> serviceRepository.findById(id).orElse(null))
+                .filter(java.util.Objects::nonNull)
+                .collect(Collectors.toSet());
+
         Booking booking = Booking.builder()
-                .user(user).shop(shop).service(service).pet(pet).staff(staff)
+                .user(user).shop(shop).pet(pet).staff(staff)
+                .services(servicesSet)
                 .appointmentDatetime(pending.getAppointmentDatetime())
                 .checkOutDatetime(pending.getCheckOutDatetime())
                 .cageSize(pending.getCageSize())
@@ -747,8 +783,14 @@ public class BookingServiceImpl implements BookingService {
         }
 
         // ── Tạo Booking ───────────────────────────────────────────────────────
+        java.util.Set<Service> servicesSet = pendingServiceIds.stream()
+                .map(id -> serviceRepository.findById(id).orElse(null))
+                .filter(java.util.Objects::nonNull)
+                .collect(Collectors.toSet());
+
         Booking booking = Booking.builder()
-                .user(user).shop(shop).service(service).pet(pet).staff(staff)
+                .user(user).shop(shop).pet(pet).staff(staff)
+                .services(servicesSet)
                 .appointmentDatetime(pending.getAppointmentDatetime())
                 .checkIn(pending.getCheckIn())
                 .checkOut(pending.getCheckOut())
@@ -1020,8 +1062,14 @@ public class BookingServiceImpl implements BookingService {
         }
 
         // ── Tạo Booking ───────────────────────────────────────────────────────
+        java.util.Set<Service> servicesSet = pendingServiceIds.stream()
+                .map(id -> serviceRepository.findById(id).orElse(null))
+                .filter(java.util.Objects::nonNull)
+                .collect(Collectors.toSet());
+
         Booking booking = Booking.builder()
-                .user(user).shop(shop).service(service).pet(pet).staff(staff)
+                .user(user).shop(shop).pet(pet).staff(staff)
+                .services(servicesSet)
                 .appointmentDatetime(pending.getAppointmentDatetime())
                 .checkOutDatetime(pending.getCheckOutDatetime())
                 .cageSize(pending.getCageSize())
@@ -1101,14 +1149,14 @@ public class BookingServiceImpl implements BookingService {
     @Override
     public List<BookingResponse> getMyBookings(String userEmail) {
         User user = resolveUser(userEmail);
-        return bookingRepository.findByUserId(user.getId())
+        return bookingRepository.findByUserIdWithServices(user.getId())
                 .stream().map(this::toResponse).collect(Collectors.toList());
     }
 
     @Override
     public BookingResponse getBookingById(int bookingId, String userEmail) {
         User user = resolveUser(userEmail);
-        Booking booking = bookingRepository.findById(bookingId)
+        Booking booking = bookingRepository.findByIdWithServices(bookingId)
                 .orElseThrow(() -> new AppException(ErrorCode.BOOKING_NOT_FOUND));
                 
         boolean isCustomer = booking.getUser().getId() == user.getId();
@@ -1129,7 +1177,7 @@ public class BookingServiceImpl implements BookingService {
     @Transactional
     public BookingResponse cancelBooking(int bookingId, String userEmail) {
         User user = resolveUser(userEmail);
-        Booking booking = bookingRepository.findById(bookingId)
+        Booking booking = bookingRepository.findByIdWithServices(bookingId)
                 .orElseThrow(() -> new AppException(ErrorCode.BOOKING_NOT_FOUND));
 
         boolean isUser  = user.getRoles().stream().anyMatch(r -> "USER".equals(r.getName()));
@@ -1167,7 +1215,9 @@ public class BookingServiceImpl implements BookingService {
             String bankInfo = (booking.getBankName() != null && !booking.getBankName().isBlank())
                     ? String.format("%s | %s | %s", booking.getBankName(), booking.getAccountHolder(), booking.getBankAccount())
                     : "Chưa có thông tin ngân hàng";
-            BigDecimal refundAmount = booking.getService() != null ? booking.getService().getPrice() : BigDecimal.ZERO;
+            BigDecimal refundAmount = (booking.getServices() != null && !booking.getServices().isEmpty())
+                    ? booking.getServices().stream().map(s -> s.getPrice() != null ? s.getPrice() : BigDecimal.ZERO).reduce(BigDecimal.ZERO, BigDecimal::add)
+                    : BigDecimal.ZERO;
             String amountText = NumberFormat.getCurrencyInstance(new Locale("vi", "VN")).format(refundAmount);
             String content = String.format("Đơn hủy lịch #%d đã được chấp nhận. Vui lòng hoàn tiền cho khách hàng %s về: %s. Số tiền: %s.",
                     bookingId,
@@ -1222,7 +1272,7 @@ public class BookingServiceImpl implements BookingService {
         }
 
         User user = resolveUser(userEmail);
-        Booking booking = bookingRepository.findById(bookingId)
+        Booking booking = bookingRepository.findByIdWithServices(bookingId)
                 .orElseThrow(() -> new AppException(ErrorCode.BOOKING_NOT_FOUND));
 
         if (booking.getUser().getId() != user.getId())
@@ -1325,8 +1375,8 @@ public class BookingServiceImpl implements BookingService {
         }
 
         List<Booking> bookings = (start != null && end != null)
-                ? bookingRepository.findByShopIdAndAppointmentDatetimeBetween(shopId, start, end)
-                : bookingRepository.findByShopId(shopId);
+                ? bookingRepository.findByShopIdAndDatetimeBetweenWithServices(shopId, start, end)
+                : bookingRepository.findByShopIdWithServices(shopId);
 
         return bookings.stream().map(this::toResponse).collect(Collectors.toList());
     }
@@ -1553,8 +1603,14 @@ public class BookingServiceImpl implements BookingService {
         }
 
         // ── Tạo Booking ───────────────────────────────────────────────────────
+        java.util.Set<Service> servicesSet = pendingServiceIds.stream()
+                .map(id -> serviceRepository.findById(id).orElse(null))
+                .filter(java.util.Objects::nonNull)
+                .collect(Collectors.toSet());
+
         Booking booking = Booking.builder()
-                .user(user).shop(shop).service(service).pet(pet).staff(staff)
+                .user(user).shop(shop).pet(pet).staff(staff)
+                .services(servicesSet)
                 .appointmentDatetime(pending.getAppointmentDatetime())
                 .checkIn(pending.getCheckIn())
                 .checkOut(pending.getCheckOut())

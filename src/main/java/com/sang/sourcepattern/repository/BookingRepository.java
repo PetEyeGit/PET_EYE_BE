@@ -13,16 +13,40 @@ import java.util.Optional;
 
 @Repository
 public interface BookingRepository extends JpaRepository<Booking, Integer> {
+
+    /** Load bookings with services eagerly using JOIN FETCH to avoid empty services collection */
+    @Query("SELECT DISTINCT b FROM Booking b LEFT JOIN FETCH b.services WHERE b.user.id = :userId")
+    List<Booking> findByUserIdWithServices(@Param("userId") int userId);
+
+    @Query("SELECT DISTINCT b FROM Booking b LEFT JOIN FETCH b.services WHERE b.shop.id = :shopId")
+    List<Booking> findByShopIdWithServices(@Param("shopId") int shopId);
+
+    @Query("SELECT DISTINCT b FROM Booking b LEFT JOIN FETCH b.services WHERE b.payosOrderCode = :orderCode")
+    Optional<Booking> findByPayosOrderCodeWithServices(@Param("orderCode") Long orderCode);
+
+    @Query("SELECT DISTINCT b FROM Booking b LEFT JOIN FETCH b.services WHERE b.id = :id")
+    Optional<Booking> findByIdWithServices(@Param("id") int id);
+
+    @Query("SELECT DISTINCT b FROM Booking b LEFT JOIN FETCH b.services WHERE b.staff.id = :staffId")
+    List<Booking> findByStaffIdWithServices(@Param("staffId") int staffId);
+
+    @Query("SELECT DISTINCT b FROM Booking b LEFT JOIN FETCH b.services WHERE b.shop.id = :shopId AND b.staff IS NULL")
+    List<Booking> findByShopIdAndStaffIsNullWithServices(@Param("shopId") int shopId);
+
+    @Query("SELECT DISTINCT b FROM Booking b LEFT JOIN FETCH b.services WHERE b.shop.id = :shopId AND b.appointmentDatetime BETWEEN :start AND :end")
+    List<Booking> findByShopIdAndDatetimeBetweenWithServices(@Param("shopId") int shopId, @Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
+
+    // Keep old methods for backward compatibility
     List<Booking> findByUserId(int userId);
     List<Booking> findByShopId(int shopId);
     Optional<Booking> findByPayosOrderCode(Long payosOrderCode);
 
-    /** Tổng doanh thu toàn hệ thống từ bookings (CONFIRMED / IN_PROGRESS / COMPLETED) */
-    @Query("SELECT COALESCE(SUM(b.service.price), 0) FROM Booking b WHERE b.status IN ('CONFIRMED', 'IN_PROGRESS', 'COMPLETED')")
+    /** Tong doanh thu toan he thong tu bookings (CONFIRMED / IN_PROGRESS / COMPLETED) */
+    @Query("SELECT COALESCE(SUM(s.price), 0) FROM Booking b JOIN b.services s WHERE b.status IN ('CONFIRMED', 'IN_PROGRESS', 'COMPLETED')")
     BigDecimal sumTotalRevenue();
 
-    /** Tổng doanh thu của các booking đã hoàn thành */
-    @Query("SELECT COALESCE(SUM(b.service.price), 0) FROM Booking b WHERE b.status = 'COMPLETED'")
+    /** Tong doanh thu cua cac booking da hoan thanh */
+    @Query("SELECT COALESCE(SUM(s.price), 0) FROM Booking b JOIN b.services s WHERE b.status = 'COMPLETED'")
     BigDecimal sumTotalCompletedRevenue();
 
     /** Tasks assigned to a specific staff member */
@@ -33,10 +57,10 @@ public interface BookingRepository extends JpaRepository<Booking, Integer> {
 
     List<Booking> findByShopIdAndAppointmentDatetimeBetween(int shopId, LocalDateTime start, LocalDateTime end);
 
-    /** Doanh thu theo tháng trong năm: SUM(service.price * 0.9) cho booking COMPLETED */
+    /** Doanh thu theo thang trong nam: SUM(s.price * 0.9) cho booking COMPLETED */
     @Query("""
-        SELECT MONTH(b.appointmentDatetime), COALESCE(SUM(b.service.price * 0.9), 0)
-        FROM Booking b
+        SELECT MONTH(b.appointmentDatetime), COALESCE(SUM(s.price * 0.9), 0)
+        FROM Booking b JOIN b.services s
         WHERE b.status = 'COMPLETED'
           AND YEAR(b.appointmentDatetime) = :year
         GROUP BY MONTH(b.appointmentDatetime)
@@ -63,7 +87,8 @@ public interface BookingRepository extends JpaRepository<Booking, Integer> {
      */
     @Query(value = """
         SELECT COUNT(*) FROM booking b
-        JOIN pet_service s ON b.service_id = s.id
+        JOIN booking_services bs ON bs.booking_id = b.id
+        JOIN pet_service s ON s.id = bs.service_id
         WHERE b.pet_id = :petId
           AND b.status IN ('WAITING_SHOP_APPROVAL', 'CONFIRMED', 'IN_PROGRESS')
           AND b.appointment_datetime < :windowEnd
@@ -87,7 +112,8 @@ public interface BookingRepository extends JpaRepository<Booking, Integer> {
 
     @Query(value = """
         SELECT COUNT(*) FROM booking b
-        JOIN pet_service s ON b.service_id = s.id
+        JOIN booking_services bs ON bs.booking_id = b.id
+        JOIN pet_service s ON s.id = bs.service_id
         WHERE b.pet_id = :petId
           AND b.status IN ('WAITING_SHOP_APPROVAL', 'CONFIRMED', 'IN_PROGRESS')
           AND b.appointment_datetime < :windowEnd
@@ -104,7 +130,8 @@ public interface BookingRepository extends JpaRepository<Booking, Integer> {
      */
     @Query(value = """
         SELECT COUNT(*) FROM booking b
-        JOIN pet_service s ON b.service_id = s.id
+        JOIN booking_services bs ON bs.booking_id = b.id
+        JOIN pet_service s ON s.id = bs.service_id
         WHERE b.staff_id = :staffId
           AND b.status IN ('WAITING_SHOP_APPROVAL', 'CONFIRMED', 'IN_PROGRESS')
           AND LOWER(s.category) NOT IN ('boarding', 'hotel')

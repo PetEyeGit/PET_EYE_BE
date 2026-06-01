@@ -55,10 +55,24 @@ public class TaskResponse {
     String category;
 
 
+    // Multiple services (Many-to-Many)
+    java.util.List<ServiceItem> services;
+
     String note;
     String cancellationReason;
     String bankName;
     String bankAccount;
     String accountHolder;
     LocalDateTime createdAt;
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @FieldDefaults(level = AccessLevel.PRIVATE)
+    public static class ServiceItem {
+        int serviceId;
+        String serviceName;
+        java.math.BigDecimal servicePrice;
+    }
 }

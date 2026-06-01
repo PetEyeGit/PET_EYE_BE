@@ -66,10 +66,10 @@ public class CameraController {
 
         List<BookingResponse> activeCameras = bookingRepository.findByUserId(user.getId()).stream()
                 .filter(b -> List.of("CONFIRMED", "IN_PROGRESS", "COMPLETED").contains(b.getStatus()))
-                .filter(b -> b.getService().getCategory() != null &&
-                        (b.getService().getCategory().equalsIgnoreCase("BOARDING") ||
-                                b.getService().getCategory().equalsIgnoreCase("Hotel")))
-                .filter(b -> b.getService().isCameraEnabled())
+                .filter(b -> b.getServices() != null && b.getServices().stream().anyMatch(s -> s.getCategory() != null &&
+                        (s.getCategory().equalsIgnoreCase("BOARDING") ||
+                                s.getCategory().equalsIgnoreCase("Hotel"))))
+                .filter(b -> b.getServices() != null && b.getServices().stream().anyMatch(com.sang.sourcepattern.entity.Service::isCameraEnabled))
                 .filter(b -> b.getCameraStreamUrl() != null && !b.getCameraStreamUrl().isBlank())
                 .map(this::toCustomerResponse)
                 .collect(Collectors.toList());
@@ -111,10 +111,11 @@ public class CameraController {
             throw new AppException(ErrorCode.BOOKING_NOT_BELONG_TO_STAFF_SHOP);
         }
 
-        boolean isLodging = booking.getService().getCategory() != null &&
-                (booking.getService().getCategory().equalsIgnoreCase("BOARDING") ||
-                        booking.getService().getCategory().equalsIgnoreCase("Hotel"));
-        boolean cameraEnabled = isLodging && booking.getService().isCameraEnabled();
+        boolean isLodging = booking.getServices() != null && booking.getServices().stream().anyMatch(s -> s.getCategory() != null &&
+                (s.getCategory().equalsIgnoreCase("BOARDING") ||
+                        s.getCategory().equalsIgnoreCase("Hotel")));
+        boolean cameraEnabled = isLodging && booking.getServices() != null &&
+                booking.getServices().stream().anyMatch(com.sang.sourcepattern.entity.Service::isCameraEnabled);
 
         if (!cameraEnabled) {
             throw new AppException(ErrorCode.INVALID_REQUEST);
@@ -188,15 +189,37 @@ public class CameraController {
     }
 
     private BookingResponse toCustomerResponse(Booking booking) {
+        com.sang.sourcepattern.entity.Service primaryService = (booking.getServices() != null && !booking.getServices().isEmpty())
+                ? booking.getServices().iterator().next() : null;
+
+        java.math.BigDecimal totalServicePrice = (booking.getServices() != null)
+                ? booking.getServices().stream()
+                        .map(s -> s.getPrice() != null ? s.getPrice() : java.math.BigDecimal.ZERO)
+                        .reduce(java.math.BigDecimal.ZERO, java.math.BigDecimal::add)
+                : java.math.BigDecimal.ZERO;
+
+        int totalDuration = (booking.getServices() != null)
+                ? booking.getServices().stream().mapToInt(s -> s.getDurationMinutes() != 0 ? s.getDurationMinutes() : 60).sum()
+                : 60;
+
+        java.util.List<BookingResponse.BookingServiceDto> serviceDtos = (booking.getServices() != null)
+                ? booking.getServices().stream().map(s -> BookingResponse.BookingServiceDto.builder()
+                        .serviceId(s.getId())
+                        .serviceName(s.getServiceName())
+                        .servicePrice(s.getPrice())
+                        .build()).collect(Collectors.toList())
+                : new java.util.ArrayList<>();
+
         return BookingResponse.builder()
                 .id(booking.getId())
                 .userId(booking.getUser().getId())
                 .shopId(booking.getShop().getId())
                 .shopName(booking.getShop().getShopName())
                 .shopAddress(booking.getShop().getAddress())
-                .serviceId(booking.getService().getId())
-                .serviceName(booking.getService().getServiceName())
-                .servicePrice(booking.getService().getPrice())
+                .serviceId(primaryService != null ? primaryService.getId() : 0)
+                .serviceName(primaryService != null ? primaryService.getServiceName() : "")
+                .servicePrice(totalServicePrice)
+                .services(serviceDtos)
                 .petId(booking.getPet().getId())
                 .petName(booking.getPet().getName())
                 .staffId(booking.getStaff() != null ? booking.getStaff().getId() : null)
@@ -214,22 +237,44 @@ public class CameraController {
                 .cameraStreamUrl(booking.getCameraStreamUrl())
                 .cameraEnabled(true)
                 .cameraConfiguredAt(booking.getCameraConfiguredAt())
-                .serviceEndDatetime(booking.getAppointmentDatetime() != null && booking.getService() != null
-                        ? booking.getAppointmentDatetime().plusMinutes(booking.getService().getDurationMinutes())
+                .serviceEndDatetime(booking.getAppointmentDatetime() != null
+                        ? booking.getAppointmentDatetime().plusMinutes(totalDuration)
                         : null)
                 .build();
     }
 
     private BookingResponse toOwnerResponse(Booking booking) {
+        com.sang.sourcepattern.entity.Service primaryService = (booking.getServices() != null && !booking.getServices().isEmpty())
+                ? booking.getServices().iterator().next() : null;
+
+        java.math.BigDecimal totalServicePrice = (booking.getServices() != null)
+                ? booking.getServices().stream()
+                        .map(s -> s.getPrice() != null ? s.getPrice() : java.math.BigDecimal.ZERO)
+                        .reduce(java.math.BigDecimal.ZERO, java.math.BigDecimal::add)
+                : java.math.BigDecimal.ZERO;
+
+        int totalDuration = (booking.getServices() != null)
+                ? booking.getServices().stream().mapToInt(s -> s.getDurationMinutes() != 0 ? s.getDurationMinutes() : 60).sum()
+                : 60;
+
+        java.util.List<BookingResponse.BookingServiceDto> serviceDtos = (booking.getServices() != null)
+                ? booking.getServices().stream().map(s -> BookingResponse.BookingServiceDto.builder()
+                        .serviceId(s.getId())
+                        .serviceName(s.getServiceName())
+                        .servicePrice(s.getPrice())
+                        .build()).collect(Collectors.toList())
+                : new java.util.ArrayList<>();
+
         return BookingResponse.builder()
                 .id(booking.getId())
                 .userId(booking.getUser().getId())
                 .shopId(booking.getShop().getId())
                 .shopName(booking.getShop().getShopName())
                 .shopAddress(booking.getShop().getAddress())
-                .serviceId(booking.getService().getId())
-                .serviceName(booking.getService().getServiceName())
-                .servicePrice(booking.getService().getPrice())
+                .serviceId(primaryService != null ? primaryService.getId() : 0)
+                .serviceName(primaryService != null ? primaryService.getServiceName() : "")
+                .servicePrice(totalServicePrice)
+                .services(serviceDtos)
                 .petId(booking.getPet().getId())
                 .petName(booking.getPet().getName())
                 .staffId(booking.getStaff() != null ? booking.getStaff().getId() : null)
@@ -247,8 +292,8 @@ public class CameraController {
                 .cameraStreamUrl(booking.getCameraStreamUrl())
                 .cameraEnabled(true)
                 .cameraConfiguredAt(booking.getCameraConfiguredAt())
-                .serviceEndDatetime(booking.getAppointmentDatetime() != null && booking.getService() != null
-                        ? booking.getAppointmentDatetime().plusMinutes(booking.getService().getDurationMinutes())
+                .serviceEndDatetime(booking.getAppointmentDatetime() != null
+                        ? booking.getAppointmentDatetime().plusMinutes(totalDuration)
                         : null)
                 .build();
     }

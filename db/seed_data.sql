@@ -26,6 +26,7 @@ TRUNCATE TABLE transaction;
 TRUNCATE TABLE review;
 TRUNCATE TABLE payment;
 TRUNCATE TABLE booking;
+TRUNCATE TABLE booking_services;
 TRUNCATE TABLE boarding_detail;
 TRUNCATE TABLE cage;
 TRUNCATE TABLE camera;
@@ -303,36 +304,44 @@ INSERT INTO pet (id, owner_id, name, species, breed, gender, color,
 -- ============================================================
 -- BOOKINGS + PAYMENTS
 -- ============================================================
-INSERT INTO booking (id, user_id, shop_id, service_id, pet_id, staff_id,
+INSERT INTO booking (id, user_id, shop_id, pet_id, staff_id,
                      appointment_datetime, status, note, created_at) VALUES
 -- COMPLETED (15)
-(1,  7,  1, 1,  1,  1, DATE_SUB(NOW(), INTERVAL 30 DAY), 'COMPLETED', 'Ghi chú booking 1',  DATE_SUB(NOW(), INTERVAL 31 DAY)),
-(2,  7,  1, 2,  1,  2, DATE_SUB(NOW(), INTERVAL 25 DAY), 'COMPLETED', 'Ghi chú booking 2',  DATE_SUB(NOW(), INTERVAL 26 DAY)),
-(3,  8,  2, 7,  3,  3, DATE_SUB(NOW(), INTERVAL 20 DAY), 'COMPLETED', 'Ghi chú booking 3',  DATE_SUB(NOW(), INTERVAL 21 DAY)),
-(4,  8,  2, 8,  4,  4, DATE_SUB(NOW(), INTERVAL 18 DAY), 'COMPLETED', 'Ghi chú booking 4',  DATE_SUB(NOW(), INTERVAL 19 DAY)),
-(5,  9,  3, 13, 5,  5, DATE_SUB(NOW(), INTERVAL 15 DAY), 'COMPLETED', 'Ghi chú booking 5',  DATE_SUB(NOW(), INTERVAL 16 DAY)),
-(6,  9,  3, 14, 6,  6, DATE_SUB(NOW(), INTERVAL 12 DAY), 'COMPLETED', 'Ghi chú booking 6',  DATE_SUB(NOW(), INTERVAL 13 DAY)),
-(7,  10, 4, 19, 7,  7, DATE_SUB(NOW(), INTERVAL 10 DAY), 'COMPLETED', 'Ghi chú booking 7',  DATE_SUB(NOW(), INTERVAL 11 DAY)),
-(8,  10, 4, 20, 8,  8, DATE_SUB(NOW(), INTERVAL 8  DAY), 'COMPLETED', 'Ghi chú booking 8',  DATE_SUB(NOW(), INTERVAL 9  DAY)),
-(9,  11, 5, 25, 9,  9, DATE_SUB(NOW(), INTERVAL 7  DAY), 'COMPLETED', 'Ghi chú booking 9',  DATE_SUB(NOW(), INTERVAL 8  DAY)),
-(10, 11, 5, 26, 10, 10,DATE_SUB(NOW(), INTERVAL 5  DAY), 'COMPLETED', 'Ghi chú booking 10', DATE_SUB(NOW(), INTERVAL 6  DAY)),
-(11, 12, 1, 3,  11, 1, DATE_SUB(NOW(), INTERVAL 22 DAY), 'COMPLETED', 'Ghi chú booking 11', DATE_SUB(NOW(), INTERVAL 23 DAY)),
-(12, 13, 2, 10, 13, 3, DATE_SUB(NOW(), INTERVAL 14 DAY), 'COMPLETED', 'Ghi chú booking 12', DATE_SUB(NOW(), INTERVAL 15 DAY)),
-(13, 14, 3, 15, 15, 5, DATE_SUB(NOW(), INTERVAL 9  DAY), 'COMPLETED', 'Ghi chú booking 13', DATE_SUB(NOW(), INTERVAL 10 DAY)),
-(14, 15, 4, 21, 17, 7, DATE_SUB(NOW(), INTERVAL 6  DAY), 'COMPLETED', 'Ghi chú booking 14', DATE_SUB(NOW(), INTERVAL 7  DAY)),
-(15, 16, 5, 28, 19, 9, DATE_SUB(NOW(), INTERVAL 3  DAY), 'COMPLETED', 'Ghi chú booking 15', DATE_SUB(NOW(), INTERVAL 4  DAY)),
+(1,  7,  1,  1,  1, DATE_SUB(NOW(), INTERVAL 30 DAY), 'COMPLETED', 'Ghi chú booking 1',  DATE_SUB(NOW(), INTERVAL 31 DAY)),
+(2,  7,  1,  1,  2, DATE_SUB(NOW(), INTERVAL 25 DAY), 'COMPLETED', 'Ghi chú booking 2',  DATE_SUB(NOW(), INTERVAL 26 DAY)),
+(3,  8,  2,  3,  3, DATE_SUB(NOW(), INTERVAL 20 DAY), 'COMPLETED', 'Ghi chú booking 3',  DATE_SUB(NOW(), INTERVAL 21 DAY)),
+(4,  8,  2,  4,  4, DATE_SUB(NOW(), INTERVAL 18 DAY), 'COMPLETED', 'Ghi chú booking 4',  DATE_SUB(NOW(), INTERVAL 19 DAY)),
+(5,  9,  3,  5,  5, DATE_SUB(NOW(), INTERVAL 15 DAY), 'COMPLETED', 'Ghi chú booking 5',  DATE_SUB(NOW(), INTERVAL 16 DAY)),
+(6,  9,  3,  6,  6, DATE_SUB(NOW(), INTERVAL 12 DAY), 'COMPLETED', 'Ghi chú booking 6',  DATE_SUB(NOW(), INTERVAL 13 DAY)),
+(7,  10, 4,  7,  7, DATE_SUB(NOW(), INTERVAL 10 DAY), 'COMPLETED', 'Ghi chú booking 7',  DATE_SUB(NOW(), INTERVAL 11 DAY)),
+(8,  10, 4,  8,  8, DATE_SUB(NOW(), INTERVAL 8  DAY), 'COMPLETED', 'Ghi chú booking 8',  DATE_SUB(NOW(), INTERVAL 9  DAY)),
+(9,  11, 5,  9,  9, DATE_SUB(NOW(), INTERVAL 7  DAY), 'COMPLETED', 'Ghi chú booking 9',  DATE_SUB(NOW(), INTERVAL 8  DAY)),
+(10, 11, 5,  10, 10,DATE_SUB(NOW(), INTERVAL 5  DAY), 'COMPLETED', 'Ghi chú booking 10', DATE_SUB(NOW(), INTERVAL 6  DAY)),
+(11, 12, 1,  11, 1, DATE_SUB(NOW(), INTERVAL 22 DAY), 'COMPLETED', 'Ghi chú booking 11', DATE_SUB(NOW(), INTERVAL 23 DAY)),
+(12, 13, 2,  13, 3, DATE_SUB(NOW(), INTERVAL 14 DAY), 'COMPLETED', 'Ghi chú booking 12', DATE_SUB(NOW(), INTERVAL 15 DAY)),
+(13, 14, 3,  15, 5, DATE_SUB(NOW(), INTERVAL 9  DAY), 'COMPLETED', 'Ghi chú booking 13', DATE_SUB(NOW(), INTERVAL 10 DAY)),
+(14, 15, 4,  17, 7, DATE_SUB(NOW(), INTERVAL 6  DAY), 'COMPLETED', 'Ghi chú booking 14', DATE_SUB(NOW(), INTERVAL 7  DAY)),
+(15, 16, 5,  19, 9, DATE_SUB(NOW(), INTERVAL 3  DAY), 'COMPLETED', 'Ghi chú booking 15', DATE_SUB(NOW(), INTERVAL 4  DAY)),
 -- CONFIRMED (5)
-(16, 7,  1, 1,  2,  2, DATE_ADD(NOW(), INTERVAL 2  DAY), 'CONFIRMED', 'Ghi chú booking 16', DATE_SUB(NOW(), INTERVAL 1  DAY)),
-(17, 8,  2, 7,  3,  3, DATE_ADD(NOW(), INTERVAL 3  DAY), 'CONFIRMED', 'Ghi chú booking 17', DATE_SUB(NOW(), INTERVAL 1  DAY)),
-(18, 9,  3, 14, 5,  5, DATE_ADD(NOW(), INTERVAL 5  DAY), 'CONFIRMED', 'Ghi chú booking 18', DATE_SUB(NOW(), INTERVAL 1  DAY)),
-(19, 10, 4, 20, 7,  7, DATE_ADD(NOW(), INTERVAL 1  DAY), 'CONFIRMED', 'Ghi chú booking 19', NOW()),
-(20, 11, 5, 26, 9,  10,DATE_ADD(NOW(), INTERVAL 4  DAY), 'CONFIRMED', 'Ghi chú booking 20', NOW()),
+(16, 7,  1,  2,  2, DATE_ADD(NOW(), INTERVAL 2  DAY), 'CONFIRMED', 'Ghi chú booking 16', DATE_SUB(NOW(), INTERVAL 1  DAY)),
+(17, 8,  2,  3,  3, DATE_ADD(NOW(), INTERVAL 3  DAY), 'CONFIRMED', 'Ghi chú booking 17', DATE_SUB(NOW(), INTERVAL 1  DAY)),
+(18, 9,  3,  5,  5, DATE_ADD(NOW(), INTERVAL 5  DAY), 'CONFIRMED', 'Ghi chú booking 18', DATE_SUB(NOW(), INTERVAL 1  DAY)),
+(19, 10, 4,  7,  7, DATE_ADD(NOW(), INTERVAL 1  DAY), 'CONFIRMED', 'Ghi chú booking 19', NOW()),
+(20, 11, 5,  9,  10,DATE_ADD(NOW(), INTERVAL 4  DAY), 'CONFIRMED', 'Ghi chú booking 20', NOW()),
 -- IN_PROGRESS (2)
-(21, 12, 1, 2,  11, 1, NOW(), 'IN_PROGRESS', 'Ghi chú booking 21', DATE_SUB(NOW(), INTERVAL 2 HOUR)),
-(22, 13, 2, 7,  13, 3, NOW(), 'IN_PROGRESS', 'Ghi chú booking 22', DATE_SUB(NOW(), INTERVAL 1 HOUR)),
+(21, 12, 1,  11, 1, NOW(), 'IN_PROGRESS', 'Ghi chú booking 21', DATE_SUB(NOW(), INTERVAL 2 HOUR)),
+(22, 13, 2,  13, 3, NOW(), 'IN_PROGRESS', 'Ghi chú booking 22', DATE_SUB(NOW(), INTERVAL 1 HOUR)),
 -- CANCELLED (2)
-(23, 14, 3, 13, 15, NULL, DATE_SUB(NOW(), INTERVAL 5 DAY), 'CANCELLED', 'Ghi chú booking 23', DATE_SUB(NOW(), INTERVAL 6 DAY)),
-(24, 15, 4, 19, 17, NULL, DATE_SUB(NOW(), INTERVAL 3 DAY), 'CANCELLED', 'Ghi chú booking 24', DATE_SUB(NOW(), INTERVAL 4 DAY));
+(23, 14, 3,  15, NULL, DATE_SUB(NOW(), INTERVAL 5 DAY), 'CANCELLED', 'Ghi chú booking 23', DATE_SUB(NOW(), INTERVAL 6 DAY)),
+(24, 15, 4,  17, NULL, DATE_SUB(NOW(), INTERVAL 3 DAY), 'CANCELLED', 'Ghi chú booking 24', DATE_SUB(NOW(), INTERVAL 4 DAY));
+
+-- ============================================================
+-- BOOKING SERVICES
+-- ============================================================
+INSERT INTO booking_services (booking_id, service_id) VALUES
+(1, 1), (2, 2), (3, 7), (4, 8), (5, 13), (6, 14), (7, 19), (8, 20), (9, 25), (10, 26),
+(11, 3), (12, 10), (13, 15), (14, 21), (15, 28), (16, 1), (17, 7), (18, 14), (19, 20),
+(20, 26), (21, 2), (22, 7), (23, 13), (24, 19);
 
 INSERT INTO payment (id, booking_id, amount, method, status, description, payment_time) VALUES
 (1,  1,  150000,  'CASH',  'SUCCESS',   'Payment booking 1',  DATE_SUB(NOW(), INTERVAL 30 DAY)),

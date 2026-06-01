@@ -48,8 +48,12 @@ public class TransactionServiceImpl implements TransactionService {
                 if (t.getBooking().getShop() != null) {
                     builder.shopName(t.getBooking().getShop().getShopName());
                 }
-                if (t.getBooking().getService() != null) {
-                    builder.serviceName(t.getBooking().getService().getServiceName());
+                if (t.getBooking().getServices() != null && !t.getBooking().getServices().isEmpty()) {
+                    String serviceNames = t.getBooking().getServices().stream()
+                            .map(com.sang.sourcepattern.entity.Service::getServiceName)
+                            .filter(java.util.Objects::nonNull)
+                            .collect(Collectors.joining(", "));
+                    builder.serviceName(serviceNames);
                 }
             }
             return builder.build();

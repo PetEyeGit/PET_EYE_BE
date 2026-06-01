@@ -26,9 +26,15 @@ public class Booking {
     @JoinColumn(name = "shop_id")
     Shop shop;
 
-    @ManyToOne
-    @JoinColumn(name = "service_id")
-    Service service;
+
+    @ManyToMany(fetch = FetchType.EAGER)
+    @JoinTable(
+        name = "booking_services",
+        joinColumns = @JoinColumn(name = "booking_id"),
+        inverseJoinColumns = @JoinColumn(name = "service_id")
+    )
+    @Builder.Default
+    java.util.Set<Service> services = new java.util.HashSet<>();
 
     @ManyToOne
     @JoinColumn(name = "pet_id")

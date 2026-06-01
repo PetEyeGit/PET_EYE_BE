@@ -58,10 +58,13 @@ public class ReviewServiceImpl implements ReviewService {
             throw new AppException(ErrorCode.REVIEW_ALREADY_EXISTED);
         }
 
+        com.sang.sourcepattern.entity.Service service = (booking.getServices() != null && !booking.getServices().isEmpty())
+                ? booking.getServices().iterator().next() : null;
+
         Review review = Review.builder()
                 .user(user)
                 .shop(shop)
-                .service(booking.getService()) // Link the service
+                .service(service) // Link the service
                 .rating(request.getRating())
                 .comment(request.getComment())
                 .build();

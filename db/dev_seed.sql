@@ -30,6 +30,7 @@ TRUNCATE TABLE transaction;
 TRUNCATE TABLE review;
 TRUNCATE TABLE payment;
 TRUNCATE TABLE booking;
+TRUNCATE TABLE booking_services;
 TRUNCATE TABLE boarding_detail;
 TRUNCATE TABLE cage;
 TRUNCATE TABLE camera;
@@ -239,8 +240,8 @@ INSERT INTO camera (id, cage_id, model_type, stream_url, access_token, status) V
 
 -- Booking 1: UPCOMING (Sắp diễn ra) - CONFIRMED status
 -- Ngày mai, 10:00 AM
-INSERT INTO booking (id, user_id, shop_id, service_id, pet_id, staff_id, appointment_datetime, status, note, created_at) VALUES
-(1, 3, 1, 1, 1, 1,
+INSERT INTO booking (id, user_id, shop_id, pet_id, staff_id, appointment_datetime, status, note, created_at) VALUES
+(1, 3, 1, 1, 1,
  DATE_ADD(CURDATE(), INTERVAL 1 DAY) + INTERVAL 10 HOUR,
  'CONFIRMED',
  'Tắm & sấy cơ bản cho Mochi - Sắp diễn ra',
@@ -248,8 +249,8 @@ INSERT INTO booking (id, user_id, shop_id, service_id, pet_id, staff_id, appoint
 
 -- Booking 2: UPCOMING (Sắp diễn ra) - CONFIRMED status
 -- Ngày kia, 14:00 PM
-INSERT INTO booking (id, user_id, shop_id, service_id, pet_id, staff_id, appointment_datetime, status, note, created_at) VALUES
-(2, 3, 1, 2, 1, 3,
+INSERT INTO booking (id, user_id, shop_id, pet_id, staff_id, appointment_datetime, status, note, created_at) VALUES
+(2, 3, 1, 1, 3,
  DATE_ADD(CURDATE(), INTERVAL 2 DAY) + INTERVAL 14 HOUR,
  'CONFIRMED',
  'Cắt tỉa lông toàn thân - Sắp diễn ra',
@@ -257,8 +258,8 @@ INSERT INTO booking (id, user_id, shop_id, service_id, pet_id, staff_id, appoint
 
 -- Booking 3: ONGOING (Đang diễn ra) - IN_PROGRESS status
 -- Hôm nay, 11:00 AM (giả sử đang trong giờ làm việc)
-INSERT INTO booking (id, user_id, shop_id, service_id, pet_id, staff_id, appointment_datetime, status, note, created_at) VALUES
-(3, 3, 1, 3, 1, 1,
+INSERT INTO booking (id, user_id, shop_id, pet_id, staff_id, appointment_datetime, status, note, created_at) VALUES
+(3, 3, 1, 1, 1,
  CURDATE() + INTERVAL 11 HOUR,
  'IN_PROGRESS',
  'Gói Spa thư giãn - Đang diễn ra',
@@ -266,8 +267,8 @@ INSERT INTO booking (id, user_id, shop_id, service_id, pet_id, staff_id, appoint
 
 -- Booking 4: COMPLETED (Hoàn thành) - COMPLETED status
 -- Hôm qua, 09:00 AM
-INSERT INTO booking (id, user_id, shop_id, service_id, pet_id, staff_id, appointment_datetime, status, note, created_at) VALUES
-(4, 3, 1, 1, 1, 3,
+INSERT INTO booking (id, user_id, shop_id, pet_id, staff_id, appointment_datetime, status, note, created_at) VALUES
+(4, 3, 1, 1, 3,
  DATE_SUB(CURDATE(), INTERVAL 1 DAY) + INTERVAL 9 HOUR,
  'COMPLETED',
  'Tắm & sấy cơ bản - Đã hoàn thành',
@@ -275,8 +276,8 @@ INSERT INTO booking (id, user_id, shop_id, service_id, pet_id, staff_id, appoint
 
 -- Booking 5: COMPLETED (Hoàn thành) - COMPLETED status
 -- 2 ngày trước, 15:00 PM
-INSERT INTO booking (id, user_id, shop_id, service_id, pet_id, staff_id, appointment_datetime, status, note, created_at) VALUES
-(5, 3, 1, 2, 1, 1,
+INSERT INTO booking (id, user_id, shop_id, pet_id, staff_id, appointment_datetime, status, note, created_at) VALUES
+(5, 3, 1, 1, 1,
  DATE_SUB(CURDATE(), INTERVAL 2 DAY) + INTERVAL 15 HOUR,
  'COMPLETED',
  'Cắt tỉa lông - Đã hoàn thành',
@@ -284,8 +285,8 @@ INSERT INTO booking (id, user_id, shop_id, service_id, pet_id, staff_id, appoint
 
 -- Booking 6: CANCELLED (Đã hủy) - CANCELLED status
 -- 3 ngày trước, 10:00 AM
-INSERT INTO booking (id, user_id, shop_id, service_id, pet_id, staff_id, appointment_datetime, status, note, created_at) VALUES
-(6, 3, 1, 3, 1, 3,
+INSERT INTO booking (id, user_id, shop_id, pet_id, staff_id, appointment_datetime, status, note, created_at) VALUES
+(6, 3, 1, 1, 3,
  DATE_SUB(CURDATE(), INTERVAL 3 DAY) + INTERVAL 10 HOUR,
  'CANCELLED',
  'Gói Spa thư giãn - Đã hủy',
@@ -293,20 +294,33 @@ INSERT INTO booking (id, user_id, shop_id, service_id, pet_id, staff_id, appoint
 
 -- Booking 7: WAITING_SHOP_APPROVAL (Chờ phê duyệt) - WAITING_SHOP_APPROVAL status
 -- Ngày mai, 16:00 PM
-INSERT INTO booking (id, user_id, shop_id, service_id, pet_id, staff_id, appointment_datetime, status, note, created_at) VALUES
-(7, 3, 1, 1, 1, NULL,
+INSERT INTO booking (id, user_id, shop_id, pet_id, staff_id, appointment_datetime, status, note, created_at) VALUES
+(7, 3, 1, 1, NULL,
  DATE_ADD(CURDATE(), INTERVAL 1 DAY) + INTERVAL 16 HOUR,
  'WAITING_SHOP_APPROVAL',
  'Tắm & sấy cơ bản - Chờ phê duyệt từ shop',
  NOW());
 
 -- Booking 8: CONFIRMED - Dành cho Boarding kèm Camera
-INSERT INTO booking (id, user_id, shop_id, service_id, pet_id, staff_id, appointment_datetime, status, note, created_at) VALUES
-(8, 3, 1, 4, 1, 1,
+INSERT INTO booking (id, user_id, shop_id, pet_id, staff_id, appointment_datetime, status, note, created_at) VALUES
+(8, 3, 1, 1, 1,
  DATE_ADD(CURDATE(), INTERVAL 1 DAY) + INTERVAL 10 HOUR,
  'CONFIRMED',
  'Lưu trú thú cưng kèm Camera',
  NOW());
+
+-- ============================================================
+-- BOOKING SERVICES (Bảng trung gian Nhiều-Nhiều)
+-- ============================================================
+INSERT INTO booking_services (booking_id, service_id) VALUES
+(1, 1),
+(2, 2),
+(3, 3),
+(4, 1),
+(5, 2),
+(6, 3),
+(7, 1),
+(8, 4);
 
 
 -- ============================================================

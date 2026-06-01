@@ -19,11 +19,11 @@ import java.util.List;
 @FieldDefaults(level = AccessLevel.PRIVATE)
 public class InitiatePaymentRequest {
 
-    @NotNull
+    @NotNull(message = "SHOP_ID_REQUIRED")
     Integer shopId;
 
     /** serviceId chính — vẫn giữ để tương thích ngược */
-    @NotNull
+    @NotNull(message = "SERVICE_ID_REQUIRED")
     Integer serviceId;
 
     /**
@@ -32,12 +32,12 @@ public class InitiatePaymentRequest {
      */
     List<Integer> serviceIds;
 
-    @NotNull
+    @NotNull(message = "PET_ID_REQUIRED")
     Integer petId;
     Integer staffId;
 
-    @NotNull
-    @Future
+    @NotNull(message = "APPOINTMENT_DATETIME_REQUIRED")
+    @Future(message = "APPOINTMENT_MUST_BE_FUTURE")
     LocalDateTime appointmentDatetime;
 
     LocalDateTime checkIn;

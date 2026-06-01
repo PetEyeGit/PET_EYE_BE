@@ -35,7 +35,14 @@ public class TierUpgradeServiceImpl implements TierUpgradeService {
                 .toList();
 
         double totalSpending = completedBookings.stream()
-                .map(b -> b.getService() != null ? b.getService().getPrice() : BigDecimal.ZERO)
+                .map(b -> {
+                    if (b.getServices() == null || b.getServices().isEmpty()) {
+                        return BigDecimal.ZERO;
+                    }
+                    return b.getServices().stream()
+                            .map(s -> s.getPrice() != null ? s.getPrice() : BigDecimal.ZERO)
+                            .reduce(BigDecimal.ZERO, BigDecimal::add);
+                })
                 .mapToDouble(BigDecimal::doubleValue)
                 .sum();
 

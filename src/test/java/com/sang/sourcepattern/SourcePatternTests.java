@@ -9,5 +9,4 @@ class SourcePatternTests {
     @Test
     void contextLoads() {
     }
-
 }
