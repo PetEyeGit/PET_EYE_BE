@@ -43,4 +43,7 @@ public interface TaskService {
 
     /** Staff/Owner: cancel a booking due to customer no-show (late arrival beyond grace period) */
     TaskResponse cancelNoShow(int bookingId, String requesterEmail);
+
+    /** Staff/Owner: mark an individual sub-service item as completed for a multi-service booking */
+    TaskResponse completeServiceItem(int bookingId, int serviceId, String requesterEmail);
 }

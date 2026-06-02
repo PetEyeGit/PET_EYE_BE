@@ -72,6 +72,12 @@ public class Booking {
     @Column(columnDefinition = "TEXT")
     String rtspLink;
 
+    @Column(name = "completed_service_ids", columnDefinition = "TEXT")
+    String completedServiceIds;
+
+    @Column(name = "completed_service_times", columnDefinition = "TEXT")
+    String completedServiceTimes;
+
     /** PayOS order code — unique long used to match webhook callback */
     Long payosOrderCode;
 

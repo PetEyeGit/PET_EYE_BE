@@ -116,15 +116,42 @@ public class TaskServiceImpl implements TaskService {
         boolean cameraEnabled = b.getServices() != null && b.getServices().stream()
                 .anyMatch(com.sang.sourcepattern.entity.Service::isCameraEnabled);
         // Services list for task
+        java.util.Map<Integer, String> serviceCompletionTimes = new java.util.HashMap<>();
+        if (b.getCompletedServiceTimes() != null && !b.getCompletedServiceTimes().isBlank()) {
+            for (String part : b.getCompletedServiceTimes().split(",")) {
+                String[] kv = part.split(":", 2);
+                if (kv.length == 2) {
+                    try {
+                        serviceCompletionTimes.put(Integer.parseInt(kv[0].trim()), kv[1].trim());
+                    } catch (NumberFormatException e) {
+                        // ignore
+                    }
+                }
+            }
+        }
+
         java.util.List<TaskResponse.ServiceItem> serviceItems = (b.getServices() != null)
                 ? b.getServices().stream().map(s -> TaskResponse.ServiceItem.builder()
-                        .serviceId(s.getId()).serviceName(s.getServiceName()).servicePrice(s.getPrice()).build())
+                        .serviceId(s.getId())
+                        .serviceName(s.getServiceName())
+                        .servicePrice(s.getPrice())
+                        .completedAt(serviceCompletionTimes.get(s.getId()))
+                        .build())
                         .collect(java.util.stream.Collectors.toList())
                 : java.util.Collections.emptyList();
 
         Payment payment = paymentRepository.findByBookingId(b.getId()).orElse(null);
         String paymentMethod = (payment != null) ? payment.getMethod() : "N/A";
         String paymentStatus = (payment != null) ? payment.getStatus() : "N/A";
+
+        java.util.List<Integer> completedServiceIds = java.util.Collections.emptyList();
+        if (b.getCompletedServiceIds() != null && !b.getCompletedServiceIds().isBlank()) {
+            completedServiceIds = java.util.Arrays.stream(b.getCompletedServiceIds().split(","))
+                    .map(String::trim)
+                    .filter(s -> !s.isEmpty())
+                    .map(Integer::parseInt)
+                    .collect(java.util.stream.Collectors.toList());
+        }
 
         return TaskResponse.builder()
                 .bookingId(b.getId())
@@ -162,6 +189,7 @@ public class TaskServiceImpl implements TaskService {
                 .accountHolder(b.getAccountHolder())
                 .createdAt(b.getCreatedAt())
                 .updatedAt(b.getUpdatedAt())
+                .completedServiceIds(completedServiceIds)
                 .build();
     }
 
@@ -775,5 +803,80 @@ public class TaskServiceImpl implements TaskService {
             case "COMPLETED", "CANCELLED" -> false; // Terminal states
             default                -> false;
         };
+    }
+
+    @Override
+    @Transactional
+    public TaskResponse completeServiceItem(int bookingId, int serviceId, String requesterEmail) {
+        User requester = resolveUser(requesterEmail);
+        boolean isOwner = requester.getRoles().stream().anyMatch(r -> "SHOP_OWNER".equals(r.getName()));
+
+        Booking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new AppException(ErrorCode.BOOKING_NOT_FOUND));
+
+        if (isOwner) {
+            Shop shop = resolveOwnerShop(requesterEmail);
+            if (booking.getShop().getId() != shop.getId()) {
+                throw new AppException(ErrorCode.BOOKING_NOT_BELONG_TO_STAFF_SHOP);
+            }
+        } else {
+            Staff staff = staffRepository.findByUserId(requester.getId())
+                    .orElseThrow(() -> new AppException(ErrorCode.STAFF_NOT_FOUND));
+            if (booking.getStaff() == null || booking.getStaff().getId() != staff.getId()) {
+                throw new AppException(ErrorCode.BOOKING_NOT_BELONG_TO_STAFF_SHOP);
+            }
+        }
+
+        if (!"IN_PROGRESS".equals(booking.getStatus())) {
+            throw new AppException(ErrorCode.BOOKING_STATUS_INVALID);
+        }
+
+        com.sang.sourcepattern.entity.Service targetService = booking.getServices().stream()
+                .filter(s -> s.getId() == serviceId)
+                .findFirst()
+                .orElseThrow(() -> new AppException(ErrorCode.SERVICE_NOT_FOUND));
+
+        if ("CLINIC".equalsIgnoreCase(targetService.getCategory())) {
+            int count = petMedicalRecordRepository.countByBookingId(bookingId);
+            if (count == 0) {
+                throw new AppException(ErrorCode.MISSING_MEDICAL_RECORD);
+            }
+        }
+
+        String currentIds = booking.getCompletedServiceIds();
+        if (currentIds == null || currentIds.isBlank()) {
+            booking.setCompletedServiceIds(String.valueOf(serviceId));
+        } else {
+            java.util.Set<String> idSet = java.util.Arrays.stream(currentIds.split(","))
+                    .map(String::trim)
+                    .filter(s -> !s.isEmpty())
+                    .collect(java.util.stream.Collectors.toSet());
+            idSet.add(String.valueOf(serviceId));
+            booking.setCompletedServiceIds(String.join(",", idSet));
+        }
+
+        String timeStr = java.time.LocalDateTime.now().toString();
+        String currentTimes = booking.getCompletedServiceTimes();
+        if (currentTimes == null || currentTimes.isBlank()) {
+            booking.setCompletedServiceTimes(serviceId + ":" + timeStr);
+        } else {
+            java.util.Map<String, String> timeMap = new java.util.HashMap<>();
+            for (String part : currentTimes.split(",")) {
+                String[] kv = part.split(":", 2);
+                if (kv.length == 2) {
+                    timeMap.put(kv[0].trim(), kv[1].trim());
+                }
+            }
+            timeMap.put(String.valueOf(serviceId), timeStr);
+            String newTimesStr = timeMap.entrySet().stream()
+                    .map(e -> e.getKey() + ":" + e.getValue())
+                    .collect(java.util.stream.Collectors.joining(","));
+            booking.setCompletedServiceTimes(newTimesStr);
+        }
+
+        bookingRepository.save(booking);
+        log.info("Requester {} completed sub-service {} for booking {}", requesterEmail, serviceId, bookingId);
+
+        return toResponse(booking);
     }
 }

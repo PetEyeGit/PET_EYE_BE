@@ -257,4 +257,17 @@ public class TaskController {
                 .message("Booking cancelled due to customer no-show")
                 .build();
     }
+
+    @PutMapping("/{bookingId}/complete-service/{serviceId}")
+    @PreAuthorize("hasAnyRole('STAFF', 'SHOP_OWNER')")
+    @Operation(summary = "Staff/Owner: mark an individual sub-service item as completed for a multi-service booking")
+    public ApiResponse<TaskResponse> completeServiceItem(
+            @AuthenticationPrincipal Jwt jwt,
+            @PathVariable int bookingId,
+            @PathVariable int serviceId) {
+        return ApiResponse.<TaskResponse>builder()
+                .result(taskService.completeServiceItem(bookingId, serviceId, jwt.getClaim("email")))
+                .message("Service item marked completed")
+                .build();
+    }
 }

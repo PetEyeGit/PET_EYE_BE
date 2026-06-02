@@ -57,6 +57,7 @@ public class TaskResponse {
 
     // Multiple services (Many-to-Many)
     java.util.List<ServiceItem> services;
+    java.util.List<Integer> completedServiceIds;
 
     String note;
     String paymentMethod; // e.g. "PAYOS" or "CASH_DEPOSIT"
@@ -77,5 +78,6 @@ public class TaskResponse {
         int serviceId;
         String serviceName;
         java.math.BigDecimal servicePrice;
+        String completedAt;
     }
 }
