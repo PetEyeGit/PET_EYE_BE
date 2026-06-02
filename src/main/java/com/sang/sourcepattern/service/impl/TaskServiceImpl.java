@@ -193,13 +193,166 @@ public class TaskServiceImpl implements TaskService {
                 .build();
     }
 
+    // ─── Split mixed booking into separate tasks for Staff ─────────────────────
+
+    /**
+     * Nếu Booking gồm CẢ dịch vụ Lưu trú (BOARDING/Hotel) VÀ dịch vụ khác (Spa, Clinic...),
+     * tách thành 2 TaskResponse riêng biệt:
+     *   - Task 1: BOARDING — dùng checkIn/checkOut, chỉ chứa services Lưu trú
+     *   - Task 2: Dịch vụ phụ — dùng appointmentDatetime, chỉ chứa services không phải Lưu trú
+     * Nếu Booking chỉ có 1 loại → trả về list 1 phần tử (giữ nguyên logic cũ).
+     */
+    private List<TaskResponse> toResponses(Booking b) {
+        if (b.getServices() == null || b.getServices().isEmpty()) {
+            return List.of(toResponse(b));
+        }
+
+        // Phân loại services
+        java.util.List<com.sang.sourcepattern.entity.Service> boardingServices = b.getServices().stream()
+                .filter(s -> s.getCategory() != null
+                        && (s.getCategory().equalsIgnoreCase("BOARDING") || s.getCategory().equalsIgnoreCase("Hotel")))
+                .collect(Collectors.toList());
+        java.util.List<com.sang.sourcepattern.entity.Service> otherServices = b.getServices().stream()
+                .filter(s -> s.getCategory() == null
+                        || (!s.getCategory().equalsIgnoreCase("BOARDING") && !s.getCategory().equalsIgnoreCase("Hotel")))
+                .collect(Collectors.toList());
+
+        // Nếu chỉ có 1 loại → trả về 1 task như cũ
+        if (boardingServices.isEmpty() || otherServices.isEmpty()) {
+            return List.of(toResponse(b));
+        }
+
+        // ── Dữ liệu chung ──────────────────────────────────────────────────
+        Payment payment = paymentRepository.findByBookingId(b.getId()).orElse(null);
+        String paymentMethod = (payment != null) ? payment.getMethod() : "N/A";
+        String paymentStatus = (payment != null) ? payment.getStatus() : "N/A";
+
+        java.util.Map<Integer, String> serviceCompletionTimes = new java.util.HashMap<>();
+        if (b.getCompletedServiceTimes() != null && !b.getCompletedServiceTimes().isBlank()) {
+            for (String part : b.getCompletedServiceTimes().split(",")) {
+                String[] kv = part.split(":", 2);
+                if (kv.length == 2) {
+                    try {
+                        serviceCompletionTimes.put(Integer.parseInt(kv[0].trim()), kv[1].trim());
+                    } catch (NumberFormatException e) { /* ignore */ }
+                }
+            }
+        }
+
+        java.util.List<Integer> completedServiceIds = java.util.Collections.emptyList();
+        if (b.getCompletedServiceIds() != null && !b.getCompletedServiceIds().isBlank()) {
+            completedServiceIds = java.util.Arrays.stream(b.getCompletedServiceIds().split(","))
+                    .map(String::trim).filter(s -> !s.isEmpty())
+                    .map(Integer::parseInt)
+                    .collect(java.util.stream.Collectors.toList());
+        }
+        final java.util.List<Integer> finalCompletedIds = completedServiceIds;
+
+        // ── Task 1: BOARDING ────────────────────────────────────────────────
+        com.sang.sourcepattern.entity.Service boardingPrimary = boardingServices.get(0);
+        java.math.BigDecimal boardingPrice = boardingServices.stream()
+                .map(s -> s.getPrice() != null ? s.getPrice() : java.math.BigDecimal.ZERO)
+                .reduce(java.math.BigDecimal.ZERO, java.math.BigDecimal::add);
+        boolean cameraEnabled = boardingServices.stream()
+                .anyMatch(com.sang.sourcepattern.entity.Service::isCameraEnabled);
+        java.util.List<TaskResponse.ServiceItem> boardingItems = boardingServices.stream()
+                .map(s -> TaskResponse.ServiceItem.builder()
+                        .serviceId(s.getId()).serviceName(s.getServiceName())
+                        .servicePrice(s.getPrice())
+                        .completedAt(serviceCompletionTimes.get(s.getId()))
+                        .build())
+                .collect(java.util.stream.Collectors.toList());
+
+        TaskResponse boardingTask = TaskResponse.builder()
+                .bookingId(b.getId())
+                .shopId(b.getShop().getId()).shopName(b.getShop().getShopName())
+                .petId(b.getPet().getId()).petName(b.getPet().getName())
+                .customerId(b.getUser().getId()).customerName(b.getUser().getFullName())
+                .customerEmail(b.getUser().getEmail()).customerPhone(b.getUser().getPhone())
+                .serviceId(boardingPrimary.getId()).serviceName(boardingPrimary.getServiceName())
+                .servicePrice(boardingPrice)
+                .services(boardingItems)
+                .staffId(b.getStaff() != null ? b.getStaff().getId() : null)
+                .staffName(b.getStaff() != null ? b.getStaff().getFullName() : null)
+                .appointmentDatetime(b.getAppointmentDatetime())
+                .checkOutDatetime(b.getCheckOutDatetime())
+                .checkOut(b.getCheckOut())
+                .serviceStartDatetime(b.getServiceStartDatetime())
+                .serviceEndDatetime(b.getServiceEndDatetime())
+                .cageSize(b.getCageSize()).roomType(b.getRoomType())
+                .status(b.getStatus())
+                .cameraEnabled(cameraEnabled).rtspLink(b.getRtspLink())
+                .category("BOARDING")
+                .note(b.getNote())
+                .paymentMethod(paymentMethod).paymentStatus(paymentStatus)
+                .cancellationReason(b.getCancellationReason())
+                .bankName(b.getBankName()).bankAccount(b.getBankAccount()).accountHolder(b.getAccountHolder())
+                .createdAt(b.getCreatedAt()).updatedAt(b.getUpdatedAt())
+                .completedServiceIds(finalCompletedIds)
+                .build();
+
+        // ── Task 2: Dịch vụ phụ (Spa, Clinic, Grooming...) ─────────────────
+        com.sang.sourcepattern.entity.Service otherPrimary = otherServices.get(0);
+        java.math.BigDecimal otherPrice = otherServices.stream()
+                .map(s -> s.getPrice() != null ? s.getPrice() : java.math.BigDecimal.ZERO)
+                .reduce(java.math.BigDecimal.ZERO, java.math.BigDecimal::add);
+        int otherDuration = otherServices.stream()
+                .mapToInt(com.sang.sourcepattern.entity.Service::getDurationMinutes).sum();
+        boolean isClinic = otherServices.stream()
+                .anyMatch(s -> "CLINIC".equalsIgnoreCase(s.getCategory()));
+        String otherCategory = isClinic ? "CLINIC" : otherPrimary.getCategory();
+
+        java.util.List<TaskResponse.ServiceItem> otherItems = otherServices.stream()
+                .map(s -> TaskResponse.ServiceItem.builder()
+                        .serviceId(s.getId()).serviceName(s.getServiceName())
+                        .servicePrice(s.getPrice())
+                        .completedAt(serviceCompletionTimes.get(s.getId()))
+                        .build())
+                .collect(java.util.stream.Collectors.toList());
+
+        // Thời gian thực hiện dịch vụ phụ = appointmentDatetime (giờ check-in)
+        // Thời gian kết thúc = appointmentDatetime + tổng duration các dịch vụ phụ
+        LocalDateTime otherEnd = b.getAppointmentDatetime() != null
+                ? b.getAppointmentDatetime().plusMinutes(otherDuration) : null;
+
+        TaskResponse otherTask = TaskResponse.builder()
+                .bookingId(b.getId())
+                .shopId(b.getShop().getId()).shopName(b.getShop().getShopName())
+                .petId(b.getPet().getId()).petName(b.getPet().getName())
+                .customerId(b.getUser().getId()).customerName(b.getUser().getFullName())
+                .customerEmail(b.getUser().getEmail()).customerPhone(b.getUser().getPhone())
+                .serviceId(otherPrimary.getId()).serviceName(otherPrimary.getServiceName())
+                .servicePrice(otherPrice)
+                .services(otherItems)
+                .staffId(b.getStaff() != null ? b.getStaff().getId() : null)
+                .staffName(b.getStaff() != null ? b.getStaff().getFullName() : null)
+                .appointmentDatetime(b.getAppointmentDatetime())
+                .checkOutDatetime(otherEnd)  // Kết thúc = start + duration dịch vụ phụ
+                .checkOut(null)  // Không phải Lưu trú nên không có checkOut
+                .serviceStartDatetime(b.getServiceStartDatetime())
+                .serviceEndDatetime(null)
+                .cageSize(null).roomType(null)
+                .status(b.getStatus())
+                .cameraEnabled(false).rtspLink(null)
+                .category(otherCategory)
+                .note(b.getNote())
+                .paymentMethod(paymentMethod).paymentStatus(paymentStatus)
+                .cancellationReason(b.getCancellationReason())
+                .bankName(b.getBankName()).bankAccount(b.getBankAccount()).accountHolder(b.getAccountHolder())
+                .createdAt(b.getCreatedAt()).updatedAt(b.getUpdatedAt())
+                .completedServiceIds(finalCompletedIds)
+                .build();
+
+        return List.of(boardingTask, otherTask);
+    }
+
     // ─── Staff: get my tasks ──────────────────────────────────────────────────
 
     @Override
     public List<TaskResponse> getMyTasks(String staffEmail) {
         Staff staff = resolveStaffByEmail(staffEmail);
         return bookingRepository.findByStaffIdWithServices(staff.getId())
-                .stream().map(this::toResponse).collect(Collectors.toList());
+                .stream().flatMap(b -> toResponses(b).stream()).collect(Collectors.toList());
     }
 
     // ─── Staff/Owner: get unassigned tasks ────────────────────────────────────
@@ -230,7 +383,7 @@ public class TaskServiceImpl implements TaskService {
 
         return unassigned.stream()
                 .filter(b -> !List.of("CANCELLED", "COMPLETED").contains(b.getStatus()))
-                .map(this::toResponse)
+                .flatMap(b -> toResponses(b).stream())
                 .collect(Collectors.toList());
     }
 
@@ -495,7 +648,7 @@ public class TaskServiceImpl implements TaskService {
     public List<TaskResponse> getAllShopTasks(String ownerEmail) {
         Shop shop = resolveOwnerShop(ownerEmail);
         return bookingRepository.findByShopIdWithServices(shop.getId())
-                .stream().map(this::toResponse).collect(Collectors.toList());
+                .stream().flatMap(b -> toResponses(b).stream()).collect(Collectors.toList());
     }
 
     @Override
