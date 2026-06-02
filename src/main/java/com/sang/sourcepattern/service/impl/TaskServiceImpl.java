@@ -263,6 +263,14 @@ public class TaskServiceImpl implements TaskService {
                         .build())
                 .collect(java.util.stream.Collectors.toList());
 
+                java.util.List<TaskResponse.ServiceItem> allItems = b.getServices().stream()
+                .map(s -> TaskResponse.ServiceItem.builder()
+                        .serviceId(s.getId()).serviceName(s.getServiceName())
+                        .servicePrice(s.getPrice())
+                        .completedAt(serviceCompletionTimes.get(s.getId()))
+                        .build())
+                .collect(java.util.stream.Collectors.toList());
+
         TaskResponse boardingTask = TaskResponse.builder()
                 .bookingId(b.getId())
                 .shopId(b.getShop().getId()).shopName(b.getShop().getShopName())
@@ -271,7 +279,7 @@ public class TaskServiceImpl implements TaskService {
                 .customerEmail(b.getUser().getEmail()).customerPhone(b.getUser().getPhone())
                 .serviceId(boardingPrimary.getId()).serviceName(boardingPrimary.getServiceName())
                 .servicePrice(boardingPrice)
-                .services(boardingItems)
+                .services(allItems)
                 .staffId(b.getStaff() != null ? b.getStaff().getId() : null)
                 .staffName(b.getStaff() != null ? b.getStaff().getFullName() : null)
                 .appointmentDatetime(b.getAppointmentDatetime())
@@ -323,7 +331,7 @@ public class TaskServiceImpl implements TaskService {
                 .customerEmail(b.getUser().getEmail()).customerPhone(b.getUser().getPhone())
                 .serviceId(otherPrimary.getId()).serviceName(otherPrimary.getServiceName())
                 .servicePrice(otherPrice)
-                .services(otherItems)
+                .services(allItems)
                 .staffId(b.getStaff() != null ? b.getStaff().getId() : null)
                 .staffName(b.getStaff() != null ? b.getStaff().getFullName() : null)
                 .appointmentDatetime(b.getAppointmentDatetime())

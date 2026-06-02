@@ -14,7 +14,6 @@ import com.sang.sourcepattern.exception.ErrorCode;
 import com.sang.sourcepattern.repository.*;
 import com.sang.sourcepattern.service.BookingService;
 import com.sang.sourcepattern.service.PayOSService;
-import com.sang.sourcepattern.service.impl.WalletServiceImpl;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
@@ -213,6 +212,7 @@ public class BookingServiceImpl implements BookingService {
                         .serviceId(s.getId())
                         .serviceName(s.getServiceName())
                         .servicePrice(s.getPrice())
+                        .category(s.getCategory())
                         .build()).collect(Collectors.toList())
                 : new java.util.ArrayList<>();
 
@@ -255,6 +255,7 @@ public class BookingServiceImpl implements BookingService {
                                 : null))
                 .cageSize(booking.getCageSize())
                 .roomType(booking.getRoomType())
+                .category(isLodging ? "BOARDING" : (primaryService != null ? primaryService.getCategory() : null))
                 .build();
     }
 
