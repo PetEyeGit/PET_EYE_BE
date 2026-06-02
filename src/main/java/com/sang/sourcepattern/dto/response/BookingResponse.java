@@ -56,6 +56,9 @@ public class BookingResponse {
     String cageSize;
     String roomType;
 
+    // Category from primary service (BOARDING, CLINIC, GROOMING, etc.)
+    String category;
+
     // Multi-service fields
     @Data
     @Builder
@@ -65,6 +68,7 @@ public class BookingResponse {
         int serviceId;
         String serviceName;
         BigDecimal servicePrice;
+        String category;
     }
     java.util.List<BookingServiceDto> services;
 }

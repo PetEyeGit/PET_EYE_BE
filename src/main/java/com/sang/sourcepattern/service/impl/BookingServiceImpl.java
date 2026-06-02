@@ -14,7 +14,6 @@ import com.sang.sourcepattern.exception.ErrorCode;
 import com.sang.sourcepattern.repository.*;
 import com.sang.sourcepattern.service.BookingService;
 import com.sang.sourcepattern.service.PayOSService;
-import com.sang.sourcepattern.service.impl.WalletServiceImpl;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
@@ -213,6 +212,7 @@ public class BookingServiceImpl implements BookingService {
                         .serviceId(s.getId())
                         .serviceName(s.getServiceName())
                         .servicePrice(s.getPrice())
+                        .category(s.getCategory())
                         .build()).collect(Collectors.toList())
                 : new java.util.ArrayList<>();
 
@@ -255,6 +255,7 @@ public class BookingServiceImpl implements BookingService {
                                 : null))
                 .cageSize(booking.getCageSize())
                 .roomType(booking.getRoomType())
+                .category(isLodging ? "BOARDING" : (primaryService != null ? primaryService.getCategory() : null))
                 .build();
     }
 
@@ -281,7 +282,7 @@ public class BookingServiceImpl implements BookingService {
      * Dùng interval overlap: newStart < existingEnd AND existingStart < newEnd
      */
     private void checkStaffConflict(int staffId, LocalDateTime appointmentTime, int durationMinutes, boolean isBoarding) {
-        if (isBoarding) return;
+        // Không bypass khi isBoarding — query SQL đã tự loại trừ boarding/hotel
         LocalDateTime windowStart = appointmentTime;
         LocalDateTime windowEnd   = appointmentTime.plusMinutes(durationMinutes);
 
@@ -309,7 +310,7 @@ public class BookingServiceImpl implements BookingService {
         if (activeStaff.isEmpty()) {
             throw new AppException(ErrorCode.NO_STAFF_AVAILABLE);
         }
-        if (isBoarding) return;
+        // Không bypass khi isBoarding — query SQL đã tự loại trừ boarding/hotel
 
         LocalDateTime windowStart = appointmentTime;
         LocalDateTime windowEnd   = appointmentTime.plusMinutes(durationMinutes);
@@ -561,7 +562,7 @@ public class BookingServiceImpl implements BookingService {
         if (pending.getStaffId() != null) {
             LocalDateTime ws = pending.getAppointmentDatetime();
             LocalDateTime we = pending.getAppointmentDatetime().plusMinutes(pendingTotalDuration);
-            if (!isBoarding && bookingRepository.countConflictingBookingForStaff(pending.getStaffId(), ws, we) > 0) {
+            if (bookingRepository.countConflictingBookingForStaff(pending.getStaffId(), ws, we) > 0) {
                 deletePending(orderCode);
                 releaseStaffSlot(pending.getStaffId(), pending.getAppointmentDatetime());
                 throw new AppException(ErrorCode.STAFF_BOOKING_CONFLICT);
@@ -581,7 +582,7 @@ public class BookingServiceImpl implements BookingService {
                 LocalDateTime we = pending.getAppointmentDatetime().plusMinutes(pendingTotalDuration);
                 
                 List<Staff> availableStaff = activeStaff.stream().filter(s -> {
-                    boolean dbBusy = !isBoarding && bookingRepository.countConflictingBookingForStaff(s.getId(), ws, we) > 0;
+                    boolean dbBusy = bookingRepository.countConflictingBookingForStaff(s.getId(), ws, we) > 0;
                     String slotKey = STAFF_SLOT_PREFIX + s.getId() + ":"
                                  + pending.getAppointmentDatetime().withSecond(0).withNano(0).toString();
                     boolean redisBusy = Boolean.TRUE.equals(redisTemplate.hasKey(slotKey));
@@ -728,7 +729,7 @@ public class BookingServiceImpl implements BookingService {
         if (pending.getStaffId() != null) {
             LocalDateTime ws = pending.getAppointmentDatetime();
             LocalDateTime we = pending.getAppointmentDatetime().plusMinutes(pendingTotalDuration);
-            if (!isBoarding && bookingRepository.countConflictingBookingForStaff(pending.getStaffId(), ws, we) > 0) {
+            if (bookingRepository.countConflictingBookingForStaff(pending.getStaffId(), ws, we) > 0) {
                 deletePending(orderCode);
                 releaseStaffSlot(pending.getStaffId(), pending.getAppointmentDatetime());
                 throw new AppException(ErrorCode.STAFF_BOOKING_CONFLICT);
@@ -748,7 +749,7 @@ public class BookingServiceImpl implements BookingService {
                 LocalDateTime we = pending.getAppointmentDatetime().plusMinutes(pendingTotalDuration);
                 
                 List<Staff> availableStaff = activeStaff.stream().filter(s -> {
-                    boolean dbBusy = !isBoarding && bookingRepository.countConflictingBookingForStaff(s.getId(), ws, we) > 0;
+                    boolean dbBusy = bookingRepository.countConflictingBookingForStaff(s.getId(), ws, we) > 0;
                     String slotKey = STAFF_SLOT_PREFIX + s.getId() + ":"
                                  + pending.getAppointmentDatetime().withSecond(0).withNano(0).toString();
                     boolean redisBusy = Boolean.TRUE.equals(redisTemplate.hasKey(slotKey));
@@ -1589,7 +1590,7 @@ public class BookingServiceImpl implements BookingService {
         if (pending.getStaffId() != null) {
             LocalDateTime ws = pending.getAppointmentDatetime();
             LocalDateTime we = pending.getAppointmentDatetime().plusMinutes(pendingTotalDuration);
-            if (!isBoarding && bookingRepository.countConflictingBookingForStaff(pending.getStaffId(), ws, we) > 0) {
+            if (bookingRepository.countConflictingBookingForStaff(pending.getStaffId(), ws, we) > 0) {
                 redisTemplate.delete(CASH_PENDING_PREFIX + orderCode);
                 releaseStaffSlot(pending.getStaffId(), pending.getAppointmentDatetime());
                 throw new AppException(ErrorCode.STAFF_BOOKING_CONFLICT);
@@ -1608,7 +1609,7 @@ public class BookingServiceImpl implements BookingService {
                 LocalDateTime ws = pending.getAppointmentDatetime();
                 LocalDateTime we = pending.getAppointmentDatetime().plusMinutes(pendingTotalDuration);
                 List<Staff> availableStaff = activeStaff.stream().filter(s -> {
-                    boolean dbBusy = !isBoarding && bookingRepository.countConflictingBookingForStaff(s.getId(), ws, we) > 0;
+                    boolean dbBusy = bookingRepository.countConflictingBookingForStaff(s.getId(), ws, we) > 0;
                     String slotKey = STAFF_SLOT_PREFIX + s.getId() + ":"
                             + pending.getAppointmentDatetime().withSecond(0).withNano(0).toString();
                     boolean redisBusy = Boolean.TRUE.equals(redisTemplate.hasKey(slotKey));
