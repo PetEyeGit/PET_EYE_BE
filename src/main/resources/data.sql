@@ -190,10 +190,55 @@ INSERT IGNORE INTO payment (id, booking_id, method, amount, status, checkout_url
 VALUES (1000, 1000, 'PAYOS', 450000, 'PAID', 'http://payos.vn/dummy', NOW());
 
 -- ==========================================
--- BOOKING SERVICES MAPPING
+-- TEST BOOKINGS: WAITING SHOP APPROVAL (for UI testing)
 -- ==========================================
+-- Booking 1001: Shop 1, customer 4, multiple services (1 + 2)
+INSERT INTO booking (id, user_id, shop_id, pet_id, staff_id, appointment_datetime, status, note, created_at)
+SELECT 1001, 4, 1, 991, NULL, DATE_ADD(NOW(), INTERVAL 1 DAY), 'WAITING_SHOP_APPROVAL', 'Test multi-service booking awaiting shop approval', NOW()
+FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM booking WHERE id = 1001);
+
+-- Booking 1002: Shop 1, customer 5, single service (1)
+INSERT INTO booking (id, user_id, shop_id, pet_id, staff_id, appointment_datetime, status, note, created_at)
+SELECT 1002, 5, 1, 992, NULL, DATE_ADD(NOW(), INTERVAL 2 DAY), 'WAITING_SHOP_APPROVAL', 'Test single-service booking awaiting shop approval', NOW()
+FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM booking WHERE id = 1002);
+
+-- Booking 1003: Shop 2, customer 4, single service (5)
+INSERT INTO booking (id, user_id, shop_id, pet_id, staff_id, appointment_datetime, status, note, created_at)
+SELECT 1003, 4, 2, 991, NULL, DATE_ADD(NOW(), INTERVAL 3 DAY), 'WAITING_SHOP_APPROVAL', 'Test shop2 booking awaiting approval', NOW()
+FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM booking WHERE id = 1003);
+
 INSERT IGNORE INTO booking_services (booking_id, service_id) VALUES
 (991, 1), (992, 5), (993, 2), (994, 3), (995, 2), (996, 2), (997, 2), (998, 2), (999, 2), (1000, 2);
+
+INSERT INTO booking_services (booking_id, service_id)
+SELECT 1001, 1 FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM booking_services WHERE booking_id = 1001 AND service_id = 1);
+INSERT INTO booking_services (booking_id, service_id)
+SELECT 1001, 2 FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM booking_services WHERE booking_id = 1001 AND service_id = 2);
+INSERT INTO booking_services (booking_id, service_id)
+SELECT 1002, 1 FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM booking_services WHERE booking_id = 1002 AND service_id = 1);
+INSERT INTO booking_services (booking_id, service_id)
+SELECT 1003, 5 FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM booking_services WHERE booking_id = 1003 AND service_id = 5);
+
+-- ==========================================
+-- ADDITIONAL TEST BOOKINGS (IDs 8001, 8002)
+-- These inserts are idempotent (only insert when id does not exist)
+-- Booking 8001: Shop 1, customer 4, multiple services (1 + 2)
+INSERT INTO booking (id, user_id, shop_id, pet_id, staff_id, appointment_datetime, status, note, created_at)
+SELECT 8001, 4, 1, 991, NULL, DATE_ADD(NOW(), INTERVAL 4 DAY), 'WAITING_SHOP_APPROVAL', 'Test booking 8001 awaiting shop approval', NOW()
+FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM booking WHERE id = 8001);
+
+-- Booking 8002: Shop 2, customer 5, single service (5)
+INSERT INTO booking (id, user_id, shop_id, pet_id, staff_id, appointment_datetime, status, note, created_at)
+SELECT 8002, 5, 2, 992, NULL, DATE_ADD(NOW(), INTERVAL 5 DAY), 'WAITING_SHOP_APPROVAL', 'Test booking 8002 awaiting shop approval', NOW()
+FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM booking WHERE id = 8002);
+
+-- Safe booking_services mapping for 8001/8002
+INSERT INTO booking_services (booking_id, service_id)
+SELECT 8001, 1 FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM booking_services WHERE booking_id = 8001 AND service_id = 1);
+INSERT INTO booking_services (booking_id, service_id)
+SELECT 8001, 2 FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM booking_services WHERE booking_id = 8001 AND service_id = 2);
+INSERT INTO booking_services (booking_id, service_id)
+SELECT 8002, 5 FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM booking_services WHERE booking_id = 8002 AND service_id = 5);
 
 -- Mock Transactions for existing Bookings
 INSERT IGNORE INTO transaction (id, booking_id, shop_id, type, amount, payment_method, status, description, created_at)
