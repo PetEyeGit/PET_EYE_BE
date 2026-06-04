@@ -201,15 +201,25 @@ public class ShopServiceImpl implements ShopService {
     }
 
     @Override
-    public ShopDashboardResponse getShopDashboard(String ownerEmail) {
+    public ShopDashboardResponse getShopDashboard(String ownerEmail, java.time.LocalDate startDate, java.time.LocalDate endDate) {
         Shop shop = shopRepository.findByOwnerEmail(ownerEmail)
                 .orElseThrow(() -> new AppException(ErrorCode.SHOP_NOT_FOUND));
 
         List<Booking> allBookings = bookingRepository.findByShopId(shop.getId());
-        
-        // 1. KPI Stats
         List<com.sang.sourcepattern.entity.Transaction> shopTxns = transactionRepository.findByShopIdOrderByCreatedAtDesc(shop.getId());
         
+        java.time.LocalDateTime now = java.time.LocalDateTime.now();
+        // Default to start of month to now if not provided
+        java.time.LocalDateTime start = startDate != null ? startDate.atStartOfDay() : now.withDayOfMonth(1).withHour(0).withMinute(0).withSecond(0);
+        java.time.LocalDateTime end = endDate != null ? endDate.atTime(23, 59, 59) : now;
+        
+        if (start.isAfter(end)) {
+            java.time.LocalDateTime temp = start;
+            start = end;
+            end = temp;
+        }
+
+        // 1. All-time stats (totalRevenue, totalBookings, totalCustomers, totalPets)
         java.math.BigDecimal totalRefunds = shopTxns.stream()
                 .filter(t -> "REFUND".equals(t.getType()) && "SUCCESS".equals(t.getStatus()))
                 .map(com.sang.sourcepattern.entity.Transaction::getAmount)
@@ -220,22 +230,6 @@ public class ShopServiceImpl implements ShopService {
                 .map(b -> b.getServices() != null ? b.getServices().stream().map(s -> s.getPrice() != null ? s.getPrice() : java.math.BigDecimal.ZERO).reduce(java.math.BigDecimal.ZERO, java.math.BigDecimal::add) : java.math.BigDecimal.ZERO)
                 .reduce(java.math.BigDecimal.ZERO, java.math.BigDecimal::add)
                 .subtract(totalRefunds);
-
-        java.time.LocalDateTime now = java.time.LocalDateTime.now();
-        java.time.LocalDateTime startOfMonth = now.withDayOfMonth(1).withHour(0).withMinute(0).withSecond(0);
-
-        java.math.BigDecimal refundsThisMonth = shopTxns.stream()
-                .filter(t -> "REFUND".equals(t.getType()) && "SUCCESS".equals(t.getStatus()))
-                .filter(t -> t.getCreatedAt().isAfter(startOfMonth))
-                .map(com.sang.sourcepattern.entity.Transaction::getAmount)
-                .reduce(java.math.BigDecimal.ZERO, java.math.BigDecimal::add);
-
-        java.math.BigDecimal revenueThisMonth = allBookings.stream()
-                .filter(b -> "COMPLETED".equals(b.getStatus()))
-                .filter(b -> b.getAppointmentDatetime().isAfter(startOfMonth))
-                .map(b -> b.getServices() != null ? b.getServices().stream().map(s -> s.getPrice() != null ? s.getPrice() : java.math.BigDecimal.ZERO).reduce(java.math.BigDecimal.ZERO, java.math.BigDecimal::add) : java.math.BigDecimal.ZERO)
-                .reduce(java.math.BigDecimal.ZERO, java.math.BigDecimal::add)
-                .subtract(refundsThisMonth);
 
         long totalBookings = allBookings.size();
         long pendingBookings = allBookings.stream()
@@ -252,84 +246,153 @@ public class ShopServiceImpl implements ShopService {
                 .distinct()
                 .count();
 
-        // 2. Revenue Chart (Last 7 Days)
+        // 2. Period stats
+        final java.time.LocalDateTime finalStart = start;
+        final java.time.LocalDateTime finalEnd = end;
+        
+        List<Booking> periodBookingsList = allBookings.stream()
+                .filter(b -> b.getCreatedAt().isAfter(finalStart) && b.getCreatedAt().isBefore(finalEnd))
+                .collect(java.util.stream.Collectors.toList());
+                
+        long periodBookingsCount = periodBookingsList.size();
+        
+        long periodNewCustomers = periodBookingsList.stream()
+                .map(b -> b.getUser().getId())
+                .distinct()
+                .filter(userId -> {
+                    return allBookings.stream()
+                            .filter(ab -> ab.getUser().getId() == userId)
+                            .map(Booking::getCreatedAt)
+                            .min(java.time.LocalDateTime::compareTo)
+                            .map(firstDate -> firstDate.isAfter(finalStart) && firstDate.isBefore(finalEnd))
+                            .orElse(false);
+                })
+                .count();
+
+        java.math.BigDecimal refundsInPeriod = shopTxns.stream()
+                .filter(t -> "REFUND".equals(t.getType()) && "SUCCESS".equals(t.getStatus()))
+                .filter(t -> t.getCreatedAt().isAfter(finalStart) && t.getCreatedAt().isBefore(finalEnd))
+                .map(com.sang.sourcepattern.entity.Transaction::getAmount)
+                .reduce(java.math.BigDecimal.ZERO, java.math.BigDecimal::add);
+
+        java.math.BigDecimal revenueInPeriod = periodBookingsList.stream()
+                .filter(b -> "COMPLETED".equals(b.getStatus()))
+                .map(b -> b.getServices() != null ? b.getServices().stream().map(s -> s.getPrice() != null ? s.getPrice() : java.math.BigDecimal.ZERO).reduce(java.math.BigDecimal.ZERO, java.math.BigDecimal::add) : java.math.BigDecimal.ZERO)
+                .reduce(java.math.BigDecimal.ZERO, java.math.BigDecimal::add)
+                .subtract(refundsInPeriod);
+
+        long periodPending = periodBookingsList.stream().filter(b -> "PENDING_PAYMENT".equals(b.getStatus()) || "CONFIRMED".equals(b.getStatus())).count();
+        long periodCompleted = periodBookingsList.stream().filter(b -> "COMPLETED".equals(b.getStatus())).count();
+        long periodCancelled = periodBookingsList.stream().filter(b -> "CANCELLED".equals(b.getStatus()) || "NO_SHOW".equals(b.getStatus()) || "REJECTED".equals(b.getStatus())).count();
+        ShopDashboardResponse.BookingStatusStats statusStats = new ShopDashboardResponse.BookingStatusStats(periodPending, periodPending, periodCompleted, periodCancelled);
+
+        // 3. Revenue Chart (Dynamic based on period up to 60 days, else month)
         java.time.format.DateTimeFormatter dayFormatter = java.time.format.DateTimeFormatter.ofPattern("dd/MM");
         List<ShopDashboardResponse.RevenueChartData> revenueChart = new java.util.ArrayList<>();
         
-        for (int i = 6; i >= 0; i--) {
-            final java.time.LocalDate date = now.toLocalDate().minusDays(i);
-            java.math.BigDecimal dayAmount = allBookings.stream()
-                    .filter(b -> "COMPLETED".equals(b.getStatus()))
-                    .filter(b -> b.getAppointmentDatetime() != null && b.getAppointmentDatetime().toLocalDate().equals(date))
-                    .map(b -> b.getServices() != null ? b.getServices().stream().map(s -> s.getPrice() != null ? s.getPrice() : java.math.BigDecimal.ZERO).reduce(java.math.BigDecimal.ZERO, java.math.BigDecimal::add) : java.math.BigDecimal.ZERO)
-                    .reduce(java.math.BigDecimal.ZERO, java.math.BigDecimal::add);
-            
-            java.math.BigDecimal dayRefunds = shopTxns.stream()
-                    .filter(t -> "REFUND".equals(t.getType()) && "SUCCESS".equals(t.getStatus()))
-                    .filter(t -> t.getCreatedAt().toLocalDate().equals(date))
-                    .map(com.sang.sourcepattern.entity.Transaction::getAmount)
-                    .reduce(java.math.BigDecimal.ZERO, java.math.BigDecimal::add);
-            
-            dayAmount = dayAmount.subtract(dayRefunds);
-            
-            revenueChart.add(new ShopDashboardResponse.RevenueChartData(date.format(dayFormatter), dayAmount));
+        long daysBetween = java.time.temporal.ChronoUnit.DAYS.between(start.toLocalDate(), end.toLocalDate());
+        if (daysBetween > 60) {
+            java.time.format.DateTimeFormatter monthFormatter = java.time.format.DateTimeFormatter.ofPattern("MM/yyyy");
+            java.time.LocalDate currentMonthStart = start.toLocalDate().withDayOfMonth(1);
+            while (!currentMonthStart.isAfter(end.toLocalDate().withDayOfMonth(1))) {
+                final java.time.LocalDate loopMonth = currentMonthStart;
+                java.math.BigDecimal monthAmount = allBookings.stream()
+                        .filter(b -> "COMPLETED".equals(b.getStatus()))
+                        .filter(b -> b.getAppointmentDatetime() != null && b.getAppointmentDatetime().toLocalDate().withDayOfMonth(1).equals(loopMonth))
+                        .map(b -> b.getServices() != null ? b.getServices().stream().map(s -> s.getPrice() != null ? s.getPrice() : java.math.BigDecimal.ZERO).reduce(java.math.BigDecimal.ZERO, java.math.BigDecimal::add) : java.math.BigDecimal.ZERO)
+                        .reduce(java.math.BigDecimal.ZERO, java.math.BigDecimal::add);
+                
+                java.math.BigDecimal monthRefunds = shopTxns.stream()
+                        .filter(t -> "REFUND".equals(t.getType()) && "SUCCESS".equals(t.getStatus()))
+                        .filter(t -> t.getCreatedAt().toLocalDate().withDayOfMonth(1).equals(loopMonth))
+                        .map(com.sang.sourcepattern.entity.Transaction::getAmount)
+                        .reduce(java.math.BigDecimal.ZERO, java.math.BigDecimal::add);
+                
+                revenueChart.add(new ShopDashboardResponse.RevenueChartData(loopMonth.format(monthFormatter), monthAmount.subtract(monthRefunds)));
+                currentMonthStart = currentMonthStart.plusMonths(1);
+            }
+        } else {
+            java.time.LocalDate currentDate = start.toLocalDate();
+            while (!currentDate.isAfter(end.toLocalDate())) {
+                final java.time.LocalDate loopDate = currentDate;
+                java.math.BigDecimal dayAmount = allBookings.stream()
+                        .filter(b -> "COMPLETED".equals(b.getStatus()))
+                        .filter(b -> b.getAppointmentDatetime() != null && b.getAppointmentDatetime().toLocalDate().equals(loopDate))
+                        .map(b -> b.getServices() != null ? b.getServices().stream().map(s -> s.getPrice() != null ? s.getPrice() : java.math.BigDecimal.ZERO).reduce(java.math.BigDecimal.ZERO, java.math.BigDecimal::add) : java.math.BigDecimal.ZERO)
+                        .reduce(java.math.BigDecimal.ZERO, java.math.BigDecimal::add);
+                
+                java.math.BigDecimal dayRefunds = shopTxns.stream()
+                        .filter(t -> "REFUND".equals(t.getType()) && "SUCCESS".equals(t.getStatus()))
+                        .filter(t -> t.getCreatedAt().toLocalDate().equals(loopDate))
+                        .map(com.sang.sourcepattern.entity.Transaction::getAmount)
+                        .reduce(java.math.BigDecimal.ZERO, java.math.BigDecimal::add);
+                
+                revenueChart.add(new ShopDashboardResponse.RevenueChartData(loopDate.format(dayFormatter), dayAmount.subtract(dayRefunds)));
+                currentDate = currentDate.plusDays(1);
+            }
         }
 
-        // 3. Top Services
-        java.util.Map<String, Long> serviceCounts = allBookings.stream()
+        // 4. Top Services in Period
+        java.util.Map<String, Long> serviceCounts = periodBookingsList.stream()
                 .collect(java.util.stream.Collectors.groupingBy(
                         b -> b.getServices() != null && !b.getServices().isEmpty() ? b.getServices().iterator().next().getServiceName() : "",
                         java.util.stream.Collectors.counting()
                 ));
 
         List<ShopDashboardResponse.ServiceStat> topServices = serviceCounts.entrySet().stream()
+                .filter(e -> !e.getKey().isEmpty())
                 .map(e -> new ShopDashboardResponse.ServiceStat(e.getKey(), e.getValue()))
                 .sorted((s1, s2) -> Long.compare(s2.getCount(), s1.getCount()))
                 .limit(5)
                 .collect(java.util.stream.Collectors.toList());
 
-        // 4. Monthly Growth
-        java.time.LocalDateTime startOfLastMonth = startOfMonth.minusMonths(1);
+        // 5. Growth compared to previous period
+        long periodDurationSeconds = java.time.temporal.ChronoUnit.SECONDS.between(start, end);
+        java.time.LocalDateTime prevStart = start.minusSeconds(periodDurationSeconds);
+        java.time.LocalDateTime prevEnd = start;
 
-        java.math.BigDecimal refundsLastMonth = shopTxns.stream()
+        java.math.BigDecimal refundsPrevPeriod = shopTxns.stream()
                 .filter(t -> "REFUND".equals(t.getType()) && "SUCCESS".equals(t.getStatus()))
-                .filter(t -> t.getCreatedAt().isAfter(startOfLastMonth) && t.getCreatedAt().isBefore(startOfMonth))
+                .filter(t -> t.getCreatedAt().isAfter(prevStart) && t.getCreatedAt().isBefore(prevEnd))
                 .map(com.sang.sourcepattern.entity.Transaction::getAmount)
                 .reduce(java.math.BigDecimal.ZERO, java.math.BigDecimal::add);
 
-        java.math.BigDecimal revenueLastMonth = allBookings.stream()
+        java.math.BigDecimal revenuePrevPeriod = allBookings.stream()
                 .filter(b -> "COMPLETED".equals(b.getStatus()))
-                .filter(b -> b.getAppointmentDatetime() != null && b.getAppointmentDatetime().isAfter(startOfLastMonth) && b.getAppointmentDatetime().isBefore(startOfMonth))
+                .filter(b -> b.getAppointmentDatetime() != null && b.getAppointmentDatetime().isAfter(prevStart) && b.getAppointmentDatetime().isBefore(prevEnd))
                 .map(b -> b.getServices() != null ? b.getServices().stream().map(s -> s.getPrice() != null ? s.getPrice() : java.math.BigDecimal.ZERO).reduce(java.math.BigDecimal.ZERO, java.math.BigDecimal::add) : java.math.BigDecimal.ZERO)
                 .reduce(java.math.BigDecimal.ZERO, java.math.BigDecimal::add)
-                .subtract(refundsLastMonth);
+                .subtract(refundsPrevPeriod);
 
-        Double monthlyGrowthPercentage = 0.0;
-        if (revenueLastMonth.compareTo(java.math.BigDecimal.ZERO) > 0) {
-            monthlyGrowthPercentage = revenueThisMonth.subtract(revenueLastMonth)
-                    .divide(revenueLastMonth, 4, java.math.RoundingMode.HALF_UP)
+        Double growthPercentage = 0.0;
+        if (revenuePrevPeriod.compareTo(java.math.BigDecimal.ZERO) > 0) {
+            growthPercentage = revenueInPeriod.subtract(revenuePrevPeriod)
+                    .divide(revenuePrevPeriod, 4, java.math.RoundingMode.HALF_UP)
                     .multiply(new java.math.BigDecimal("100"))
                     .doubleValue();
-        } else if (revenueThisMonth.compareTo(java.math.BigDecimal.ZERO) > 0) {
-            monthlyGrowthPercentage = 100.0;
+        } else if (revenueInPeriod.compareTo(java.math.BigDecimal.ZERO) > 0) {
+            growthPercentage = 100.0;
         }
 
         String topServiceName = topServices.isEmpty() ? "các dịch vụ" : topServices.get(0).getName();
-        String monthlyGrowthDescription = monthlyGrowthPercentage >= 0 
-            ? "Hệ thống ghi nhận sự tăng trưởng ổn định nhờ vào " + topServiceName + "."
-            : "Doanh thu đang giảm so với tháng trước, cân nhắc tạo mã giảm giá cho " + topServiceName + ".";
+        String growthDescription = growthPercentage >= 0 
+            ? "Hệ thống ghi nhận sự tăng trưởng ổn định so với kỳ trước nhờ vào " + topServiceName + "."
+            : "Doanh thu đang giảm so với kỳ trước, cân nhắc tạo mã giảm giá cho " + topServiceName + ".";
 
         return ShopDashboardResponse.builder()
                 .totalRevenue(totalRevenue)
-                .revenueThisMonth(revenueThisMonth)
+                .periodRevenue(revenueInPeriod)
                 .totalBookings(totalBookings)
                 .pendingBookings(pendingBookings)
                 .totalCustomers(totalCustomers)
                 .totalPets(totalPets)
+                .periodBookings(periodBookingsCount)
+                .periodNewCustomers(periodNewCustomers)
                 .revenueChart(revenueChart)
                 .topServices(topServices)
-                .monthlyGrowthPercentage(monthlyGrowthPercentage)
-                .monthlyGrowthDescription(monthlyGrowthDescription)
+                .bookingStatusStats(statusStats)
+                .growthPercentage(growthPercentage)
+                .growthDescription(growthDescription)
                 .build();
     }
 

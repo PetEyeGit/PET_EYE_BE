@@ -55,9 +55,12 @@ public class ShopController {
     @GetMapping("/my-shop/dashboard")
     @PreAuthorize("hasRole('SHOP_OWNER')")
     @Operation(summary = "Get dashboard statistics for the authenticated shop owner")
-    public ApiResponse<ShopDashboardResponse> getShopDashboard(@AuthenticationPrincipal Jwt jwt) {
+    public ApiResponse<ShopDashboardResponse> getShopDashboard(
+            @AuthenticationPrincipal Jwt jwt,
+            @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate startDate,
+            @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate endDate) {
         return ApiResponse.<ShopDashboardResponse>builder()
-                .result(shopService.getShopDashboard(jwt.getClaim("email")))
+                .result(shopService.getShopDashboard(jwt.getClaim("email"), startDate, endDate))
                 .build();
     }
 
