@@ -30,4 +30,7 @@ public interface UserRepository extends JpaRepository<User, Integer> {
            "AND (m.senderEmail = u.email OR m.recipientEmail = u.email))")
     List<User> findUsersByChatHistory(@Param("shopId") int shopId);
 
+    @Query("SELECT COUNT(u) FROM User u WHERE u.createdAt BETWEEN :start AND :end")
+    long countUsersBetween(@Param("start") java.time.LocalDateTime start, @Param("end") java.time.LocalDateTime end);
 }
+
