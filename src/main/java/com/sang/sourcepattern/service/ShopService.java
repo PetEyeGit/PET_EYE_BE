@@ -11,7 +11,7 @@ import java.util.List;
 
 public interface ShopService {
     ShopCustomerResponse getShopCustomers(String ownerEmail);
-    ShopDashboardResponse getShopDashboard(String ownerEmail);
+    ShopDashboardResponse getShopDashboard(String ownerEmail, java.time.LocalDate startDate, java.time.LocalDate endDate);
     CustomerDetailResponse getCustomerDetail(String ownerEmail, int customerId);
     ShopResponse registerShop(ShopRegistrationRequest request);
     ShopResponse approveShop(int shopId);
