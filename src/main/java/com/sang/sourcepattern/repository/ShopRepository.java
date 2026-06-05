@@ -25,12 +25,14 @@ public interface ShopRepository extends JpaRepository<Shop, Integer> {
     }
 
     @Query("""
-        SELECT s FROM Shop s
+        SELECT DISTINCT s FROM Shop s
+        LEFT JOIN FETCH s.services svc
         WHERE s.isVerified = true
           AND (:keyword IS NULL OR :keyword = ''
                OR LOWER(s.shopName) LIKE LOWER(CONCAT('%', :keyword, '%'))
                OR LOWER(s.description) LIKE LOWER(CONCAT('%', :keyword, '%'))
-               OR LOWER(s.address) LIKE LOWER(CONCAT('%', :keyword, '%')))
+               OR LOWER(s.address) LIKE LOWER(CONCAT('%', :keyword, '%'))
+               OR LOWER(svc.serviceName) LIKE LOWER(CONCAT('%', :keyword, '%')))
           AND (:city IS NULL OR :city = ''
                OR LOWER(s.city) LIKE LOWER(CONCAT('%', :city, '%')))
           AND (:shopType IS NULL OR :shopType = ''
