@@ -41,9 +41,15 @@ public class SecurityConfig {
             "/services/{id}",
             "/shops/public",
             "/shops/public/**",
+            "/shops/nearby",
             "/bookings/staff/**",
+            "/bookings/shop/*/available-slots",
+            "/bookings/shop/*/available-slots-by-services",
+            "/bookings/pet/*/availability",
             "/ws/**",
-            "/v1/camera/**"
+            "/v1/camera/**",
+            "/reviews/shop/**",
+            "/reviews/latest"
     };
 
 

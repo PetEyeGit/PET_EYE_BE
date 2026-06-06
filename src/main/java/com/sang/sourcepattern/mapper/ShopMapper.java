@@ -29,6 +29,7 @@ public interface ShopMapper {
     @Mapping(target = "ownerId", source = "owner.id")
     @Mapping(target = "isVerified", source = "verified")
     @Mapping(target = "status", expression = "java(shop.getStatus() != null ? shop.getStatus().name() : null)")
+    @Mapping(target = "serviceNames", expression = "java(shop.getServices() != null ? shop.getServices().stream().map(s -> s.getServiceName()).collect(java.util.stream.Collectors.toList()) : null)")
     ShopResponse toShopResponse(Shop shop);
 
     @Mapping(target = "owner", ignore = true)
