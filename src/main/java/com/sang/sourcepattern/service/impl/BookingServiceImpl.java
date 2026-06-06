@@ -53,6 +53,7 @@ public class BookingServiceImpl implements BookingService {
     NotificationRepository notificationRepository;
     com.sang.sourcepattern.service.CameraService cameraService;
     UserVoucherRepository userVoucherRepository;
+    com.sang.sourcepattern.service.EmailService emailService;
     /** Redis template để lưu PendingBooking thay vì in-memory */
     RedisTemplate<String, Object> redisTemplate;
 
@@ -693,6 +694,20 @@ public class BookingServiceImpl implements BookingService {
         // ------------------------------------------
 
         log.info("Booking {} CONFIRMED (PayOS) — orderCode={}", booking.getId(), orderCode);
+
+        // ── Gửi hóa đơn email cho khách hàng ─────────────────────────────────
+        try {
+            emailService.sendBookingInvoiceEmail(
+                    user.getEmail(),
+                    booking,
+                    new BigDecimal(pending.getAmountVnd()),
+                    "PAYOS",
+                    "Đã thanh toán thành công"
+            );
+        } catch (Exception e) {
+            log.warn("Failed to send invoice email for booking {}: {}", booking.getId(), e.getMessage());
+        }
+
         return toResponse(booking);
     }
 
@@ -858,6 +873,20 @@ public class BookingServiceImpl implements BookingService {
         }
 
         log.info("Booking {} CONFIRMED (MOCK) — orderCode={}", booking.getId(), orderCode);
+
+        // ── Gửi hóa đơn email cho khách hàng ─────────────────────────────────
+        try {
+            emailService.sendBookingInvoiceEmail(
+                    user.getEmail(),
+                    booking,
+                    new BigDecimal(pending.getAmountVnd()),
+                    "MOCK",
+                    "Đã thanh toán thành công"
+            );
+        } catch (Exception e) {
+            log.warn("Failed to send invoice email for booking {}: {}", booking.getId(), e.getMessage());
+        }
+
         return toResponse(booking);
     }
 
@@ -1140,6 +1169,20 @@ public class BookingServiceImpl implements BookingService {
 
         log.info("Cash booking {} CONFIRMED — deposit={}VND, remaining {}VND to be collected in cash",
                 booking.getId(), depositAmount, service.getPrice().subtract(depositAmount));
+
+        // ── Gửi email xác nhận đặt cọc cho khách hàng ────────────────────────
+        try {
+            emailService.sendBookingInvoiceEmail(
+                    user.getEmail(),
+                    booking,
+                    depositAmount,
+                    "CASH_DEPOSIT",
+                    "Đã thanh toán cọc thành công — phần còn lại thanh toán tại quầy"
+            );
+        } catch (Exception e) {
+            log.warn("Failed to send deposit invoice email for booking {}: {}", booking.getId(), e.getMessage());
+        }
+
         return toResponse(booking);
     }
 
@@ -1697,5 +1740,64 @@ public class BookingServiceImpl implements BookingService {
 
         log.info("Booking {} CONFIRMED (MOCK CASH) — orderCode={}", booking.getId(), orderCode);
         return toResponse(booking);
+    }
+
+    // ─── Send invoice manually ────────────────────────────────────────────────
+
+    @Override
+    public void sendInvoice(int bookingId, String requesterEmail) {
+        // Xác định requester là shop owner
+        User requester = resolveUser(requesterEmail);
+
+        Booking booking = bookingRepository.findByIdWithServices(bookingId)
+                .orElseThrow(() -> new AppException(ErrorCode.BOOKING_NOT_FOUND));
+
+        // Kiểm tra quyền: chỉ shop owner của shop đó
+        boolean isOwner = requester.getRoles().stream().anyMatch(r -> "SHOP_OWNER".equals(r.getName()))
+                && booking.getShop().getOwner() != null
+                && booking.getShop().getOwner().getId() == requester.getId();
+
+        if (!isOwner) {
+            throw new AppException(ErrorCode.UNAUTHORIZED);
+        }
+
+        // Lấy thông tin payment
+        Payment payment = paymentRepository.findByBookingId(bookingId).orElse(null);
+        String method = payment != null ? payment.getMethod() : "CASH";
+
+        // Tính số tiền đã thanh toán thực tế
+        BigDecimal paidAmount;
+        if (payment != null && payment.getAmount() != null) {
+            if ("CASH_DEPOSIT".equals(method) || "MOCK_CASH_DEPOSIT".equals(method)) {
+                // Cash deposit: full price = tổng giá dịch vụ
+                paidAmount = (booking.getServices() != null)
+                        ? booking.getServices().stream()
+                                .map(s -> s.getPrice() != null ? s.getPrice() : BigDecimal.ZERO)
+                                .reduce(BigDecimal.ZERO, BigDecimal::add)
+                        : payment.getAmount();
+            } else {
+                paidAmount = payment.getAmount();
+            }
+        } else {
+            paidAmount = (booking.getServices() != null)
+                    ? booking.getServices().stream()
+                            .map(s -> s.getPrice() != null ? s.getPrice() : BigDecimal.ZERO)
+                            .reduce(BigDecimal.ZERO, BigDecimal::add)
+                    : BigDecimal.ZERO;
+        }
+
+        // Xác định nhãn phương thức thanh toán
+        String invoiceMethod = (method != null) ? method.replace("MOCK_", "") : "CASH";
+
+        String customerEmail = booking.getUser().getEmail();
+        emailService.sendBookingInvoiceEmail(
+                customerEmail,
+                booking,
+                paidAmount,
+                invoiceMethod,
+                "Đã thanh toán thành công"
+        );
+
+        log.info("Invoice for booking {} sent to {} by shop owner {}", bookingId, customerEmail, requesterEmail);
     }
 }

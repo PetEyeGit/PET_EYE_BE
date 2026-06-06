@@ -109,4 +109,13 @@ public interface BookingService {
      * @return list of LocalDateTime representing available slot start times
      */
     List<java.time.LocalDateTime> getAvailableTimeSlotsForServices(int shopId, LocalDate date, List<Integer> serviceIds);
+
+    /**
+     * Shop xuất hóa đơn thủ công và gửi về email khách hàng.
+     * Chỉ shop owner / staff của shop đó mới được gọi.
+     *
+     * @param bookingId    booking cần xuất hóa đơn
+     * @param requesterEmail email của shop owner hoặc staff thực hiện
+     */
+    void sendInvoice(int bookingId, String requesterEmail);
 }
