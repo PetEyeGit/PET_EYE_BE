@@ -55,8 +55,20 @@ public class AdminController {
     // ─── Dashboard ───────────────────────────────────────────────────────────
 
     @GetMapping("/dashboard")
-    public ApiResponse<Map<String, Object>> getDashboard() {
+    public ApiResponse<Map<String, Object>> getDashboard(
+            @RequestParam(required = false) LocalDate startDate,
+            @RequestParam(required = false) LocalDate endDate
+    ) {
         LocalDateTime now = LocalDateTime.now();
+
+        LocalDateTime periodEnd = (endDate != null) ? endDate.atTime(23, 59, 59) : now;
+        LocalDateTime periodStart = (startDate != null) ? startDate.atStartOfDay() : periodEnd.minusDays(30);
+
+        long daysDiff = java.time.temporal.ChronoUnit.DAYS.between(periodStart.toLocalDate(), periodEnd.toLocalDate()) + 1;
+        if (daysDiff <= 0) daysDiff = 1;
+
+        LocalDateTime prevStart = periodStart.minusDays(daysDiff);
+        LocalDateTime prevEnd = periodStart.minusSeconds(1);
 
         // Core stats
         BigDecimal totalRevenue = bookingRepository.sumTotalRevenue();
@@ -69,37 +81,40 @@ public class AdminController {
         long unreadMessages = messageRepository
                 .countByShopIdAndChannelTypeAndIsReadFalseAndSenderRoleNot(0, "ADMIN_SUPPORT", "ADMIN");
 
-        // Calculate Revenue Trend (30 days vs prev 30 days)
-        BigDecimal rev30 = bookingRepository.sumRevenueBetween(now.minusDays(30), now);
-        BigDecimal revPrev30 = bookingRepository.sumRevenueBetween(now.minusDays(60), now.minusDays(30));
+        // Period stats
+        BigDecimal periodRevenue = bookingRepository.sumRevenueBetween(periodStart, periodEnd);
+        if (periodRevenue == null) periodRevenue = BigDecimal.ZERO;
+        long periodUsers = userRepository.countUsersBetween(periodStart, periodEnd);
+        long periodBookings = bookingRepository.countBookingsBetween(periodStart, periodEnd);
+
+        // Calculate Revenue Trend (Current vs Prev period)
+        BigDecimal revPrev = bookingRepository.sumRevenueBetween(prevStart, prevEnd);
         double revTrendVal = 0.0;
-        if (revPrev30 != null && revPrev30.compareTo(BigDecimal.ZERO) > 0 && rev30 != null) {
-            revTrendVal = rev30.subtract(revPrev30).doubleValue() / revPrev30.doubleValue() * 100;
-        } else if ((revPrev30 == null || revPrev30.compareTo(BigDecimal.ZERO) == 0) && rev30 != null && rev30.compareTo(BigDecimal.ZERO) > 0) {
+        if (revPrev != null && revPrev.compareTo(BigDecimal.ZERO) > 0 && periodRevenue.compareTo(BigDecimal.ZERO) > 0) {
+            revTrendVal = periodRevenue.subtract(revPrev).doubleValue() / revPrev.doubleValue() * 100;
+        } else if ((revPrev == null || revPrev.compareTo(BigDecimal.ZERO) == 0) && periodRevenue.compareTo(BigDecimal.ZERO) > 0) {
             revTrendVal = 100.0;
         }
         String totalRevenueTrend = String.format("%s%.1f%%", revTrendVal >= 0 ? "+" : "", revTrendVal);
         Boolean totalRevenueTrendUp = revTrendVal >= 0;
 
-        // Calculate Users Trend (7 days vs prev 7 days)
-        long users7 = userRepository.countUsersBetween(now.minusDays(7), now);
-        long usersPrev7 = userRepository.countUsersBetween(now.minusDays(14), now.minusDays(7));
+        // Calculate Users Trend
+        long usersPrev = userRepository.countUsersBetween(prevStart, prevEnd);
         double usersTrendVal = 0.0;
-        if (usersPrev7 > 0) {
-            usersTrendVal = (double) (users7 - usersPrev7) / usersPrev7 * 100;
-        } else if (usersPrev7 == 0 && users7 > 0) {
+        if (usersPrev > 0) {
+            usersTrendVal = (double) (periodUsers - usersPrev) / usersPrev * 100;
+        } else if (usersPrev == 0 && periodUsers > 0) {
             usersTrendVal = 100.0;
         }
         String totalUsersTrend = String.format("%s%.1f%%", usersTrendVal >= 0 ? "+" : "", usersTrendVal);
         Boolean totalUsersTrendUp = usersTrendVal >= 0;
 
-        // Calculate Bookings Trend (30 days vs prev 30 days)
-        long bookings30 = bookingRepository.countBookingsBetween(now.minusDays(30), now);
-        long bookingsPrev30 = bookingRepository.countBookingsBetween(now.minusDays(60), now.minusDays(30));
+        // Calculate Bookings Trend
+        long bookingsPrev = bookingRepository.countBookingsBetween(prevStart, prevEnd);
         double bookingsTrendVal = 0.0;
-        if (bookingsPrev30 > 0) {
-            bookingsTrendVal = (double) (bookings30 - bookingsPrev30) / bookingsPrev30 * 100;
-        } else if (bookingsPrev30 == 0 && bookings30 > 0) {
+        if (bookingsPrev > 0) {
+            bookingsTrendVal = (double) (periodBookings - bookingsPrev) / bookingsPrev * 100;
+        } else if (bookingsPrev == 0 && periodBookings > 0) {
             bookingsTrendVal = 100.0;
         }
         String totalBookingsTrend = String.format("%s%.1f%%", bookingsTrendVal >= 0 ? "+" : "", bookingsTrendVal);
@@ -128,11 +143,13 @@ public class AdminController {
 
         Map<String, Object> result = new java.util.HashMap<>();
         result.put("totalRevenue", totalRevenue);
+        result.put("periodRevenue", periodRevenue);
         result.put("totalRevenueTrend", totalRevenueTrend);
         result.put("totalRevenueTrendUp", totalRevenueTrendUp);
         result.put("totalRevenueSparkData", totalRevenueSparkData);
 
         result.put("totalUsers", totalUsers);
+        result.put("periodUsers", periodUsers);
         result.put("totalUsersTrend", totalUsersTrend);
         result.put("totalUsersTrendUp", totalUsersTrendUp);
         result.put("totalUsersSparkData", totalUsersSparkData);
@@ -143,6 +160,7 @@ public class AdminController {
         result.put("totalShopsSparkData", totalShopsSparkData);
 
         result.put("totalBookings", totalBookings);
+        result.put("periodBookings", periodBookings);
         result.put("totalBookingsTrend", totalBookingsTrend);
         result.put("totalBookingsTrendUp", totalBookingsTrendUp);
         result.put("totalBookingsSparkData", totalBookingsSparkData);

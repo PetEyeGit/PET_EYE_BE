@@ -25,6 +25,7 @@ public class ShopResponse {
     String bannerUrl;
     String galleryUrls;
     java.util.List<StaffResponse> staffs;
+    java.util.List<String> serviceNames;
     String openTime;
     String closeTime;
     String workingDays;

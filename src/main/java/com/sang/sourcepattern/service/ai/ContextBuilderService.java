@@ -61,7 +61,7 @@ public class ContextBuilderService {
         Shop shop = shopRepository.findByOwnerEmail(email)
                 .orElseThrow(() -> new AppException(ErrorCode.SHOP_NOT_FOUND));
 
-        ShopDashboardResponse dashboard = shopService.getShopDashboard(email);
+        ShopDashboardResponse dashboard = shopService.getShopDashboard(email, null, null);
         List<BookingResponse> bookings = bookingService.getShopBookings(email, null, null);
         List<StaffResponse> staff = staffService.getMyShopStaff(email);
         List<com.sang.sourcepattern.entity.Service> services = serviceRepository.findByShopIdAndActiveTrue(shop.getId());
@@ -98,7 +98,7 @@ public class ContextBuilderService {
                 Địa chỉ: %s, %s
 
                 DOANH THU:
-                - Tổng: %sđ | Tháng này: %sđ
+                - Tổng: %sđ | Kỳ này: %sđ
 
                 LỊCH HẸN:
                 - Tổng: %d | Theo trạng thái: %s
@@ -117,7 +117,7 @@ public class ContextBuilderService {
                 shop.isVerified() ? "✅ Đã xác minh" : "⚠️ Chưa xác minh",
                 shop.getAddress(), shop.getCity(),
                 fmt(dashboard.getTotalRevenue()),
-                fmt(dashboard.getRevenueThisMonth()),
+                fmt(dashboard.getPeriodRevenue()),
                 bookings.size(),
                 statusCount.entrySet().stream()
                         .map(e -> e.getKey() + ":" + e.getValue())

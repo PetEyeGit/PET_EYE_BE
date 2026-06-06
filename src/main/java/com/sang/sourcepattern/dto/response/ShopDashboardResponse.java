@@ -14,19 +14,35 @@ import java.util.List;
 public class ShopDashboardResponse {
     // KPI Stats
     BigDecimal totalRevenue;
-    BigDecimal revenueThisMonth;
+    BigDecimal periodRevenue;
     long totalBookings;
     long pendingBookings;
     long totalCustomers;
     long totalPets;
+    long periodBookings;
+    long periodNewCustomers;
 
     // Charts
     List<RevenueChartData> revenueChart;
     List<ServiceStat> topServices;
 
+    // Status stats
+    BookingStatusStats bookingStatusStats;
+
     // Growth
-    Double monthlyGrowthPercentage;
-    String monthlyGrowthDescription;
+    Double growthPercentage;
+    String growthDescription;
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class BookingStatusStats {
+        long pending;
+        long confirmed;
+        long completed;
+        long cancelled;
+    }
 
     @Data
     @Builder
