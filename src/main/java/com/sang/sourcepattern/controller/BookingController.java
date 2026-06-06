@@ -300,4 +300,17 @@ public class BookingController {
                 .result(bookingService.getShopBookings(jwt.getClaim("email"), start, end))
                 .build();
     }
+
+    @PostMapping("/{id}/send-invoice")
+    @PreAuthorize("hasRole('SHOP_OWNER')")
+    @Operation(summary = "Shop owner xuất hóa đơn và gửi về email khách hàng")
+    public ApiResponse<Void> sendInvoice(
+            @PathVariable int id,
+            @AuthenticationPrincipal Jwt jwt) {
+
+        bookingService.sendInvoice(id, jwt.getClaim("email"));
+        return ApiResponse.<Void>builder()
+                .message("Hóa đơn đã được gửi về email khách hàng.")
+                .build();
+    }
 }

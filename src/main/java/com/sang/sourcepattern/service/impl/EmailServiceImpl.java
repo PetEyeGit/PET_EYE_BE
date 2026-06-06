@@ -1,5 +1,6 @@
 package com.sang.sourcepattern.service.impl;
 
+import com.sang.sourcepattern.entity.Booking;
 import com.sang.sourcepattern.service.EmailService;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
@@ -13,6 +14,10 @@ import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 import jakarta.mail.internet.MimeMessage;
+import java.math.BigDecimal;
+import java.text.NumberFormat;
+import java.time.format.DateTimeFormatter;
+import java.util.Locale;
 
 @Service
 @RequiredArgsConstructor
@@ -80,10 +85,172 @@ public class EmailServiceImpl implements EmailService {
         doSend(toEmail, subject, html);
     }
 
+    @Async
+    @Override
+    public void sendBookingInvoiceEmail(String toEmail, Booking booking,
+                                        BigDecimal paidAmount,
+                                        String paymentMethod,
+                                        String paymentStatus) {
+        String subject = "[PET EYE] Hóa đơn dịch vụ #" + booking.getId();
+        String html = buildInvoiceEmailHtml(booking, paidAmount, paymentMethod, paymentStatus);
+        doSend(toEmail, subject, html);
+    }
+
+    private String buildInvoiceEmailHtml(Booking booking, BigDecimal paidAmount,
+                                          String paymentMethod, String paymentStatus) {
+        NumberFormat vndFmt = NumberFormat.getInstance(Locale.forLanguageTag("vi-VN"));
+        DateTimeFormatter dtFmt = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
+
+        // ── Thông tin shop ────────────────────────────────────────────────────
+        var shop = booking.getShop();
+        String shopName    = shop != null && shop.getShopName() != null ? shop.getShopName() : "PET EYE";
+        String shopAddress = shop != null && shop.getAddress() != null  ? shop.getAddress()  : "—";
+        String shopPhone   = shop != null && shop.getPhone() != null    ? shop.getPhone()    : "—";
+        String shopEmail   = shop != null && shop.getEmail() != null    ? shop.getEmail()    : "—";
+
+        // ── Thông tin khách hàng ──────────────────────────────────────────────
+        var user = booking.getUser();
+        String customerName  = user != null && user.getFullName() != null ? user.getFullName() : "Khách hàng";
+        String customerEmail = user != null && user.getEmail() != null    ? user.getEmail()    : "—";
+        String customerPhone = user != null && user.getPhone() != null    ? user.getPhone()    : "—";
+
+        // ── Bảng dịch vụ ─────────────────────────────────────────────────────
+        StringBuilder serviceRows = new StringBuilder();
+        BigDecimal totalServicePrice = BigDecimal.ZERO;
+        if (booking.getServices() != null) {
+            for (com.sang.sourcepattern.entity.Service s : booking.getServices()) {
+                BigDecimal price = s.getPrice() != null ? s.getPrice() : BigDecimal.ZERO;
+                totalServicePrice = totalServicePrice.add(price);
+                serviceRows.append("""
+                        <tr>
+                          <td style="padding:9px 12px;border-bottom:1px solid #f0f0f0;">%s</td>
+                          <td style="padding:9px 12px;border-bottom:1px solid #f0f0f0;text-align:right;font-weight:600;color:#2e7d32;">%s ₫</td>
+                        </tr>
+                        """.formatted(
+                        s.getServiceName() != null ? s.getServiceName() : "Dịch vụ",
+                        vndFmt.format(price)
+                ));
+            }
+        }
+
+        // ── Dòng giảm giá (nếu có) ────────────────────────────────────────────
+        String discountRow = "";
+        if (booking.getDiscountAmount() != null && booking.getDiscountAmount() > 0) {
+            discountRow = """
+                    <tr>
+                      <td style="padding:9px 12px;border-bottom:1px solid #f0f0f0;color:#e53935;">Giảm giá (voucher)</td>
+                      <td style="padding:9px 12px;border-bottom:1px solid #f0f0f0;text-align:right;color:#e53935;">-%s ₫</td>
+                    </tr>
+                    """.formatted(vndFmt.format(booking.getDiscountAmount()));
+        }
+
+        // ── Nhãn phương thức thanh toán ───────────────────────────────────────
+        String methodLabel = switch (paymentMethod) {
+            case "PAYOS"        -> "Chuyển khoản PayOS";
+            case "CASH_DEPOSIT" -> "Tiền mặt (đặt cọc qua PayOS)";
+            case "CASH"         -> "Tiền mặt";
+            case "MOCK"         -> "PayOS (Demo)";
+            default             -> paymentMethod;
+        };
+
+        String appointmentStr = booking.getAppointmentDatetime() != null
+                ? booking.getAppointmentDatetime().format(dtFmt) : "—";
+        String petName = booking.getPet() != null ? booking.getPet().getName() : "—";
+
+        return """
+                <div style="font-family:Arial,sans-serif;max-width:660px;margin:auto;border:1px solid #e0e0e0;border-radius:10px;overflow:hidden;">
+
+                  <!-- Header -->
+                  <div style="background:#4CAF50;padding:22px 32px;">
+                    <h2 style="color:#fff;margin:0;font-size:21px;">🐾 PET EYE — Hóa đơn dịch vụ</h2>
+                    <p style="color:#c8e6c9;margin:5px 0 0;font-size:13px;">Mã đơn: <strong>#%d</strong> &nbsp;|&nbsp; %s</p>
+                  </div>
+
+                  <div style="padding:28px 32px;">
+
+                    <!-- Thông tin shop & khách hàng (2 cột) -->
+                    <table style="width:100%%;border-collapse:collapse;margin-bottom:24px;font-size:13px;">
+                      <tr>
+                        <td style="width:50%%;vertical-align:top;padding-right:16px;">
+                          <p style="margin:0 0 6px;font-weight:700;font-size:14px;color:#333;">Thông tin cửa hàng</p>
+                          <p style="margin:3px 0;color:#555;"><strong>%s</strong></p>
+                          <p style="margin:3px 0;color:#777;">📍 %s</p>
+                          <p style="margin:3px 0;color:#777;">📞 %s</p>
+                          <p style="margin:3px 0;color:#777;">✉️ %s</p>
+                        </td>
+                        <td style="width:50%%;vertical-align:top;padding-left:16px;border-left:1px solid #f0f0f0;">
+                          <p style="margin:0 0 6px;font-weight:700;font-size:14px;color:#333;">Thông tin khách hàng</p>
+                          <p style="margin:3px 0;color:#555;"><strong>%s</strong></p>
+                          <p style="margin:3px 0;color:#777;">✉️ %s</p>
+                          <p style="margin:3px 0;color:#777;">📞 %s</p>
+                          <p style="margin:3px 0;color:#777;">🐾 Thú cưng: <strong>%s</strong></p>
+                          <p style="margin:3px 0;color:#777;">📅 Ngày hẹn: %s</p>
+                        </td>
+                      </tr>
+                    </table>
+
+                    <!-- Bảng dịch vụ -->
+                    <p style="font-weight:700;font-size:14px;margin:0 0 8px;">Chi tiết dịch vụ</p>
+                    <table style="width:100%%;border-collapse:collapse;font-size:14px;margin-bottom:20px;">
+                      <thead>
+                        <tr style="background:#f5f5f5;">
+                          <th style="padding:10px 12px;text-align:left;font-weight:600;color:#333;">Tên dịch vụ</th>
+                          <th style="padding:10px 12px;text-align:right;font-weight:600;color:#333;">Giá</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        %s
+                        %s
+                        <tr style="background:#f1f8e9;">
+                          <td style="padding:11px 12px;font-weight:700;font-size:15px;">Tổng cộng</td>
+                          <td style="padding:11px 12px;text-align:right;font-weight:700;font-size:15px;color:#2e7d32;">%s ₫</td>
+                        </tr>
+                      </tbody>
+                    </table>
+
+                    <!-- Thông tin thanh toán -->
+                    <div style="background:#f9f9f9;border:1px solid #e8e8e8;border-radius:8px;padding:16px 20px;font-size:14px;">
+                      <table style="width:100%%;border-collapse:collapse;">
+                        <tr>
+                          <td style="padding:6px 0;color:#666;">Số tiền đã thanh toán</td>
+                          <td style="padding:6px 0;text-align:right;font-weight:700;font-size:16px;color:#2e7d32;">%s ₫</td>
+                        </tr>
+                        <tr>
+                          <td style="padding:6px 0;color:#666;">Phương thức thanh toán</td>
+                          <td style="padding:6px 0;text-align:right;color:#333;">%s</td>
+                        </tr>
+                        <tr>
+                          <td style="padding:6px 0;color:#666;">Trạng thái</td>
+                          <td style="padding:6px 0;text-align:right;">
+                            <span style="background:#e8f5e9;color:#2e7d32;padding:4px 12px;border-radius:12px;font-weight:700;font-size:13px;">✓ %s</span>
+                          </td>
+                        </tr>
+                      </table>
+                    </div>
+                  </div>
+
+                  <!-- Footer -->
+                  <div style="border-top:1px solid #eee;padding:14px 32px;background:#fafafa;">
+                    <p style="color:#aaa;font-size:12px;margin:0;">Cảm ơn bạn đã tin dùng PET EYE 🐾 — Nếu có thắc mắc, vui lòng liên hệ cửa hàng.</p>
+                  </div>
+                </div>
+                """.formatted(
+                // header
+                booking.getId(), appointmentStr,
+                // shop
+                shopName, shopAddress, shopPhone, shopEmail,
+                // customer
+                customerName, customerEmail, customerPhone, petName, appointmentStr,
+                // services
+                serviceRows, discountRow, vndFmt.format(totalServicePrice),
+                // payment
+                vndFmt.format(paidAmount), methodLabel, paymentStatus
+        );
+    }
+
     // ─── Internal helper — không @Async, gọi nội bộ an toàn ─────────────────
 
-    private void doSend(String to, String subject, String htmlContent) {
-        try {
+    private void doSend(String to, String subject, String htmlContent) {        try {
             MimeMessage message = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
             helper.setFrom(fromEmail);
