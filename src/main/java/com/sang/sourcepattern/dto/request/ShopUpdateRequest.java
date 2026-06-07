@@ -19,6 +19,7 @@ public class ShopUpdateRequest {
     String openTime;
     String closeTime;
     String workingDays;
+    String offDays;
     String licenseImageUrl;
     String logoUrl;
     String bannerUrl;

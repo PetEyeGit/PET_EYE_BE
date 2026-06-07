@@ -1262,9 +1262,36 @@ public class BookingServiceImpl implements BookingService {
             String bankInfo = (booking.getBankName() != null && !booking.getBankName().isBlank())
                     ? String.format("%s | %s | %s", booking.getBankName(), booking.getAccountHolder(), booking.getBankAccount())
                     : "Chưa có thông tin ngân hàng";
-            BigDecimal refundAmount = (booking.getServices() != null && !booking.getServices().isEmpty())
+                    
+            BigDecimal totalPrice = (booking.getServices() != null && !booking.getServices().isEmpty())
                     ? booking.getServices().stream().map(s -> s.getPrice() != null ? s.getPrice() : BigDecimal.ZERO).reduce(BigDecimal.ZERO, BigDecimal::add)
                     : BigDecimal.ZERO;
+                    
+            List<Integer> serviceIds = booking.getServices().stream()
+                    .map(com.sang.sourcepattern.entity.Service::getId)
+                    .collect(Collectors.toList());
+            BigDecimal deposit = walletService.calculateAdminCommission(serviceIds);
+            
+            long hoursToAppointment = 0;
+            if (booking.getAppointmentDatetime() != null) {
+                // Dùng thời gian hiện tại hoặc thời gian khách thực hiện request hủy (ở đây lấy NOW cho an toàn)
+                hoursToAppointment = java.time.Duration.between(LocalDateTime.now(), booking.getAppointmentDatetime()).toHours();
+            }
+            
+            BigDecimal refundAmount;
+            if (hoursToAppointment >= 5) {
+                // Hủy trước 5 tiếng: Được hoàn lại tiền dịch vụ, trừ tiền cọc
+                refundAmount = totalPrice.subtract(deposit);
+            } else {
+                // Hủy sau 5 tiếng: Mất cọc + mất 50% tiền thiệt hại cho shop
+                BigDecimal penalty = totalPrice.multiply(new BigDecimal("0.5"));
+                refundAmount = totalPrice.subtract(deposit).subtract(penalty);
+            }
+            
+            if (refundAmount.compareTo(BigDecimal.ZERO) < 0) {
+                refundAmount = BigDecimal.ZERO;
+            }
+
             String amountText = NumberFormat.getCurrencyInstance(new Locale("vi", "VN")).format(refundAmount);
             String content = String.format("Đơn hủy lịch #%d đã được chấp nhận. Vui lòng hoàn tiền cho khách hàng %s về: %s. Số tiền: %s.",
                     bookingId,
@@ -1469,6 +1496,14 @@ public class BookingServiceImpl implements BookingService {
         Shop shop = shopRepository.findById(shopId)
                 .orElseThrow(() -> new AppException(ErrorCode.SHOP_NOT_FOUND));
 
+        // ── Kiểm tra ngày nghỉ (Off Days) ─────────────────────────────────────
+        if (shop.getOffDays() != null && !shop.getOffDays().trim().isEmpty()) {
+            String targetDateStr = date.toString();
+            if (java.util.Arrays.asList(shop.getOffDays().split(",")).contains(targetDateStr)) {
+                return java.util.Collections.emptyList();
+            }
+        }
+
         // ── Parse openTime / closeTime ────────────────────────────────────────
         java.time.LocalTime open  = parseShopTime(shop.getOpenTime(),  java.time.LocalTime.of(8, 0));
         java.time.LocalTime close = parseShopTime(shop.getCloseTime(), java.time.LocalTime.of(20, 0));
@@ -1554,6 +1589,14 @@ public class BookingServiceImpl implements BookingService {
                                                                   List<Integer> serviceIds) {
         Shop shop = shopRepository.findById(shopId)
                 .orElseThrow(() -> new AppException(ErrorCode.SHOP_NOT_FOUND));
+
+        // ── Kiểm tra ngày nghỉ (Off Days) ─────────────────────────────────────
+        if (shop.getOffDays() != null && !shop.getOffDays().trim().isEmpty()) {
+            String targetDateStr = date.toString();
+            if (java.util.Arrays.asList(shop.getOffDays().split(",")).contains(targetDateStr)) {
+                return java.util.Collections.emptyList();
+            }
+        }
 
         // ── Tính tổng duration ────────────────────────────────────────────────
         int totalDuration = serviceIds.stream()

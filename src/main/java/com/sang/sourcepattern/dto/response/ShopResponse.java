@@ -29,6 +29,7 @@ public class ShopResponse {
     String openTime;
     String closeTime;
     String workingDays;
+    String offDays;
     boolean isVerified;
     float ratingAvg;
     int ownerId;

@@ -54,6 +54,7 @@ public class TaskServiceImpl implements TaskService {
     PetMedicalRecordRepository petMedicalRecordRepository;
     PaymentRepository paymentRepository;
     TransactionRepository transactionRepository;
+    com.sang.sourcepattern.service.EmailService emailService;
 
     // Valid status transition chain for Staff
     private static final Set<String> VALID_STATUSES = Set.of("CONFIRMED", "IN_PROGRESS", "COMPLETED", "CANCELLED", "CANCEL_REQUESTED");
@@ -644,6 +645,13 @@ public class TaskServiceImpl implements TaskService {
         if ("COMPLETED".equals(newStatus)) {
             walletService.onBookingCompleted(bookingId);
             tierUpgradeService.processTierUpgrade(booking.getUser());
+            
+            // Gửi email hoàn thành cho khách hàng
+            try {
+                emailService.sendBookingCompletedEmail(booking.getUser().getEmail(), booking);
+            } catch (Exception e) {
+                log.warn("Failed to send completion email to {}: {}", booking.getUser().getEmail(), e.getMessage());
+            }
         }
         // CANCELLED → không cần làm gì với ví (tiền chưa bao giờ vào ví)
 

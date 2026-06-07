@@ -44,6 +44,9 @@ public class Shop {
     String openTime;
     String closeTime;
     String workingDays;
+    
+    @Column(columnDefinition = "TEXT")
+    String offDays; // Comma-separated dates e.g. 2026-06-10,2026-06-11
 
     @Builder.Default
     float ratingAvg = 0.0f;

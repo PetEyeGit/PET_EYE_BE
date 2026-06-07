@@ -30,6 +30,7 @@ import com.sang.sourcepattern.repository.StaffRepository;
 import com.sang.sourcepattern.repository.StaffCertificateRepository;
 import com.sang.sourcepattern.repository.UserTokenRepository;
 import com.sang.sourcepattern.repository.UserRepository;
+import com.sang.sourcepattern.repository.NotificationRepository;
 import com.sang.sourcepattern.dto.response.StaffCertificateResponse;
 import com.sang.sourcepattern.service.ShopService;
 import lombok.AccessLevel;
@@ -65,6 +66,7 @@ public class ShopServiceImpl implements ShopService {
     StaffRepository staffRepository;
     StaffCertificateRepository staffCertificateRepository;
     com.sang.sourcepattern.repository.TransactionRepository transactionRepository;
+    NotificationRepository notificationRepository;
 
     com.sang.sourcepattern.service.EmailService emailService;
     com.sang.sourcepattern.service.GoongMapService goongMapService;
@@ -524,7 +526,26 @@ public class ShopServiceImpl implements ShopService {
         Shop shop = shopRepository.findByOwnerEmail(email)
                 .orElseThrow(() -> new AppException(ErrorCode.SHOP_NOT_FOUND));
 
+        String oldOffDays = shop.getOffDays();
+
         shopMapper.updateShop(shop, request);
+
+        String newOffDays = shop.getOffDays();
+        if (newOffDays != null && !newOffDays.equals(oldOffDays)) {
+            // Find all ADMINs and notify
+            List<User> admins = userRepository.findAll().stream()
+                    .filter(u -> u.getRoles().stream().anyMatch(r -> "ADMIN".equals(r.getName())))
+                    .collect(java.util.stream.Collectors.toList());
+            for (User admin : admins) {
+                notificationRepository.save(com.sang.sourcepattern.entity.Notification.builder()
+                        .user(admin)
+                        .title("Cập nhật ngày nghỉ (Shop Off)")
+                        .content("Shop '" + shop.getShopName() + "' đã cập nhật ngày nghỉ: " + newOffDays)
+                        .notificationType(com.sang.sourcepattern.entity.Notification.NotificationType.SYSTEM)
+                        .build());
+            }
+            log.info("Sent notification to admins about offDays update for shop {}", shop.getShopName());
+        }
 
         // Validate & apply lateGracePeriod nếu có truyền lên
         if (request.getLateGracePeriod() != null) {
