@@ -27,6 +27,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.text.NumberFormat;
 import java.time.LocalDateTime;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
@@ -56,6 +57,7 @@ public class BookingServiceImpl implements BookingService {
     com.sang.sourcepattern.service.EmailService emailService;
     /** Redis template để lưu PendingBooking thay vì in-memory */
     RedisTemplate<String, Object> redisTemplate;
+    SimpMessagingTemplate messagingTemplate;
 
     @Value("${payos.return-url}") @NonFinal String returnUrl;
     @Value("${payos.cancel-url}") @NonFinal String cancelUrl;
@@ -681,6 +683,7 @@ public class BookingServiceImpl implements BookingService {
                 .notificationType(Notification.NotificationType.BOOKING)
                 .build();
         notificationRepository.save(notifOwner);
+        messagingTemplate.convertAndSend("/topic/shop/" + shop.getId() + "/notifications", java.util.Map.of("message", "Có đơn hàng mới!"));
 
         if (staff != null && staff.getUser() != null) {
             Notification notifStaff = Notification.builder()
@@ -861,6 +864,7 @@ public class BookingServiceImpl implements BookingService {
                 .notificationType(Notification.NotificationType.BOOKING)
                 .build();
         notificationRepository.save(notifOwner);
+        messagingTemplate.convertAndSend("/topic/shop/" + shop.getId() + "/notifications", java.util.Map.of("message", "Có đơn hàng mới!"));
 
         if (staff != null && staff.getUser() != null) {
             Notification notifStaff = Notification.builder()
@@ -1155,6 +1159,7 @@ public class BookingServiceImpl implements BookingService {
                 .notificationType(Notification.NotificationType.BOOKING)
                 .build();
         notificationRepository.save(notifOwner);
+        messagingTemplate.convertAndSend("/topic/shop/" + shop.getId() + "/notifications", java.util.Map.of("message", "Có đơn hàng mới!"));
 
         if (staff != null && staff.getUser() != null) {
             Notification notifStaff = Notification.builder()
@@ -1727,6 +1732,7 @@ public class BookingServiceImpl implements BookingService {
                 .notificationType(Notification.NotificationType.BOOKING)
                 .build();
         notificationRepository.save(notifOwner);
+        messagingTemplate.convertAndSend("/topic/shop/" + shop.getId() + "/notifications", java.util.Map.of("message", "Có đơn hàng mới!"));
 
         if (staff != null && staff.getUser() != null) {
             Notification notifStaff = Notification.builder()
