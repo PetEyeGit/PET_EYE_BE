@@ -325,4 +325,105 @@ public class EmailServiceImpl implements EmailService {
                 </div>
                 """.formatted(purpose, fullName != null ? fullName : "bạn", purpose, otp, minutes);
     }
+
+    @Async
+    @Override
+    public void sendBookingCompletedEmail(String toEmail, Booking booking) {
+        String subject = "[PET EYE] Dịch vụ đã hoàn thành - Đơn hàng #" + booking.getId();
+        doSend(toEmail, subject, buildBookingCompletedHtml(booking));
+    }
+
+    private String buildBookingCompletedHtml(Booking booking) {
+        DateTimeFormatter dtFmt = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
+        NumberFormat vnFormat = NumberFormat.getCurrencyInstance(new Locale("vi", "VN"));
+
+        String shopName = booking.getShop() != null ? booking.getShop().getShopName() : "PET EYE Shop";
+        String userName = booking.getUser() != null ? booking.getUser().getFullName() : "Quý khách";
+        String petName = booking.getPet() != null ? booking.getPet().getName() : "—";
+        String appointmentStr = booking.getAppointmentDatetime() != null
+                ? booking.getAppointmentDatetime().format(dtFmt) : "—";
+
+        // Parse completion times
+        java.util.Map<Integer, String> completionTimes = new java.util.HashMap<>();
+        if (booking.getCompletedServiceTimes() != null && !booking.getCompletedServiceTimes().isBlank()) {
+            for (String part : booking.getCompletedServiceTimes().split(",")) {
+                String[] kv = part.split(":", 2);
+                if (kv.length == 2) {
+                    try {
+                        Integer sId = Integer.parseInt(kv[0].trim());
+                        java.time.LocalDateTime dt = java.time.LocalDateTime.parse(kv[1].trim());
+                        completionTimes.put(sId, dt.format(dtFmt));
+                    } catch (Exception e) {
+                        // ignore
+                    }
+                }
+            }
+        }
+
+        StringBuilder servicesRows = new StringBuilder();
+        BigDecimal total = BigDecimal.ZERO;
+        
+        if (booking.getServices() != null) {
+            for (com.sang.sourcepattern.entity.Service s : booking.getServices()) {
+                BigDecimal price = s.getPrice() != null ? s.getPrice() : BigDecimal.ZERO;
+                total = total.add(price);
+                String completedAt = completionTimes.getOrDefault(s.getId(), "Chưa ghi nhận");
+                
+                servicesRows.append("<tr>")
+                            .append("<td style=\"padding:10px 12px;border-bottom:1px solid #eee;color:#555;\">").append(s.getServiceName()).append("</td>")
+                            .append("<td style=\"padding:10px 12px;border-bottom:1px solid #eee;color:#555;\">").append(completedAt).append("</td>")
+                            .append("<td style=\"padding:10px 12px;text-align:right;border-bottom:1px solid #eee;color:#555;\">").append(vnFormat.format(price)).append("</td>")
+                            .append("</tr>");
+            }
+        }
+
+        return """
+                <div style="font-family:Arial,sans-serif;max-width:660px;margin:auto;border:1px solid #e0e0e0;border-radius:10px;overflow:hidden;">
+                  <div style="background:#4CAF50;padding:22px 32px;text-align:center;">
+                    <h2 style="color:#fff;margin:0;font-size:24px;">🎉 Hoàn Thành Dịch Vụ!</h2>
+                    <p style="color:#c8e6c9;margin:5px 0 0;font-size:14px;">Mã đơn: <strong>#%d</strong></p>
+                  </div>
+                  <div style="padding:28px 32px;">
+                    <p style="font-size:15px;color:#333;">Chào <strong>%s</strong>,</p>
+                    <p style="font-size:15px;color:#555;line-height:1.5;">
+                      Cửa hàng <strong>%s</strong> đã hoàn thành các dịch vụ chăm sóc cho thú cưng <strong>%s</strong> của bạn (Ngày hẹn: %s).
+                    </p>
+                    
+                    <p style="font-weight:700;font-size:15px;margin:24px 0 8px;color:#333;">Chi tiết dịch vụ</p>
+                    <table style="width:100%%;border-collapse:collapse;font-size:14px;margin-bottom:24px;">
+                      <thead>
+                        <tr style="background:#f5f5f5;">
+                          <th style="padding:10px 12px;text-align:left;font-weight:600;color:#333;">Dịch vụ</th>
+                          <th style="padding:10px 12px;text-align:left;font-weight:600;color:#333;">Thời gian xong</th>
+                          <th style="padding:10px 12px;text-align:right;font-weight:600;color:#333;">Giá</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        %s
+                      </tbody>
+                      <tfoot>
+                        <tr>
+                          <td colspan="2" style="padding:12px;text-align:right;font-weight:700;color:#333;border-top:2px solid #eee;">Tổng tiền dịch vụ:</td>
+                          <td style="padding:12px;text-align:right;font-weight:700;color:#e53935;border-top:2px solid #eee;font-size:16px;">%s</td>
+                        </tr>
+                      </tfoot>
+                    </table>
+
+                    <div style="background:#f9f9f9;padding:16px;border-radius:8px;text-align:center;margin-top:24px;border:1px dashed #ccc;">
+                      <p style="margin:0 0 8px;font-size:15px;color:#333;">🙏 <strong>Cảm ơn bạn đã tin tưởng PET EYE!</strong></p>
+                      <p style="margin:0 0 16px;color:#666;font-size:14px;line-height:1.5;">
+                        Chúng tôi hy vọng bạn và thú cưng đã có một trải nghiệm tuyệt vời.<br>
+                        Mong rằng sẽ được phục vụ các bạn trong những lần tiếp theo!
+                      </p>
+                      <p style="margin:0;color:#555;font-size:14px;">
+                        Đừng quên đánh giá dịch vụ trên website để chúng tôi cải thiện tốt hơn nhé!
+                      </p>
+                    </div>
+
+                    <hr style="border:none;border-top:1px solid #eee;margin:32px 0 24px;">
+                    <p style="color:#aaa;font-size:12px;text-align:center;margin:0;">PET EYE — Nền tảng chăm sóc thú cưng hàng đầu</p>
+                  </div>
+                </div>
+                """.formatted(booking.getId(), userName, shopName, petName, appointmentStr, servicesRows.toString(), vnFormat.format(total));
+    }
 }

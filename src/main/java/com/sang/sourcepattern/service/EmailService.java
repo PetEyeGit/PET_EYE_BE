@@ -29,4 +29,9 @@ public interface EmailService {
      * @param booking thông tin lịch hẹn
      */
     void sendAppointmentReminderEmail(String toEmail, Booking booking);
+
+    /**
+     * Gửi email thông báo đơn hàng đã hoàn thành, chi tiết thời gian và cảm ơn.
+     */
+    void sendBookingCompletedEmail(String toEmail, Booking booking);
 }

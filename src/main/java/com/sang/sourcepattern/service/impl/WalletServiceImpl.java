@@ -341,6 +341,11 @@ public class WalletServiceImpl implements WalletService {
         Shop shop = resolveOwnerShop(ownerEmail);
         ShopWallet wallet = getOrCreateWallet(shop);
 
+        // Kiểm tra min withdrawal
+        if (request.getAmount().compareTo(new BigDecimal("200000")) < 0) {
+            throw new AppException(ErrorCode.MIN_WITHDRAWAL_AMOUNT_REQUIRED);
+        }
+
         // Kiểm tra số dư khả dụng
         if (safe(wallet.getAvailableBalance()).compareTo(request.getAmount()) < 0) {
             throw new AppException(ErrorCode.INSUFFICIENT_BALANCE);

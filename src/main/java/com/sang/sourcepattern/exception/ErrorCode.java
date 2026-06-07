@@ -89,6 +89,7 @@ public enum ErrorCode {
     WITHDRAWAL_NOT_FOUND(8003, "Withdrawal request not found", HttpStatus.NOT_FOUND),
     WITHDRAWAL_ALREADY_PROCESSED(8004, "Withdrawal request has already been processed", HttpStatus.BAD_REQUEST),
     PENDING_WITHDRAWAL_EXISTS(8005, "You already have a pending or in-progress withdrawal request", HttpStatus.BAD_REQUEST),
+    MIN_WITHDRAWAL_AMOUNT_REQUIRED(8006, "Minimum withdrawal amount is 200,000 VND", HttpStatus.BAD_REQUEST),
 
     // Review errors
     REVIEW_NOT_ALLOWED(9001, "You must complete a booking before reviewing this shop", HttpStatus.FORBIDDEN),

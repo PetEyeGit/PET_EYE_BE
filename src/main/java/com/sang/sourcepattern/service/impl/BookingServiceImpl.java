@@ -1491,6 +1491,14 @@ public class BookingServiceImpl implements BookingService {
         Shop shop = shopRepository.findById(shopId)
                 .orElseThrow(() -> new AppException(ErrorCode.SHOP_NOT_FOUND));
 
+        // ── Kiểm tra ngày nghỉ (Off Days) ─────────────────────────────────────
+        if (shop.getOffDays() != null && !shop.getOffDays().trim().isEmpty()) {
+            String targetDateStr = date.toString();
+            if (java.util.Arrays.asList(shop.getOffDays().split(",")).contains(targetDateStr)) {
+                return java.util.Collections.emptyList();
+            }
+        }
+
         // ── Parse openTime / closeTime ────────────────────────────────────────
         java.time.LocalTime open  = parseShopTime(shop.getOpenTime(),  java.time.LocalTime.of(8, 0));
         java.time.LocalTime close = parseShopTime(shop.getCloseTime(), java.time.LocalTime.of(20, 0));
@@ -1576,6 +1584,14 @@ public class BookingServiceImpl implements BookingService {
                                                                   List<Integer> serviceIds) {
         Shop shop = shopRepository.findById(shopId)
                 .orElseThrow(() -> new AppException(ErrorCode.SHOP_NOT_FOUND));
+
+        // ── Kiểm tra ngày nghỉ (Off Days) ─────────────────────────────────────
+        if (shop.getOffDays() != null && !shop.getOffDays().trim().isEmpty()) {
+            String targetDateStr = date.toString();
+            if (java.util.Arrays.asList(shop.getOffDays().split(",")).contains(targetDateStr)) {
+                return java.util.Collections.emptyList();
+            }
+        }
 
         // ── Tính tổng duration ────────────────────────────────────────────────
         int totalDuration = serviceIds.stream()
