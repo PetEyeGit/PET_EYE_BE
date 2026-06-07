@@ -56,6 +56,9 @@ public class Booking {
     @Builder.Default
     String status = "PENDING_PAYMENT";
 
+    @Builder.Default
+    Boolean isReminderSent = false;
+
     String note;
 
     @ManyToOne

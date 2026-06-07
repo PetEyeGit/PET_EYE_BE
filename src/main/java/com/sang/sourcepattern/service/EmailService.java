@@ -21,4 +21,12 @@ public interface EmailService {
                                  java.math.BigDecimal paidAmount,
                                  String paymentMethod,
                                  String paymentStatus);
+
+    /**
+     * Gửi email nhắc lịch hẹn trước 24 giờ kèm chính sách hủy.
+     *
+     * @param toEmail email khách hàng
+     * @param booking thông tin lịch hẹn
+     */
+    void sendAppointmentReminderEmail(String toEmail, Booking booking);
 }

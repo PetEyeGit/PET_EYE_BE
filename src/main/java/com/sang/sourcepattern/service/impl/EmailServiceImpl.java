@@ -248,6 +248,50 @@ public class EmailServiceImpl implements EmailService {
         );
     }
 
+    @Async
+    @Override
+    public void sendAppointmentReminderEmail(String toEmail, Booking booking) {
+        String subject = "[PET EYE] ⏰ Nhắc nhở: Bạn có lịch hẹn sắp tới!";
+        DateTimeFormatter dtFmt = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
+        String appointmentStr = booking.getAppointmentDatetime() != null
+                ? booking.getAppointmentDatetime().format(dtFmt) : "—";
+        var shop = booking.getShop();
+        String shopName = shop != null && shop.getShopName() != null ? shop.getShopName() : "PET EYE";
+        String shopAddress = shop != null && shop.getAddress() != null ? shop.getAddress() : "—";
+        var user = booking.getUser();
+        String customerName = user != null && user.getFullName() != null ? user.getFullName() : "Khách hàng";
+        String petName = booking.getPet() != null ? booking.getPet().getName() : "—";
+
+        String html = """
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 24px; border: 1px solid #e0e0e0; border-radius: 8px;">
+                    <h2 style="color: #4CAF50;">⏰ Nhắc nhở lịch hẹn sắp tới</h2>
+                    <p>Xin chào <strong>%s</strong>,</p>
+                    <p>PET EYE xin nhắc nhở bạn có một lịch hẹn chăm sóc cho bé <strong>%s</strong> sẽ diễn ra trong vòng 24 giờ tới.</p>
+                    
+                    <div style="background-color: #f9f9f9; padding: 16px; border-radius: 8px; margin: 16px 0;">
+                        <p style="margin: 4px 0;"><strong>Thời gian:</strong> <span style="color: #e53935; font-size: 16px; font-weight: bold;">%s</span></p>
+                        <p style="margin: 4px 0;"><strong>Cửa hàng:</strong> %s</p>
+                        <p style="margin: 4px 0;"><strong>Địa chỉ:</strong> %s</p>
+                    </div>
+
+                    <p>Vui lòng sắp xếp thời gian đến đúng giờ để bé được phục vụ tốt nhất.</p>
+
+                    <div style="background-color: #fff3e0; border-left: 4px solid #ff9800; padding: 12px; margin-top: 24px;">
+                        <h4 style="margin: 0 0 8px; color: #e65100;">⚠️ LƯU Ý VỀ CHÍNH SÁCH HỦY LỊCH:</h4>
+                        <ul style="margin: 0; padding-left: 20px; color: #555; font-size: 13px; line-height: 1.5;">
+                            <li>Nếu hủy lịch <strong>trước 5 tiếng</strong>: Bạn sẽ được hoàn lại tiền dịch vụ, trừ đi tiền cọc.</li>
+                            <li>Nếu hủy lịch <strong>sau 5 tiếng</strong> (sát giờ hẹn): Bạn cần phải trả thêm <strong>50%% tiền thiệt hại</strong> cho shop và mất thêm cọc.</li>
+                        </ul>
+                    </div>
+
+                    <hr style="border: none; border-top: 1px solid #eee; margin: 24px 0;">
+                    <p style="color: #aaa; font-size: 12px;">PET EYE — Nền tảng chăm sóc thú cưng</p>
+                </div>
+                """.formatted(customerName, petName, appointmentStr, shopName, shopAddress);
+
+        doSend(toEmail, subject, html);
+    }
+
     // ─── Internal helper — không @Async, gọi nội bộ an toàn ─────────────────
 
     private void doSend(String to, String subject, String htmlContent) {        try {
