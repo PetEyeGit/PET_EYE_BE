@@ -26,6 +26,14 @@ public interface MessageRepository extends JpaRepository<Message, Integer> {
     @org.springframework.data.jpa.repository.Query("SELECT DISTINCT m.shopId FROM Message m WHERE m.senderEmail = :email OR m.recipientEmail = :email")
     List<Integer> findShopIdsByParticipantEmail(@org.springframework.data.repository.query.Param("email") String email);
 
+    Message findFirstByShopIdAndChannelTypeAndRecipientEmailOrderByCreatedAtDesc(int shopId, String channelType, String recipientEmail);
+
+    @Query("SELECT COUNT(m) FROM Message m WHERE m.shopId = :shopId AND m.channelType = :channelType AND m.recipientEmail = :email AND m.isRead = false AND m.senderRole <> 'USER'")
+    long countUnreadForCustomer(@Param("shopId") int shopId, @Param("channelType") String channelType, @Param("email") String email);
+
+    @Query("SELECT COUNT(m) FROM Message m WHERE m.shopId = :shopId AND m.channelType = :channelType AND m.recipientEmail = :customerEmail AND m.isRead = false AND m.senderRole = 'USER'")
+    long countUnreadForShopFromCustomer(@Param("shopId") int shopId, @Param("channelType") String channelType, @Param("customerEmail") String customerEmail);
+
     @Modifying
     @Transactional
     @Query("UPDATE Message m SET m.isRead = true WHERE m.shopId = :shopId AND m.channelType = :channelType AND m.senderRole <> :readerRole AND m.isRead = false")

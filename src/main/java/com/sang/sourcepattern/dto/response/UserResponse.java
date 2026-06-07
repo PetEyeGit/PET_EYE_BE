@@ -24,5 +24,8 @@ public class UserResponse {
     MembershipTierResponse currentTier;
     List<VoucherResponse> vouchers;
     Set<RoleResponse> roles;
+    String lastMessage;
+    java.time.LocalDateTime lastMessageAt;
+    int unreadCount;
 
 }

@@ -122,6 +122,38 @@ public class ChatController {
         messagingTemplate.convertAndSend(destination, toResponse(message));
     }
 
+    @MessageMapping("/chat/typing")
+    public void handleTyping(@Payload ChatMessageRequest request, Principal principal) {
+        if (!(principal instanceof WebSocketAuthInterceptor.WsPrincipal wsPrincipal)) return;
+        String senderEmail = wsPrincipal.email();
+        List<String> roles = wsPrincipal.roles();
+        
+        String senderRole = roles.contains("ADMIN") ? "ADMIN" : 
+                           roles.contains("SHOP_OWNER") ? "SHOP_OWNER" : 
+                           roles.contains("STAFF") ? "STAFF" : "USER";
+
+        String finalRecipient = request.getRecipientEmail();
+        if ("USER".equals(senderRole) && "CUSTOMER_CHAT".equals(request.getChannelType())) {
+            finalRecipient = senderEmail;
+        }
+
+        String destination;
+        if ("CUSTOMER_CHAT".equals(request.getChannelType())) {
+            destination = "/topic/chat/" + request.getShopId() + "/typing/customer/" + finalRecipient;
+        } else if ("DIRECT".equals(request.getChannelType())) {
+            String staffEmail = roles.contains("SHOP_OWNER") ? request.getRecipientEmail() : senderEmail;
+            destination = "/topic/chat/" + request.getShopId() + "/typing/direct/" + staffEmail;
+        } else {
+            destination = "/topic/chat/" + request.getShopId() + "/typing/" + request.getChannelType();
+        }
+
+        messagingTemplate.convertAndSend(destination, java.util.Map.of(
+            "senderEmail", senderEmail,
+            "senderRole", senderRole,
+            "isTyping", "true".equals(request.getContent())
+        ));
+    }
+
     /** REST — lấy lịch sử chat */
     @GetMapping("/chat/{shopId}/history")
     @PreAuthorize("hasRole('ADMIN') or hasRole('SHOP_OWNER') or hasRole('STAFF') or hasRole('USER')")
@@ -175,7 +207,7 @@ public class ChatController {
 
     @GetMapping("/chat/my-conversations")
     @PreAuthorize("hasRole('USER')")
-    public ApiResponse<List<com.sang.sourcepattern.dto.response.ShopResponse>> getMyConversations(@AuthenticationPrincipal Jwt jwt) {
+    public ApiResponse<List<com.sang.sourcepattern.dto.response.ConversationResponse>> getMyConversations(@AuthenticationPrincipal Jwt jwt) {
         final String myEmail = jwt.getClaimAsString("email") != null 
                 ? jwt.getClaimAsString("email") 
                 : jwt.getSubject();
@@ -188,19 +220,33 @@ public class ChatController {
         if (msgShopIds != null) shopIds.addAll(msgShopIds);
         if (bookingShopIds != null) shopIds.addAll(bookingShopIds);
 
-        List<com.sang.sourcepattern.dto.response.ShopResponse> shops = shopIds.stream()
+        List<com.sang.sourcepattern.dto.response.ConversationResponse> shops = shopIds.stream()
                 .map(id -> {
                     com.sang.sourcepattern.entity.Shop shop = shopRepository.findById(id).orElse(null);
                     if (shop == null) return null;
-                    return com.sang.sourcepattern.dto.response.ShopResponse.builder()
+                    
+                    Message lastMsg = messageRepository.findFirstByShopIdAndChannelTypeAndRecipientEmailOrderByCreatedAtDesc(id, "CUSTOMER_CHAT", myEmail);
+                    long unreadCount = messageRepository.countUnreadForCustomer(id, "CUSTOMER_CHAT", myEmail);
+                    
+                    return com.sang.sourcepattern.dto.response.ConversationResponse.builder()
                             .id(shop.getId())
                             .shopName(shop.getShopName())
+                            .logoUrl(shop.getLogoUrl())
+                            .lastMessage(lastMsg != null ? lastMsg.getContent() : null)
+                            .lastMessageAt(lastMsg != null ? lastMsg.getCreatedAt() : null)
+                            .unreadCount((int) unreadCount)
                             .build();
                 })
                 .filter(java.util.Objects::nonNull)
+                .sorted((a, b) -> {
+                    if (a.getLastMessageAt() == null && b.getLastMessageAt() == null) return 0;
+                    if (a.getLastMessageAt() == null) return 1;
+                    if (b.getLastMessageAt() == null) return -1;
+                    return b.getLastMessageAt().compareTo(a.getLastMessageAt());
+                })
                 .toList();
 
-        return ApiResponse.<List<com.sang.sourcepattern.dto.response.ShopResponse>>builder().result(shops).build();
+        return ApiResponse.<List<com.sang.sourcepattern.dto.response.ConversationResponse>>builder().result(shops).build();
     }
 
     /** REST — đánh dấu đã đọc */
@@ -272,12 +318,25 @@ public class ChatController {
         }
 
         List<UserResponse> response = allowedUsers.stream()
-                .map(u -> UserResponse.builder()
+                .map(u -> {
+                    Message lastMsg = messageRepository.findFirstByShopIdAndChannelTypeAndRecipientEmailOrderByCreatedAtDesc(shopId, "CUSTOMER_CHAT", u.getEmail());
+                    long unreadCount = messageRepository.countUnreadForShopFromCustomer(shopId, "CUSTOMER_CHAT", u.getEmail());
+                    return UserResponse.builder()
                         .id(u.getId())
                         .email(u.getEmail())
                         .fullName(u.getFullName())
                         .avatar(u.getAvatar())
-                        .build())
+                        .lastMessage(lastMsg != null ? lastMsg.getContent() : null)
+                        .lastMessageAt(lastMsg != null ? lastMsg.getCreatedAt() : null)
+                        .unreadCount((int) unreadCount)
+                        .build();
+                })
+                .sorted((a, b) -> {
+                    if (a.getLastMessageAt() == null && b.getLastMessageAt() == null) return 0;
+                    if (a.getLastMessageAt() == null) return 1;
+                    if (b.getLastMessageAt() == null) return -1;
+                    return b.getLastMessageAt().compareTo(a.getLastMessageAt());
+                })
                 .toList();
         return ApiResponse.<List<UserResponse>>builder().result(response).build();
     }
