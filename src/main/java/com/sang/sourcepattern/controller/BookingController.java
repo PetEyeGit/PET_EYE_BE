@@ -75,6 +75,19 @@ public class BookingController {
                 .build();
     }
 
+    @PostMapping("/shop-create")
+    @PreAuthorize("hasAnyRole('SHOP_OWNER', 'STAFF')")
+    @Operation(summary = "Shop owner or staff creates booking for a user")
+    public ApiResponse<BookingResponse> createBookingByShop(
+            @RequestBody @Valid com.sang.sourcepattern.dto.request.ShopCreateBookingRequest request,
+            @AuthenticationPrincipal Jwt jwt) {
+
+        return ApiResponse.<BookingResponse>builder()
+                .result(bookingService.createBookingByShop(request, jwt.getClaim("email")))
+                .message("Booking created successfully by shop")
+                .build();
+    }
+
     // ─── Cash flow (2-step: 10% deposit via PayOS + 90% cash at venue) ─────────
 
     @PostMapping("/cash/initiate")

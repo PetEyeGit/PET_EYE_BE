@@ -118,4 +118,9 @@ public interface BookingService {
      * @param requesterEmail email của shop owner hoặc staff thực hiện
      */
     void sendInvoice(int bookingId, String requesterEmail);
+
+    /**
+     * Shop tạo lịch hẹn trực tiếp cho khách.
+     */
+    BookingResponse createBookingByShop(com.sang.sourcepattern.dto.request.ShopCreateBookingRequest request, String requesterEmail);
 }

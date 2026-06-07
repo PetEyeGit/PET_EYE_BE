@@ -1800,4 +1800,122 @@ public class BookingServiceImpl implements BookingService {
 
         log.info("Invoice for booking {} sent to {} by shop owner {}", bookingId, customerEmail, requesterEmail);
     }
+
+    @Override
+    @Transactional
+    public BookingResponse createBookingByShop(com.sang.sourcepattern.dto.request.ShopCreateBookingRequest request, String requesterEmail) {
+        User requester = resolveUser(requesterEmail);
+        Shop shop = shopRepository.findById(request.getShopId())
+                .orElseThrow(() -> new AppException(ErrorCode.SHOP_NOT_FOUND));
+
+        // Check permission
+        boolean isOwner = shop.getOwner().getId() == requester.getId();
+        boolean isStaff = staffRepository.findByUserEmail(requesterEmail)
+                .map(s -> s.getShop().getId() == shop.getId())
+                .orElse(false);
+
+        if (!isOwner && !isStaff) {
+            throw new AppException(ErrorCode.UNAUTHORIZED);
+        }
+
+        User customer = userRepository.findById(request.getCustomerId())
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
+
+        List<Integer> effectiveServiceIds = request.getServiceIds();
+        if (effectiveServiceIds == null || effectiveServiceIds.isEmpty()) {
+            throw new AppException(ErrorCode.INVALID_REQUEST);
+        }
+
+        int totalDuration = resolveTotalDuration(effectiveServiceIds);
+
+        boolean isBoarding = effectiveServiceIds.stream()
+                .map(id -> serviceRepository.findById(id).orElse(null))
+                .anyMatch(s -> s != null && ("BOARDING".equalsIgnoreCase(s.getCategory()) || "Hotel".equalsIgnoreCase(s.getCategory())));
+
+        checkPetConflict(request.getPetId(), request.getShopId(), request.getAppointmentDatetime(), totalDuration, isBoarding);
+
+        if (request.getStaffId() != null) {
+            checkStaffConflict(request.getStaffId(), request.getAppointmentDatetime(), totalDuration, isBoarding);
+        } else if (!isBoarding) {
+            checkShopHasAvailableStaff(request.getShopId(), request.getAppointmentDatetime(), totalDuration, isBoarding);
+        }
+
+        Pet pet = petRepository.findById(request.getPetId())
+                .orElseThrow(() -> new AppException(ErrorCode.PET_NOT_EXISTED));
+
+        if (pet.getOwner().getId() != customer.getId()) {
+            throw new AppException(ErrorCode.PET_NOT_BELONG_TO_USER);
+        }
+
+        Staff staff = request.getStaffId() != null
+                ? staffRepository.findById(request.getStaffId()).orElse(null)
+                : null;
+
+        if (staff == null && !isBoarding) {
+            List<Staff> activeStaff = staffRepository.findByShopIdAndIsActiveTrue(shop.getId());
+            if (!activeStaff.isEmpty()) {
+                LocalDateTime ws = request.getAppointmentDatetime();
+                LocalDateTime we = request.getAppointmentDatetime().plusMinutes(totalDuration);
+
+                List<Staff> availableStaff = activeStaff.stream().filter(s -> {
+                    boolean dbBusy = bookingRepository.countConflictingBookingForStaff(s.getId(), ws, we) > 0;
+                    String slotKey = STAFF_SLOT_PREFIX + s.getId() + ":"
+                                 + request.getAppointmentDatetime().withSecond(0).withNano(0).toString();
+                    boolean redisBusy = Boolean.TRUE.equals(redisTemplate.hasKey(slotKey));
+                    return !dbBusy && !redisBusy;
+                }).collect(Collectors.toList());
+
+                if (!availableStaff.isEmpty()) {
+                    staff = availableStaff.get(java.util.concurrent.ThreadLocalRandom.current().nextInt(availableStaff.size()));
+                } else {
+                    staff = activeStaff.get(java.util.concurrent.ThreadLocalRandom.current().nextInt(activeStaff.size()));
+                }
+            }
+        }
+
+        java.util.Set<Service> servicesSet = effectiveServiceIds.stream()
+                .map(id -> serviceRepository.findById(id).orElse(null))
+                .filter(java.util.Objects::nonNull)
+                .collect(Collectors.toSet());
+
+        Booking booking = Booking.builder()
+                .user(customer)
+                .shop(shop)
+                .pet(pet)
+                .staff(staff)
+                .services(servicesSet)
+                .appointmentDatetime(request.getAppointmentDatetime())
+                .checkOutDatetime(request.getCheckOut())
+                .checkIn(request.getCheckIn())
+                .checkOut(request.getCheckOut())
+                .cageSize(request.getCageSize())
+                .roomType(request.getRoomType())
+                .note(request.getNote())
+                .status("CONFIRMED")
+                .build();
+
+        booking = bookingRepository.save(booking);
+
+        Notification notifUser = Notification.builder()
+                .user(customer)
+                .title("Có đơn đặt lịch mới từ shop")
+                .content(String.format("Shop %s đã tạo đơn đặt lịch mới #%d cho bạn.", shop.getShopName(), booking.getId()))
+                .notificationType(Notification.NotificationType.BOOKING)
+                .build();
+        notificationRepository.save(notifUser);
+
+        if (staff != null && staff.getUser() != null) {
+            Notification notifStaff = Notification.builder()
+                    .user(staff.getUser())
+                    .title("Bạn vừa được giao lịch hẹn mới")
+                    .content(String.format("Bạn vừa được giao một lịch hẹn mới #%d.", booking.getId()))
+                    .notificationType(Notification.NotificationType.BOOKING)
+                    .build();
+            notificationRepository.save(notifStaff);
+        }
+
+        log.info("Booking {} CONFIRMED (Created by Shop) — customer={}", booking.getId(), customer.getEmail());
+
+        return toResponse(booking);
+    }
 }
