@@ -261,8 +261,9 @@ public class WalletServiceImpl implements WalletService {
         boolean isPureCash = "CASH".equals(paymentMethod);
         boolean isCashDeposit = "CASH_DEPOSIT".equals(paymentMethod);
         boolean isOnlinePayment = !isPureCash && !isCashDeposit; // PAYOS, MOCK, etc.
+        boolean isShopCreated = "SHOP".equalsIgnoreCase(booking.getCreatedBy());
 
-        if (isPureCash) {
+        if (isPureCash && isShopCreated) {
             // Shop nhận 100% tiền mặt từ khách nên Shop nợ Admin phần hoa hồng.
             // Trừ phần adminCommission vào số dư ví của Shop.
             wallet.setAvailableBalance(safe(wallet.getAvailableBalance()).subtract(adminCommission));
@@ -297,7 +298,7 @@ public class WalletServiceImpl implements WalletService {
                 log.info("Wallet credited for COMPLETED booking {} — shopShare={} (full price {})",
                         bookingId, shopShare, fullPrice);
             }
-        } else if (isPureCash) {
+        } else if (isPureCash && isShopCreated) {
             if (transactionRepository.existsByBookingIdAndType(bookingId, "COMMISSION_FEE")) {
                 log.warn("Commission fee transaction already exists for booking {}, skipping.", bookingId);
             } else {

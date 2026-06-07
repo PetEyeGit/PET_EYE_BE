@@ -1892,6 +1892,7 @@ public class BookingServiceImpl implements BookingService {
                 .roomType(request.getRoomType())
                 .note(request.getNote())
                 .status("CONFIRMED")
+                .createdBy("SHOP")
                 .build();
 
         booking = bookingRepository.save(booking);
