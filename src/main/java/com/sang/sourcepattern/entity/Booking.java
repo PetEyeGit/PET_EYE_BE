@@ -94,5 +94,6 @@ public class Booking {
     @org.hibernate.annotations.UpdateTimestamp
     LocalDateTime updatedAt;
 
-
+    @Builder.Default
+    String createdBy = "USER";
 }

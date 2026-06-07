@@ -258,40 +258,66 @@ public class WalletServiceImpl implements WalletService {
         // Cộng TRỰC TIẾP vào available + totalEarned
         ShopWallet wallet = getOrCreateWallet(booking.getShop());
         
-        // Không cộng vào availableBalance nếu thanh toán bằng tiền mặt (CASH hoặc CASH_DEPOSIT)
-        // vì Shop đã tự nhận phần tiền này bằng tiền mặt trực tiếp từ khách hàng.
-        boolean isCashPayment = "CASH_DEPOSIT".equals(paymentMethod) || "CASH".equals(paymentMethod);
-        if (!isCashPayment) {
+        boolean isPureCash = "CASH".equals(paymentMethod);
+        boolean isCashDeposit = "CASH_DEPOSIT".equals(paymentMethod);
+        boolean isOnlinePayment = !isPureCash && !isCashDeposit; // PAYOS, MOCK, etc.
+        boolean isShopCreated = "SHOP".equalsIgnoreCase(booking.getCreatedBy());
+
+        if (isPureCash && isShopCreated) {
+            // Shop nhận 100% tiền mặt từ khách nên Shop nợ Admin phần hoa hồng.
+            // Trừ phần adminCommission vào số dư ví của Shop.
+            wallet.setAvailableBalance(safe(wallet.getAvailableBalance()).subtract(adminCommission));
+        } else if (isOnlinePayment) {
+            // Khách trả 100% qua hệ thống (PayOS/MOCK), Admin giữ tiền. Admin trả lại shopShare cho Shop.
             wallet.setAvailableBalance(safe(wallet.getAvailableBalance()).add(shopShare));
         }
+        // Với CASH_DEPOSIT: Khách đã trả cọc qua PayOS (đủ phần adminCommission), Admin đã nhận.
+        // Shop nhận phần còn lại bằng tiền mặt từ khách. Nên availableBalance không đổi.
         
         wallet.setTotalEarned(safe(wallet.getTotalEarned()).add(shopShare));
         wallet.setUpdatedAt(LocalDateTime.now());
         walletRepository.save(wallet);
 
-        if (!isCashPayment) {
+        if (isOnlinePayment) {
             if (transactionRepository.existsByBookingIdAndType(bookingId, "WALLET_CREDIT")) {
                 log.warn("Wallet credit transaction already exists for booking {}, skipping creation.", bookingId);
-                return;
+            } else {
+                // Ghi Transaction WALLET_CREDIT
+                transactionRepository.save(Transaction.builder()
+                        .booking(booking)
+                        .shop(booking.getShop())
+                        .type("WALLET_CREDIT")
+                        .amount(shopShare)
+                        .paymentMethod(paymentMethod)
+                        .status("SUCCESS")
+                        .description(String.format("Wallet credit for booking #%d (shop share of %s VND)",
+                                bookingId, fullPrice.toPlainString()))
+                        .completedAt(LocalDateTime.now())
+                        .build());
+
+                log.info("Wallet credited for COMPLETED booking {} — shopShare={} (full price {})",
+                        bookingId, shopShare, fullPrice);
             }
+        } else if (isPureCash && isShopCreated) {
+            if (transactionRepository.existsByBookingIdAndType(bookingId, "COMMISSION_FEE")) {
+                log.warn("Commission fee transaction already exists for booking {}, skipping.", bookingId);
+            } else {
+                // Ghi Transaction COMMISSION_FEE (Trừ tiền hoa hồng)
+                transactionRepository.save(Transaction.builder()
+                        .booking(booking)
+                        .shop(booking.getShop())
+                        .type("COMMISSION_FEE")
+                        .amount(adminCommission)
+                        .paymentMethod("SYSTEM")
+                        .status("SUCCESS")
+                        .description(String.format("Deducted commission fee for cash booking #%d", bookingId))
+                        .completedAt(LocalDateTime.now())
+                        .build());
 
-            // Ghi Transaction WALLET_CREDIT
-            transactionRepository.save(Transaction.builder()
-                    .booking(booking)
-                    .shop(booking.getShop())
-                    .type("WALLET_CREDIT")
-                    .amount(shopShare)
-                    .paymentMethod(paymentMethod)
-                    .status("SUCCESS")
-                    .description(String.format("Wallet credit for booking #%d (shop share of %s VND)",
-                            bookingId, fullPrice.toPlainString()))
-                    .completedAt(LocalDateTime.now())
-                    .build());
-
-            log.info("Wallet credited for COMPLETED booking {} — shopShare={} (full price {})",
-                    bookingId, shopShare, fullPrice);
+                log.info("Commission fee deducted for CASH booking {} — adminCommission={}", bookingId, adminCommission);
+            }
         } else {
-            log.info("Cash booking completed {} — no wallet credit. Shop received cash directly.", bookingId);
+            log.info("Cash deposit booking completed {} — no wallet balance change. Admin kept deposit, Shop received cash.", bookingId);
         }
     }
 
