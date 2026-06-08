@@ -1440,15 +1440,14 @@ public class BookingServiceImpl implements BookingService {
         }
 
         // Calculate penalty and refund
+        // - refundAmount: số tiền Admin cần hoàn cho Khách (= toàn bộ tiền khách đã trả)
+        // - penalty:      số tiền phạt trừ vào VÍ của Shop (= toàn bộ tiền khách đã trả, vì Shop có lỗi)
         BigDecimal penalty = BigDecimal.ZERO;
         BigDecimal refundAmount = BigDecimal.ZERO;
         Payment payment = paymentRepository.findByBookingId(bookingId).orElse(null);
         if (payment != null && "SUCCESS".equals(payment.getStatus())) {
             refundAmount = payment.getAmount();
-            List<Integer> serviceIds = booking.getServices().stream()
-                    .map(com.sang.sourcepattern.entity.Service::getId)
-                    .collect(Collectors.toList());
-            penalty = walletService.calculateAdminCommission(serviceIds);
+            penalty = payment.getAmount(); // Shop chịu 100% — bằng đúng số tiền khách đã trả
         }
 
         // Shop cancels booking:
