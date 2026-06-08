@@ -97,6 +97,21 @@ public class UserServiceImpl implements UserService {
                 .toList();
     }
 
+    @Override
+    public com.sang.sourcepattern.dto.response.PageResponse<UserResponse> getAllUsersPaged(int page) {
+        org.springframework.data.domain.Page<User> pageResult =
+                userRepository.findAll(org.springframework.data.domain.PageRequest.of(page, 10,
+                        org.springframework.data.domain.Sort.by(org.springframework.data.domain.Sort.Direction.DESC, "createdAt")));
+        return com.sang.sourcepattern.dto.response.PageResponse.<UserResponse>builder()
+                .content(pageResult.getContent().stream().map(this::mapUserWithVouchers).toList())
+                .page(pageResult.getNumber())
+                .size(pageResult.getSize())
+                .totalElements(pageResult.getTotalElements())
+                .totalPages(pageResult.getTotalPages())
+                .last(pageResult.isLast())
+                .build();
+    }
+
     private UserResponse mapUserWithVouchers(User user) {
         UserResponse response = userMapper.toUserResponse(user);
         List<com.sang.sourcepattern.dto.response.VoucherResponse> vouchers = userVoucherRepository.findByUserId(user.getId()).stream()

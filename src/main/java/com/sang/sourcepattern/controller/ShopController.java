@@ -100,6 +100,18 @@ public class ShopController {
                 .build();
     }
 
+    @GetMapping("/public/paged")
+    @Operation(summary = "Search verified shops (public, paginated, 10 per page)")
+    public ApiResponse<com.sang.sourcepattern.dto.response.PageResponse<ShopResponse>> searchPublicPaged(
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) String city,
+            @RequestParam(required = false) String shopType,
+            @RequestParam(defaultValue = "0") int page) {
+        return ApiResponse.<com.sang.sourcepattern.dto.response.PageResponse<ShopResponse>>builder()
+                .result(shopService.searchVerifiedShopsPaged(keyword, city, shopType, page))
+                .build();
+    }
+
     @GetMapping("/public/{id}")
     @Operation(summary = "Get a verified shop by id (public)")
     public ApiResponse<ShopResponse> getPublicById(@PathVariable int id) {
@@ -164,6 +176,16 @@ public class ShopController {
     public ApiResponse<List<ShopResponse>> getAll() {
         return ApiResponse.<List<ShopResponse>>builder()
                 .result(shopService.getAllShops())
+                .build();
+    }
+
+    @GetMapping("/paged")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Get all shops paginated (admin, 10 per page)")
+    public ApiResponse<com.sang.sourcepattern.dto.response.PageResponse<ShopResponse>> getAllPaged(
+            @RequestParam(defaultValue = "0") int page) {
+        return ApiResponse.<com.sang.sourcepattern.dto.response.PageResponse<ShopResponse>>builder()
+                .result(shopService.getAllShopsPaged(page))
                 .build();
     }
 

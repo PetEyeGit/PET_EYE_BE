@@ -128,6 +128,15 @@ public class UserController {
                 .build();
     }
 
+    @GetMapping("/paged")
+    @PreAuthorize("hasRole('ADMIN')")
+    ApiResponse<PageResponse<UserResponse>> getAllUsersPaged(
+            @RequestParam(defaultValue = "0") int page) {
+        return ApiResponse.<PageResponse<UserResponse>>builder()
+                .result(userService.getAllUsersPaged(page))
+                .build();
+    }
+
     @PatchMapping("/{id}/deactivate")
     @PreAuthorize("hasRole('ADMIN')")
     ApiResponse<Void> deactivateUser(@PathVariable Integer id) {

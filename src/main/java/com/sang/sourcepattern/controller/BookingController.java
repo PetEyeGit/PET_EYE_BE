@@ -141,6 +141,17 @@ public class BookingController {
                 .build();
     }
 
+    @GetMapping("/my/paged")
+    @PreAuthorize("hasRole('USER')")
+    @Operation(summary = "Get bookings of the authenticated user (paginated, 10 per page)")
+    public ApiResponse<com.sang.sourcepattern.dto.response.PageResponse<BookingResponse>> getMyBookingsPaged(
+            @RequestParam(defaultValue = "0") int page,
+            @AuthenticationPrincipal Jwt jwt) {
+        return ApiResponse.<com.sang.sourcepattern.dto.response.PageResponse<BookingResponse>>builder()
+                .result(bookingService.getMyBookingsPaged(jwt.getClaim("email"), page))
+                .build();
+    }
+
     @GetMapping("/{id}")
     @PreAuthorize("hasAnyRole('USER', 'SHOP_OWNER', 'STAFF', 'ADMIN')")
     @Operation(summary = "Get booking detail by id")
@@ -330,6 +341,20 @@ public class BookingController {
 
         return ApiResponse.<List<BookingResponse>>builder()
                 .result(bookingService.getShopBookings(jwt.getClaim("email"), start, end))
+                .build();
+    }
+
+    @GetMapping("/shop/paged")
+    @PreAuthorize("hasAnyRole('SHOP_OWNER', 'STAFF')")
+    @Operation(summary = "Get bookings for the shop (paginated, 10 per page)")
+    public ApiResponse<com.sang.sourcepattern.dto.response.PageResponse<BookingResponse>> getShopBookingsPaged(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime start,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime end,
+            @RequestParam(defaultValue = "0") int page,
+            @AuthenticationPrincipal Jwt jwt) {
+
+        return ApiResponse.<com.sang.sourcepattern.dto.response.PageResponse<BookingResponse>>builder()
+                .result(bookingService.getShopBookingsPaged(jwt.getClaim("email"), start, end, page))
                 .build();
     }
 

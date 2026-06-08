@@ -44,6 +44,16 @@ public class ReviewController {
                 .build();
     }
 
+    @GetMapping("/shop/{shopId}/paged")
+    @Operation(summary = "Get reviews for a specific shop (paginated, 10 per page)")
+    public ApiResponse<com.sang.sourcepattern.dto.response.PageResponse<ReviewResponse>> getReviewsByShopPaged(
+            @PathVariable int shopId,
+            @RequestParam(defaultValue = "0") int page) {
+        return ApiResponse.<com.sang.sourcepattern.dto.response.PageResponse<ReviewResponse>>builder()
+                .result(reviewService.getReviewsByShopPaged(shopId, page))
+                .build();
+    }
+
     @GetMapping("/shop/{shopId}/count")
     @Operation(summary = "Count total reviews for a specific shop")
     public ApiResponse<Long> getReviewCount(@PathVariable int shopId) {

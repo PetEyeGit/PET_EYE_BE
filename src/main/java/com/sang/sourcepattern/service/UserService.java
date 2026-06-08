@@ -5,6 +5,7 @@ import com.sang.sourcepattern.dto.request.PasswordChangeRequest;
 import com.sang.sourcepattern.dto.request.ResetPasswordRequest;
 import com.sang.sourcepattern.dto.request.UserCreationRequest;
 import com.sang.sourcepattern.dto.request.UserUpdateRequest;
+import com.sang.sourcepattern.dto.response.PageResponse;
 import com.sang.sourcepattern.dto.response.UserResponse;
 
 import java.util.List;
@@ -18,6 +19,8 @@ public interface UserService {
     UserResponse getUserById(Integer userId);
 
     List<UserResponse> getAllUsers();
+
+    PageResponse<UserResponse> getAllUsersPaged(int page);
 
     void deleteUser(Integer userId);
 

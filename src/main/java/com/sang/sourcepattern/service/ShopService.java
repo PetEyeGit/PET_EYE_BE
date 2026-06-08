@@ -7,6 +7,7 @@ import com.sang.sourcepattern.dto.response.ShopCustomerResponse;
 import com.sang.sourcepattern.dto.response.ShopDashboardResponse;
 import com.sang.sourcepattern.dto.response.ShopResponse;
 
+import com.sang.sourcepattern.dto.response.PageResponse;
 import java.util.List;
 
 public interface ShopService {
@@ -16,6 +17,7 @@ public interface ShopService {
     ShopResponse registerShop(ShopRegistrationRequest request);
     ShopResponse approveShop(int shopId);
     List<ShopResponse> getAllShops();
+    PageResponse<ShopResponse> getAllShopsPaged(int page);
     ShopResponse getShopById(int id);
 
     ShopResponse getMyShop(String email);
@@ -23,6 +25,7 @@ public interface ShopService {
 
     /** Public: only verified shops, optional keyword/city/shopType filter */
     List<ShopResponse> searchVerifiedShops(String keyword, String city, String shopType);
+    PageResponse<ShopResponse> searchVerifiedShopsPaged(String keyword, String city, String shopType, int page);
 
     /** Public: get a single verified shop by id */
     ShopResponse getVerifiedShopById(int id);

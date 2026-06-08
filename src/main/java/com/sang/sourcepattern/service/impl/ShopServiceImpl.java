@@ -512,6 +512,21 @@ public class ShopServiceImpl implements ShopService {
     }
 
     @Override
+    public com.sang.sourcepattern.dto.response.PageResponse<ShopResponse> getAllShopsPaged(int page) {
+        org.springframework.data.domain.Page<Shop> pageResult =
+                shopRepository.findAll(org.springframework.data.domain.PageRequest.of(page, 10,
+                        org.springframework.data.domain.Sort.by(org.springframework.data.domain.Sort.Direction.DESC, "id")));
+        return com.sang.sourcepattern.dto.response.PageResponse.<ShopResponse>builder()
+                .content(pageResult.getContent().stream().map(shopMapper::toShopResponse).toList())
+                .page(pageResult.getNumber())
+                .size(pageResult.getSize())
+                .totalElements(pageResult.getTotalElements())
+                .totalPages(pageResult.getTotalPages())
+                .last(pageResult.isLast())
+                .build();
+    }
+
+    @Override
     public ShopResponse getShopById(int id) {
         Shop shop = shopRepository.findById(id)
                 .orElseThrow(() -> new AppException(ErrorCode.SHOP_NOT_FOUND));
@@ -590,6 +605,21 @@ public class ShopServiceImpl implements ShopService {
                 .stream()
                 .map(shopMapper::toShopResponse)
                 .toList();
+    }
+
+    @Override
+    public com.sang.sourcepattern.dto.response.PageResponse<ShopResponse> searchVerifiedShopsPaged(String keyword, String city, String shopType, int page) {
+        org.springframework.data.domain.Page<Shop> pageResult =
+                shopRepository.searchVerifiedPaged(keyword, city, shopType,
+                        org.springframework.data.domain.PageRequest.of(page, 10));
+        return com.sang.sourcepattern.dto.response.PageResponse.<ShopResponse>builder()
+                .content(pageResult.getContent().stream().map(shopMapper::toShopResponse).toList())
+                .page(pageResult.getNumber())
+                .size(pageResult.getSize())
+                .totalElements(pageResult.getTotalElements())
+                .totalPages(pageResult.getTotalPages())
+                .last(pageResult.isLast())
+                .build();
     }
 
     @Override

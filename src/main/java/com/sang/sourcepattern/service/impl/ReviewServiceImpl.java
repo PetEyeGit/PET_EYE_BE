@@ -81,6 +81,21 @@ public class ReviewServiceImpl implements ReviewService {
                 .map(this::toReviewResponse)
                 .toList();
     }
+
+    @Override
+    public com.sang.sourcepattern.dto.response.PageResponse<ReviewResponse> getReviewsByShopPaged(int shopId, int page) {
+        org.springframework.data.domain.Page<Review> pageResult =
+                reviewRepository.findByShopIdOrderByCreatedAtDesc(shopId,
+                        org.springframework.data.domain.PageRequest.of(page, 10));
+        return com.sang.sourcepattern.dto.response.PageResponse.<ReviewResponse>builder()
+                .content(pageResult.getContent().stream().map(this::toReviewResponse).toList())
+                .page(pageResult.getNumber())
+                .size(pageResult.getSize())
+                .totalElements(pageResult.getTotalElements())
+                .totalPages(pageResult.getTotalPages())
+                .last(pageResult.isLast())
+                .build();
+    }
     
     @Override
     public long countReviewsByShop(int shopId) {

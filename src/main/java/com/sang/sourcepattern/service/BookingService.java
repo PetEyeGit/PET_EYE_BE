@@ -6,6 +6,7 @@ import com.sang.sourcepattern.dto.response.BookingResponse;
 import com.sang.sourcepattern.dto.response.InitiatePaymentResponse;
 import com.sang.sourcepattern.dto.response.StaffResponse;
 
+import com.sang.sourcepattern.dto.response.PageResponse;
 import java.time.LocalDate;
 import java.util.List;
 
@@ -55,6 +56,7 @@ public interface BookingService {
 
     /** Get all bookings of the authenticated user */
     List<BookingResponse> getMyBookings(String userEmail);
+    PageResponse<BookingResponse> getMyBookingsPaged(String userEmail, int page);
 
     /** Get a single booking detail */
     BookingResponse getBookingById(int bookingId, String userEmail);
@@ -81,6 +83,7 @@ public interface BookingService {
 
     /** Get all bookings for a shop owner within a range */
     List<BookingResponse> getShopBookings(String ownerEmail, java.time.LocalDateTime start, java.time.LocalDateTime end);
+    PageResponse<BookingResponse> getShopBookingsPaged(String ownerEmail, java.time.LocalDateTime start, java.time.LocalDateTime end, int page);
 
     /** Check if pet is available for booking at a specific time */
     boolean checkPetAvailability(int petId, java.time.LocalDateTime appointmentDatetime, int durationMinutes);
