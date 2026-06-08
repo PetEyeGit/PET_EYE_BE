@@ -426,4 +426,34 @@ public class EmailServiceImpl implements EmailService {
                 </div>
                 """.formatted(booking.getId(), userName, shopName, petName, appointmentStr, servicesRows.toString(), vnFormat.format(total));
     }
+
+    @Async
+    @Override
+    public void sendStaffChangeRequestEmail(String toEmail, Booking booking, com.sang.sourcepattern.entity.Staff proposedStaff, String reason) {
+        String subject = "[PET EYE] Yêu cầu đổi nhân viên chăm sóc - Đơn hàng #" + booking.getId();
+        String customerName = booking.getUser() != null && booking.getUser().getFullName() != null ? booking.getUser().getFullName() : "Quý khách";
+        String shopName = booking.getShop() != null ? booking.getShop().getShopName() : "PET EYE Shop";
+        String staffName = proposedStaff != null ? proposedStaff.getFullName() : "Nhân viên mới";
+        
+        String html = """
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 24px; border: 1px solid #e0e0e0; border-radius: 8px;">
+                    <h2 style="color: #f57c00;">🔄 Yêu Cầu Đổi Nhân Viên</h2>
+                    <p>Xin chào <strong>%s</strong>,</p>
+                    <p>Cửa hàng <strong>%s</strong> vừa gửi yêu cầu thay đổi nhân viên chăm sóc cho đơn hàng <strong>#%d</strong> của bạn.</p>
+                    
+                    <div style="background-color: #f9f9f9; padding: 16px; border-radius: 8px; margin: 16px 0; border-left: 4px solid #ff9800;">
+                        <p style="margin: 4px 0;"><strong>Nhân viên mới đề xuất:</strong> %s</p>
+                        <p style="margin: 4px 0;"><strong>Lý do từ shop:</strong> %s</p>
+                    </div>
+
+                    <p>Bạn vui lòng truy cập vào website hoặc ứng dụng PET EYE để <strong>Đồng ý</strong> hoặc <strong>Từ chối</strong> yêu cầu này.</p>
+                    <p style="color: #d32f2f; font-size: 13px;"><em>* Nếu bạn từ chối, đơn hàng vẫn sẽ giữ nhân viên cũ hoặc shop sẽ phải thương lượng lại với bạn.</em></p>
+
+                    <hr style="border: none; border-top: 1px solid #eee; margin: 24px 0;">
+                    <p style="color: #aaa; font-size: 12px; text-align: center;">PET EYE — Nền tảng chăm sóc thú cưng</p>
+                </div>
+                """.formatted(customerName, shopName, booking.getId(), staffName, reason != null ? reason : "Không có lý do");
+                
+        doSend(toEmail, subject, html);
+    }
 }

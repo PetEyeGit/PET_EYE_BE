@@ -721,6 +721,10 @@ public class TaskServiceImpl implements TaskService {
                 
         notificationRepository.save(notification);
         
+        if (booking.getUser().getEmail() != null) {
+            emailService.sendStaffChangeRequestEmail(booking.getUser().getEmail(), booking, proposedStaff, reason);
+        }
+        
         log.info("Owner requested staff change for booking {} to staff {}", bookingId, proposedStaff.getFullName());
     }
 

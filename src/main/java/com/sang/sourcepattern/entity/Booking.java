@@ -68,6 +68,7 @@ public class Booking {
     Double discountAmount;
 
     String cancellationReason;
+    LocalDateTime cancellationRequestedAt;
     String bankName;
     String bankAccount;
     String accountHolder;

@@ -1274,8 +1274,8 @@ public class BookingServiceImpl implements BookingService {
             
             long hoursToAppointment = 0;
             if (booking.getAppointmentDatetime() != null) {
-                // Dùng thời gian hiện tại hoặc thời gian khách thực hiện request hủy (ở đây lấy NOW cho an toàn)
-                hoursToAppointment = java.time.Duration.between(LocalDateTime.now(), booking.getAppointmentDatetime()).toHours();
+                LocalDateTime requestTime = booking.getCancellationRequestedAt() != null ? booking.getCancellationRequestedAt() : LocalDateTime.now();
+                hoursToAppointment = java.time.Duration.between(requestTime, booking.getAppointmentDatetime()).toHours();
             }
             
             BigDecimal refundAmount;
@@ -1388,6 +1388,7 @@ public class BookingServiceImpl implements BookingService {
 
         booking.setStatus("CANCEL_REQUESTED");
         booking.setCancellationReason(reason);
+        booking.setCancellationRequestedAt(LocalDateTime.now());
         booking.setBankName(bankName);
         booking.setBankAccount(bankAccount);
         booking.setAccountHolder(accountHolder);

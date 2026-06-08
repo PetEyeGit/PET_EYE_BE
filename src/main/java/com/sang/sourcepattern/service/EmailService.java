@@ -34,4 +34,9 @@ public interface EmailService {
      * Gửi email thông báo đơn hàng đã hoàn thành, chi tiết thời gian và cảm ơn.
      */
     void sendBookingCompletedEmail(String toEmail, Booking booking);
+
+    /**
+     * Gửi email thông báo cho khách hàng khi shop xin đổi nhân viên.
+     */
+    void sendStaffChangeRequestEmail(String toEmail, Booking booking, com.sang.sourcepattern.entity.Staff proposedStaff, String reason);
 }
