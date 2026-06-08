@@ -216,8 +216,14 @@ public class BookingServiceImpl implements BookingService {
                         .serviceName(s.getServiceName())
                         .servicePrice(s.getPrice())
                         .category(s.getCategory())
+                        .durationMinutes(s.getDurationMinutes())
                         .build()).collect(Collectors.toList())
                 : new java.util.ArrayList<>();
+
+        java.math.BigDecimal paidAmount = java.math.BigDecimal.ZERO;
+        if (payment != null && "SUCCESS".equals(payment.getStatus())) {
+            paidAmount = payment.getAmount();
+        }
 
         return BookingResponse.builder()
                 .id(booking.getId())
@@ -242,9 +248,11 @@ public class BookingServiceImpl implements BookingService {
                 .accountHolder(booking.getAccountHolder())
                 .payosOrderCode(booking.getPayosOrderCode())
                 .createdAt(booking.getCreatedAt())
+                .updatedAt(booking.getUpdatedAt())
                 .checkoutUrl(payment != null ? payment.getCheckoutUrl() : null)
                 .paymentStatus(payment != null ? payment.getStatus() : null)
                 .paymentMethod(payment != null ? payment.getMethod() : null)
+                .paidAmount(paidAmount)
                 .cameraRtspUrl(isShopUser ? booking.getCameraRtspUrl() : null)
                 .cameraStreamUrl(streamUrl)
                 .cameraEnabled(cameraEnabled)
@@ -1394,6 +1402,91 @@ public class BookingServiceImpl implements BookingService {
         bookingRepository.save(booking);
 
         log.info("Booking {} CANCEL REQUESTED by {}", bookingId, userEmail);
+        return toResponse(booking);
+    }
+
+    @Override
+    @Transactional
+    public BookingResponse shopCancelBooking(int bookingId, String reason, String requesterEmail) {
+        if (reason == null || reason.isBlank()) {
+            throw new AppException(ErrorCode.INVALID_REQUEST);
+        }
+
+        Shop shop = shopRepository.findByOwnerEmail(requesterEmail)
+                .orElse(null);
+
+        if (shop == null) {
+            // Check if requester is staff
+            Staff staff = staffRepository.findByUserEmail(requesterEmail)
+                    .orElseThrow(() -> new AppException(ErrorCode.UNAUTHENTICATED));
+            shop = staff.getShop();
+        }
+
+        Booking booking = bookingRepository.findByIdWithServices(bookingId)
+                .orElseThrow(() -> new AppException(ErrorCode.BOOKING_NOT_FOUND));
+
+        if (booking.getShop().getId() != shop.getId()) {
+            throw new AppException(ErrorCode.BOOKING_NOT_BELONG_TO_STAFF_SHOP);
+        }
+
+        if ("COMPLETED".equals(booking.getStatus()) || "CANCELLED".equals(booking.getStatus())) {
+            throw new AppException(ErrorCode.INVALID_REQUEST);
+        }
+
+        // Shop cancels booking:
+        // Set to WAITING_REFUND so Admin can refund user.
+        booking.setStatus("WAITING_REFUND");
+        booking.setCancellationReason(reason);
+        bookingRepository.save(booking);
+
+        cameraService.stopStream(bookingId);
+
+        // Calculate penalty (deposit amount)
+        BigDecimal penalty = BigDecimal.ZERO;
+        Payment payment = paymentRepository.findByBookingId(bookingId).orElse(null);
+        if (payment != null && "SUCCESS".equals(payment.getStatus())) {
+            penalty = payment.getAmount();
+        }
+
+        // Deduct penalty from shop
+        if (penalty.compareTo(BigDecimal.ZERO) > 0) {
+            walletService.deductShopPenalty(shop.getId(), penalty, bookingId);
+        }
+
+        // Notify Admin to refund User
+        List<User> admins = userRepository.findByRoleName("ADMIN");
+        String broadcastId = UUID.randomUUID().toString();
+        String amountText = NumberFormat.getCurrencyInstance(new Locale("vi", "VN")).format(penalty);
+        String content = String.format("Shop %s đã chủ động hủy đơn #%d. Vui lòng hoàn lại toàn bộ số tiền %s cho khách hàng %s. Shop đã bị trừ phí phạt mất cọc.",
+                shop.getShopName(),
+                bookingId,
+                amountText,
+                booking.getUser() != null ? booking.getUser().getFullName() : "khách lẻ");
+
+        List<Notification> notifications = admins.stream()
+                .map(admin -> Notification.builder()
+                        .user(admin)
+                        .title("Shop tự hủy đơn - Yêu cầu hoàn tiền")
+                        .content(content)
+                        .broadcastId(broadcastId)
+                        .notificationType(Notification.NotificationType.SYSTEM)
+                        .build())
+                .collect(Collectors.toList());
+        notificationRepository.saveAll(notifications);
+
+        // Notify User
+        if (booking.getUser() != null) {
+            Notification notifToUser = Notification.builder()
+                    .user(booking.getUser())
+                    .title("Shop đã hủy lịch của bạn")
+                    .content(String.format("Shop %s đã hủy lịch #%d của bạn với lý do: %s. Hệ thống sẽ hoàn lại 100%% tiền cọc cho bạn sớm nhất.",
+                            shop.getShopName(), bookingId, reason))
+                    .notificationType(Notification.NotificationType.SYSTEM)
+                    .build();
+            notificationRepository.save(notifToUser);
+        }
+
+        log.info("Booking {} SHOP CANCELLED by {} - Reason: {}", bookingId, requesterEmail, reason);
         return toResponse(booking);
     }
 

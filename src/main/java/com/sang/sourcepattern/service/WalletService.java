@@ -90,6 +90,9 @@ public interface WalletService {
     /** Cộng tiền bồi thường cho Shop khi khách hàng bị phạt (e.g., LATE_NO_SHOW). */
     void creditShopPenalty(int bookingId, BigDecimal penaltyAmount);
 
+    /** Trừ tiền phạt của Shop (Shop hủy lịch), trừ trực tiếp vào availableBalance và totalEarned */
+    void deductShopPenalty(int shopId, BigDecimal amount, int bookingId);
+
     /** Admin từ chối yêu cầu rút tiền */
     WithdrawalRequestResponse rejectWithdrawal(int requestId, String adminNote);
 

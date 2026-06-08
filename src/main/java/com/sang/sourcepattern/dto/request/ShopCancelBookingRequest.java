@@ -1,0 +1,15 @@
+package com.sang.sourcepattern.dto.request;
+
+import jakarta.validation.constraints.NotBlank;
+import lombok.*;
+import lombok.experimental.FieldDefaults;
+
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+@FieldDefaults(level = AccessLevel.PRIVATE)
+public class ShopCancelBookingRequest {
+    @NotBlank(message = "FIELD_CANNOT_BE_BLANK")
+    String reason;
+}

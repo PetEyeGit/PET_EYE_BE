@@ -700,6 +700,36 @@ public class WalletServiceImpl implements WalletService {
 
     @Override
     @Transactional
+    public void deductShopPenalty(int shopId, BigDecimal amount, int bookingId) {
+        if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
+            return;
+        }
+
+        Shop shop = shopRepository.findById(shopId)
+                .orElseThrow(() -> new AppException(ErrorCode.SHOP_NOT_FOUND));
+
+        ShopWallet wallet = getOrCreateWallet(shop);
+        
+        wallet.setAvailableBalance(safe(wallet.getAvailableBalance()).subtract(amount));
+        wallet.setTotalEarned(safe(wallet.getTotalEarned()).subtract(amount));
+        wallet.setUpdatedAt(LocalDateTime.now());
+        walletRepository.save(wallet);
+
+        transactionRepository.save(Transaction.builder()
+                .shop(shop)
+                .type("PENALTY")
+                .amount(amount)
+                .status("SUCCESS")
+                .description(String.format("Phí phạt mất cọc do Shop tự hủy đơn #%d", bookingId))
+                .completedAt(LocalDateTime.now())
+                .build());
+
+        log.info("Deducted PENALTY from Shop {} for booking {} - Amount: {}", 
+                shop.getShopName(), bookingId, amount);
+    }
+
+    @Override
+    @Transactional
     public WithdrawalRequestResponse rejectWithdrawal(int requestId, String adminNote) {
         WithdrawalRequest wr = withdrawalRepository.findById(requestId)
                 .orElseThrow(() -> new AppException(ErrorCode.WITHDRAWAL_NOT_FOUND));
