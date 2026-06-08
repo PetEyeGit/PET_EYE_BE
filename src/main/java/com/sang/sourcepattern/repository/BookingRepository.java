@@ -14,9 +14,16 @@ import java.util.Optional;
 @Repository
 public interface BookingRepository extends JpaRepository<Booking, Integer> {
 
-    /** Load bookings with services eagerly using JOIN FETCH to avoid empty services collection */
     @Query("SELECT DISTINCT b FROM Booking b LEFT JOIN FETCH b.services WHERE b.user.id = :userId")
     List<Booking> findByUserIdWithServices(@Param("userId") int userId);
+
+    @Query(value = "SELECT b FROM Booking b LEFT JOIN FETCH b.services WHERE b.user.id = :userId",
+           countQuery = "SELECT COUNT(b) FROM Booking b WHERE b.user.id = :userId")
+    org.springframework.data.domain.Page<Booking> findByUserIdWithServices(@Param("userId") int userId, org.springframework.data.domain.Pageable pageable);
+
+    @Query(value = "SELECT b FROM Booking b LEFT JOIN FETCH b.services WHERE b.user.id = :userId AND b.status IN :statuses",
+           countQuery = "SELECT COUNT(b) FROM Booking b WHERE b.user.id = :userId AND b.status IN :statuses")
+    org.springframework.data.domain.Page<Booking> findByUserIdAndStatusInWithServices(@Param("userId") int userId, @Param("statuses") List<String> statuses, org.springframework.data.domain.Pageable pageable);
 
     @Query("SELECT DISTINCT b FROM Booking b LEFT JOIN FETCH b.services WHERE b.shop.id = :shopId")
     List<Booking> findByShopIdWithServices(@Param("shopId") int shopId);

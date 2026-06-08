@@ -2,12 +2,13 @@ package com.sang.sourcepattern.service;
 
 import com.sang.sourcepattern.dto.request.BookingCreationRequest;
 import com.sang.sourcepattern.dto.request.InitiatePaymentRequest;
+import com.sang.sourcepattern.dto.request.ShopCreateBookingRequest;
 import com.sang.sourcepattern.dto.response.BookingResponse;
 import com.sang.sourcepattern.dto.response.InitiatePaymentResponse;
 import com.sang.sourcepattern.dto.response.StaffResponse;
 
-import com.sang.sourcepattern.dto.response.PageResponse;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 
 public interface BookingService {
@@ -56,7 +57,6 @@ public interface BookingService {
 
     /** Get all bookings of the authenticated user */
     List<BookingResponse> getMyBookings(String userEmail);
-    PageResponse<BookingResponse> getMyBookingsPaged(String userEmail, int page);
 
     /** Get a single booking detail */
     BookingResponse getBookingById(int bookingId, String userEmail);
@@ -79,14 +79,13 @@ public interface BookingService {
      * Get active staff list for a shop with availability check.
      * If appointmentDatetime + durationMinutes provided, marks each staff as available/busy.
      */
-    List<StaffResponse> getShopStaffWithAvailability(int shopId, java.time.LocalDateTime appointmentDatetime, int durationMinutes);
+    List<StaffResponse> getShopStaffWithAvailability(int shopId, LocalDateTime appointmentDatetime, int durationMinutes);
 
     /** Get all bookings for a shop owner within a range */
-    List<BookingResponse> getShopBookings(String ownerEmail, java.time.LocalDateTime start, java.time.LocalDateTime end);
-    PageResponse<BookingResponse> getShopBookingsPaged(String ownerEmail, java.time.LocalDateTime start, java.time.LocalDateTime end, int page);
+    List<BookingResponse> getShopBookings(String ownerEmail, LocalDateTime start, LocalDateTime end);
 
     /** Check if pet is available for booking at a specific time */
-    boolean checkPetAvailability(int petId, java.time.LocalDateTime appointmentDatetime, int durationMinutes);
+    boolean checkPetAvailability(int petId, LocalDateTime appointmentDatetime, int durationMinutes);
 
     /**
      * Get available time slots for a shop on a specific date.
@@ -98,7 +97,7 @@ public interface BookingService {
      * @param durationMinutes duration of the service (used for conflict window + slot step)
      * @return list of LocalDateTime representing available slot start times
      */
-    List<java.time.LocalDateTime> getAvailableTimeSlots(int shopId, LocalDate date, int durationMinutes);
+    List<LocalDateTime> getAvailableTimeSlots(int shopId, LocalDate date, int durationMinutes);
 
     /**
      * Get available time slots for a shop on a specific date, given a list of service IDs.
@@ -114,7 +113,7 @@ public interface BookingService {
      * @param serviceIds list of service IDs the user wants to book
      * @return list of LocalDateTime representing available slot start times
      */
-    List<java.time.LocalDateTime> getAvailableTimeSlotsForServices(int shopId, LocalDate date, List<Integer> serviceIds);
+    List<LocalDateTime> getAvailableTimeSlotsForServices(int shopId, LocalDate date, List<Integer> serviceIds);
 
     /**
      * Shop xuất hóa đơn thủ công và gửi về email khách hàng.
@@ -128,5 +127,5 @@ public interface BookingService {
     /**
      * Shop tạo lịch hẹn trực tiếp cho khách.
      */
-    BookingResponse createBookingByShop(com.sang.sourcepattern.dto.request.ShopCreateBookingRequest request, String requesterEmail);
+    BookingResponse createBookingByShop(ShopCreateBookingRequest request, String requesterEmail);
 }
