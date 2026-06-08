@@ -53,8 +53,8 @@ public interface BookingService {
      */
     BookingResponse confirmCashDeposit(long orderCode, String userEmail);
 
-    /** Get all bookings of the authenticated user */
-    List<BookingResponse> getMyBookings(String userEmail);
+    /** Get all bookings of the authenticated user (paginated) */
+    com.sang.sourcepattern.dto.response.PageResponse<BookingResponse> getMyBookings(String userEmail, int page, int size, String status);
 
     /** Get a single booking detail */
     BookingResponse getBookingById(int bookingId, String userEmail);

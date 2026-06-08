@@ -1202,10 +1202,40 @@ public class BookingServiceImpl implements BookingService {
     // ─── Queries ──────────────────────────────────────────────────────────────
 
     @Override
-    public List<BookingResponse> getMyBookings(String userEmail) {
+    public com.sang.sourcepattern.dto.response.PageResponse<BookingResponse> getMyBookings(String userEmail, int page, int size, String status) {
         User user = resolveUser(userEmail);
-        return bookingRepository.findByUserIdWithServices(user.getId())
-                .stream().map(this::toResponse).collect(Collectors.toList());
+        org.springframework.data.domain.Pageable pageable = org.springframework.data.domain.PageRequest.of(page - 1, size, org.springframework.data.domain.Sort.by(org.springframework.data.domain.Sort.Direction.DESC, "createdAt"));
+        org.springframework.data.domain.Page<Booking> pageData;
+
+        if (status == null || status.isBlank() || "all".equalsIgnoreCase(status)) {
+            pageData = bookingRepository.findByUserIdWithServices(user.getId(), pageable);
+        } else {
+            List<String> statuses;
+            if ("upcoming".equalsIgnoreCase(status)) {
+                statuses = List.of("CONFIRMED", "WAITING_SHOP_APPROVAL", "PENDING_PAYMENT");
+                pageData = bookingRepository.findByUserIdAndStatusInWithServices(user.getId(), statuses, pageable);
+            } else if ("active".equalsIgnoreCase(status)) {
+                statuses = List.of("IN_PROGRESS");
+                pageData = bookingRepository.findByUserIdAndStatusInWithServices(user.getId(), statuses, pageable);
+            } else if ("completed".equalsIgnoreCase(status)) {
+                statuses = List.of("COMPLETED");
+                pageData = bookingRepository.findByUserIdAndStatusInWithServices(user.getId(), statuses, pageable);
+            } else if ("cancelled".equalsIgnoreCase(status)) {
+                statuses = List.of("CANCELLED", "WAITING_REFUND", "CANCEL_REQUESTED");
+                pageData = bookingRepository.findByUserIdAndStatusInWithServices(user.getId(), statuses, pageable);
+            } else {
+                pageData = bookingRepository.findByUserIdWithServices(user.getId(), pageable);
+            }
+        }
+
+        return com.sang.sourcepattern.dto.response.PageResponse.<BookingResponse>builder()
+                .content(pageData.getContent().stream().map(this::toResponse).collect(Collectors.toList()))
+                .page(pageData.getNumber() + 1)
+                .size(pageData.getSize())
+                .totalElements(pageData.getTotalElements())
+                .totalPages(pageData.getTotalPages())
+                .last(pageData.isLast())
+                .build();
     }
 
     @Override
