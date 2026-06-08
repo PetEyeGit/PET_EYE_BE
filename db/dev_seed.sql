@@ -344,3 +344,17 @@ INSERT INTO payment (id, booking_id, amount, method, status, description, paymen
 -- ============================================================
 INSERT INTO boarding_detail (id, booking_id, cage_id, check_in, check_out) VALUES
 (1, 8, 3, DATE_ADD(CURDATE(), INTERVAL 1 DAY) + INTERVAL 10 HOUR, DATE_ADD(CURDATE(), INTERVAL 2 DAY) + INTERVAL 10 HOUR);
+
+-- Booking 10: CONFIRMED - Để test luồng Shop Hủy lịch (đã thanh toán PAYOS)
+INSERT INTO booking (id, user_id, shop_id, pet_id, staff_id, appointment_datetime, status, note, created_at, created_by) VALUES
+(10, 3, 1, 1, 1,
+ DATE_ADD(CURDATE(), INTERVAL 3 DAY) + INTERVAL 9 HOUR,
+ 'CONFIRMED',
+ 'Booking để test Shop Hủy Lịch -> Hoàn tiền',
+ NOW(), 'USER');
+
+INSERT INTO booking_services (booking_id, service_id) VALUES
+(10, 1);
+
+INSERT INTO payment (id, booking_id, amount, method, status, description, payment_time) VALUES
+(2, 10, 150000.00, 'PAYOS', 'SUCCESS', 'Test Payment for shop cancel refund flow', NOW());

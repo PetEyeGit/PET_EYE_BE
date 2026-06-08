@@ -187,7 +187,7 @@ public class AdminController {
 
         // Build map month -> revenue từ query
         Map<Integer, BigDecimal> revenueMap = new java.util.HashMap<>();
-        for (Object[] row : bookingRepository.revenueByMonth(targetYear)) {
+        for (Object[] row : bookingRepository.adminCommissionByMonth(targetYear)) {
             int month = ((Number) row[0]).intValue();
             BigDecimal revenue = new BigDecimal(row[1].toString());
             revenueMap.put(month, revenue);

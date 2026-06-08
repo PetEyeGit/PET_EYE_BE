@@ -413,10 +413,12 @@ public class WalletServiceImpl implements WalletService {
                             .bankName(b.getBankName())
                             .bankAccount(b.getBankAccount())
                             .accountHolder(b.getAccountHolder())
-                            .note("Lý do huỷ: " + b.getNote())
+                            .note("Lý do huỷ: " + (b.getCancellationReason() != null ? b.getCancellationReason() : (b.getNote() != null ? b.getNote() : "Không có lý do")))
                             .status("PENDING") // Map WAITING_REFUND to PENDING so UI shows it in pending tab
                             .createdAt(b.getUpdatedAt() != null ? b.getUpdatedAt().format(FMT) : "")
                             .type("REFUND")
+                            .userId(b.getUser() != null ? b.getUser().getId() : null)
+                            .userEmail(b.getUser() != null ? b.getUser().getEmail() : null)
                             .build();
                 })
                 .collect(Collectors.toList());

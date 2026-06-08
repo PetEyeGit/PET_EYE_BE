@@ -154,6 +154,27 @@ public class ChatController {
         ));
     }
 
+    /** REST - Send a message directly (used for system messages like requesting bank info) */
+    @PostMapping("/chat/send")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ApiResponse<ChatMessageResponse> sendRestMessage(@RequestBody ChatMessageRequest request, @AuthenticationPrincipal Jwt jwt) {
+        String senderEmail = jwt.getClaimAsString("email") != null ? jwt.getClaimAsString("email") : jwt.getSubject();
+        
+        Message message = messageRepository.save(Message.builder()
+                .shopId(request.getShopId())
+                .channelType(request.getChannelType() != null ? request.getChannelType() : "ADMIN_SUPPORT")
+                .senderEmail(senderEmail)
+                .recipientEmail(request.getRecipientEmail())
+                .targetId(request.getTargetId())
+                .senderRole("ADMIN")
+                .content(request.getContent())
+                .build());
+
+        String destination = "/topic/chat/" + request.getShopId() + "/" + message.getChannelType();
+        messagingTemplate.convertAndSend(destination, toResponse(message));
+        return ApiResponse.<ChatMessageResponse>builder().result(toResponse(message)).build();
+    }
+
     /** REST — lấy lịch sử chat */
     @GetMapping("/chat/{shopId}/history")
     @PreAuthorize("hasRole('ADMIN') or hasRole('SHOP_OWNER') or hasRole('STAFF') or hasRole('USER')")

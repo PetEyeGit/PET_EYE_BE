@@ -202,6 +202,18 @@ public class ShopServiceImpl implements ShopService {
                 .build();
     }
 
+    private java.math.BigDecimal calculateShopRevenueForBooking(Booking b) {
+        if (b.getServices() == null || b.getServices().isEmpty()) return java.math.BigDecimal.ZERO;
+        return b.getServices().stream().map(s -> {
+            if (s.getPrice() == null) return java.math.BigDecimal.ZERO;
+            String cat = s.getCategory() != null ? s.getCategory().toLowerCase() : "";
+            double multiplier = 0.90;
+            if (cat.contains("grooming") || cat.contains("spa")) multiplier = 0.82;
+            else if ((cat.contains("boarding") || cat.contains("hotel")) && s.isCameraEnabled()) multiplier = 0.75;
+            return s.getPrice().multiply(new java.math.BigDecimal(String.valueOf(multiplier)));
+        }).reduce(java.math.BigDecimal.ZERO, java.math.BigDecimal::add);
+    }
+
     @Override
     public ShopDashboardResponse getShopDashboard(String ownerEmail, java.time.LocalDate startDate, java.time.LocalDate endDate) {
         Shop shop = shopRepository.findByOwnerEmail(ownerEmail)
@@ -229,7 +241,7 @@ public class ShopServiceImpl implements ShopService {
 
         java.math.BigDecimal totalRevenue = allBookings.stream()
                 .filter(b -> "COMPLETED".equals(b.getStatus()))
-                .map(b -> b.getServices() != null ? b.getServices().stream().map(s -> s.getPrice() != null ? s.getPrice() : java.math.BigDecimal.ZERO).reduce(java.math.BigDecimal.ZERO, java.math.BigDecimal::add) : java.math.BigDecimal.ZERO)
+                .map(this::calculateShopRevenueForBooking)
                 .reduce(java.math.BigDecimal.ZERO, java.math.BigDecimal::add)
                 .subtract(totalRefunds);
 
@@ -279,7 +291,7 @@ public class ShopServiceImpl implements ShopService {
 
         java.math.BigDecimal revenueInPeriod = periodBookingsList.stream()
                 .filter(b -> "COMPLETED".equals(b.getStatus()))
-                .map(b -> b.getServices() != null ? b.getServices().stream().map(s -> s.getPrice() != null ? s.getPrice() : java.math.BigDecimal.ZERO).reduce(java.math.BigDecimal.ZERO, java.math.BigDecimal::add) : java.math.BigDecimal.ZERO)
+                .map(this::calculateShopRevenueForBooking)
                 .reduce(java.math.BigDecimal.ZERO, java.math.BigDecimal::add)
                 .subtract(refundsInPeriod);
 
@@ -301,7 +313,7 @@ public class ShopServiceImpl implements ShopService {
                 java.math.BigDecimal monthAmount = allBookings.stream()
                         .filter(b -> "COMPLETED".equals(b.getStatus()))
                         .filter(b -> b.getAppointmentDatetime() != null && b.getAppointmentDatetime().toLocalDate().withDayOfMonth(1).equals(loopMonth))
-                        .map(b -> b.getServices() != null ? b.getServices().stream().map(s -> s.getPrice() != null ? s.getPrice() : java.math.BigDecimal.ZERO).reduce(java.math.BigDecimal.ZERO, java.math.BigDecimal::add) : java.math.BigDecimal.ZERO)
+                        .map(this::calculateShopRevenueForBooking)
                         .reduce(java.math.BigDecimal.ZERO, java.math.BigDecimal::add);
                 
                 java.math.BigDecimal monthRefunds = shopTxns.stream()
@@ -320,7 +332,7 @@ public class ShopServiceImpl implements ShopService {
                 java.math.BigDecimal dayAmount = allBookings.stream()
                         .filter(b -> "COMPLETED".equals(b.getStatus()))
                         .filter(b -> b.getAppointmentDatetime() != null && b.getAppointmentDatetime().toLocalDate().equals(loopDate))
-                        .map(b -> b.getServices() != null ? b.getServices().stream().map(s -> s.getPrice() != null ? s.getPrice() : java.math.BigDecimal.ZERO).reduce(java.math.BigDecimal.ZERO, java.math.BigDecimal::add) : java.math.BigDecimal.ZERO)
+                        .map(this::calculateShopRevenueForBooking)
                         .reduce(java.math.BigDecimal.ZERO, java.math.BigDecimal::add);
                 
                 java.math.BigDecimal dayRefunds = shopTxns.stream()
@@ -362,7 +374,7 @@ public class ShopServiceImpl implements ShopService {
         java.math.BigDecimal revenuePrevPeriod = allBookings.stream()
                 .filter(b -> "COMPLETED".equals(b.getStatus()))
                 .filter(b -> b.getAppointmentDatetime() != null && b.getAppointmentDatetime().isAfter(prevStart) && b.getAppointmentDatetime().isBefore(prevEnd))
-                .map(b -> b.getServices() != null ? b.getServices().stream().map(s -> s.getPrice() != null ? s.getPrice() : java.math.BigDecimal.ZERO).reduce(java.math.BigDecimal.ZERO, java.math.BigDecimal::add) : java.math.BigDecimal.ZERO)
+                .map(this::calculateShopRevenueForBooking)
                 .reduce(java.math.BigDecimal.ZERO, java.math.BigDecimal::add)
                 .subtract(refundsPrevPeriod);
 

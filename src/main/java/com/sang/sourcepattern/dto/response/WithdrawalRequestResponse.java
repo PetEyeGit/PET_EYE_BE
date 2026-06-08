@@ -26,4 +26,6 @@ public class WithdrawalRequestResponse {
     String createdAt;
     String processedAt;
     String type;
+    Integer userId;
+    String userEmail;
 }
