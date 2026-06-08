@@ -69,6 +69,7 @@ public class Booking {
 
     String cancellationReason;
     LocalDateTime cancellationRequestedAt;
+    java.math.BigDecimal refundAmount;
     String bankName;
     String bankAccount;
     String accountHolder;

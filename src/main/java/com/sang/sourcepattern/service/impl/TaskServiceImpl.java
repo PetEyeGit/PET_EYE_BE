@@ -55,6 +55,14 @@ public class TaskServiceImpl implements TaskService {
     PaymentRepository paymentRepository;
     TransactionRepository transactionRepository;
     com.sang.sourcepattern.service.EmailService emailService;
+    org.springframework.messaging.simp.SimpMessagingTemplate messagingTemplate;
+
+    private void sendBookingUpdateEvent(Integer shopId, Integer bookingId) {
+        if (shopId != null && messagingTemplate != null) {
+            messagingTemplate.convertAndSend("/topic/shop/" + shopId + "/notifications", 
+                java.util.Map.of("message", "BOOKING_UPDATED", "bookingId", bookingId));
+        }
+    }
 
     // Valid status transition chain for Staff
     private static final Set<String> VALID_STATUSES = Set.of("CONFIRMED", "IN_PROGRESS", "COMPLETED", "CANCELLED", "CANCEL_REQUESTED");
@@ -601,6 +609,7 @@ public class TaskServiceImpl implements TaskService {
             booking.setRtspLink(request.getRtspLink());
         }
         bookingRepository.save(booking);
+        sendBookingUpdateEvent(booking.getShop().getId(), bookingId);
         log.info("Requester {} updated booking {} status: {} → {}", requesterEmail, bookingId, current, newStatus);
 
         // --- Notifications cho User ---
@@ -841,6 +850,7 @@ public class TaskServiceImpl implements TaskService {
             // Khách trả 100% -> Chờ hoàn tiền
             booking.setStatus("WAITING_REFUND");
             bookingRepository.save(booking);
+            sendBookingUpdateEvent(booking.getShop().getId(), bookingId);
 
             if (payment != null) {
                 payment.setStatus("WAITING_REFUND");
@@ -918,6 +928,7 @@ public class TaskServiceImpl implements TaskService {
             // Khách trả CASH_DEPOSIT -> Hủy luôn
             booking.setStatus("CANCELLED");
             bookingRepository.save(booking);
+            sendBookingUpdateEvent(booking.getShop().getId(), bookingId);
 
             if (payment != null) {
                 payment.setStatus("NO_SHOW_PENALTY");

@@ -43,6 +43,14 @@ public class WalletServiceImpl implements WalletService {
     PayOSService                payOSService;
     com.sang.sourcepattern.service.CameraService cameraService;
     ServiceRepository           serviceRepository;
+    org.springframework.messaging.simp.SimpMessagingTemplate messagingTemplate;
+
+    private void sendBookingUpdateEvent(Integer shopId, Integer bookingId) {
+        if (shopId != null && messagingTemplate != null) {
+            messagingTemplate.convertAndSend("/topic/shop/" + shopId + "/notifications",
+                java.util.Map.of("message", "BOOKING_UPDATED", "bookingId", bookingId));
+        }
+    }
 
     /** Phí admin: 10% */
     @NonFinal
@@ -401,9 +409,7 @@ public class WalletServiceImpl implements WalletService {
         return bookingRepository.findByStatusWithServices("WAITING_REFUND")
                 .stream()
                 .map(b -> {
-                    BigDecimal refundAmount = (b.getServices() != null && !b.getServices().isEmpty())
-                            ? b.getServices().stream().map(s -> s.getPrice() != null ? s.getPrice() : BigDecimal.ZERO).reduce(BigDecimal.ZERO, BigDecimal::add)
-                            : BigDecimal.ZERO;
+                    BigDecimal refundAmount = b.getRefundAmount() != null ? b.getRefundAmount() : BigDecimal.ZERO;
                     
                     return WithdrawalRequestResponse.builder()
                             .id(b.getId()) // use booking id
@@ -633,9 +639,7 @@ public class WalletServiceImpl implements WalletService {
             throw new AppException(ErrorCode.BOOKING_CANCELLED);
         }
 
-        BigDecimal refundAmount = (booking.getServices() != null && !booking.getServices().isEmpty())
-                ? booking.getServices().stream().map(s -> s.getPrice() != null ? s.getPrice() : BigDecimal.ZERO).reduce(BigDecimal.ZERO, BigDecimal::add)
-                : BigDecimal.ZERO;
+        BigDecimal refundAmount = booking.getRefundAmount() != null ? booking.getRefundAmount() : BigDecimal.ZERO;
         if (refundAmount.compareTo(BigDecimal.ZERO) <= 0) {
             throw new AppException(ErrorCode.INVALID_REQUEST);
         }
@@ -662,9 +666,7 @@ public class WalletServiceImpl implements WalletService {
             booking.setStatus("CANCELLED");
             bookingRepository.save(booking);
             cameraService.stopStream(bookingId);
-            
-            // Optionally, we could send a notification to the user that their refund is complete
-            // But the requirement only specified the notification at the time of shop approval.
+            sendBookingUpdateEvent(booking.getShop().getId(), bookingId);
         }
 
         log.info("Refund for booking {} processed — shop={} amount={}", bookingId, booking.getShop().getShopName(), refundAmount);

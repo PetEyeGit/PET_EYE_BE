@@ -1263,6 +1263,7 @@ public class BookingServiceImpl implements BookingService {
             booking.setStatus("CANCELLED");
         }
         bookingRepository.save(booking);
+        sendBookingUpdateEvent(booking.getShop().getId(), bookingId);
 
         if (wasCancelRequested) {
             List<User> admins = userRepository.findByRoleName("ADMIN");
@@ -1299,6 +1300,9 @@ public class BookingServiceImpl implements BookingService {
             if (refundAmount.compareTo(BigDecimal.ZERO) < 0) {
                 refundAmount = BigDecimal.ZERO;
             }
+
+            booking.setRefundAmount(refundAmount);
+            bookingRepository.save(booking);
 
             String amountText = NumberFormat.getCurrencyInstance(new Locale("vi", "VN")).format(refundAmount);
             String content = String.format("Đơn hủy lịch #%d đã được chấp nhận. Vui lòng hoàn tiền cho khách hàng %s về: %s. Số tiền: %s.",
@@ -1401,6 +1405,7 @@ public class BookingServiceImpl implements BookingService {
         booking.setBankAccount(bankAccount);
         booking.setAccountHolder(accountHolder);
         bookingRepository.save(booking);
+        sendBookingUpdateEvent(booking.getShop().getId(), bookingId);
 
         log.info("Booking {} CANCEL REQUESTED by {}", bookingId, userEmail);
         return toResponse(booking);
@@ -1434,20 +1439,27 @@ public class BookingServiceImpl implements BookingService {
             throw new AppException(ErrorCode.INVALID_REQUEST);
         }
 
+        // Calculate penalty and refund
+        BigDecimal penalty = BigDecimal.ZERO;
+        BigDecimal refundAmount = BigDecimal.ZERO;
+        Payment payment = paymentRepository.findByBookingId(bookingId).orElse(null);
+        if (payment != null && "SUCCESS".equals(payment.getStatus())) {
+            refundAmount = payment.getAmount();
+            List<Integer> serviceIds = booking.getServices().stream()
+                    .map(com.sang.sourcepattern.entity.Service::getId)
+                    .collect(Collectors.toList());
+            penalty = walletService.calculateAdminCommission(serviceIds);
+        }
+
         // Shop cancels booking:
         // Set to WAITING_REFUND so Admin can refund user.
         booking.setStatus("WAITING_REFUND");
         booking.setCancellationReason(reason);
+        booking.setRefundAmount(refundAmount);
         bookingRepository.save(booking);
+        sendBookingUpdateEvent(booking.getShop().getId(), bookingId);
 
         cameraService.stopStream(bookingId);
-
-        // Calculate penalty (deposit amount)
-        BigDecimal penalty = BigDecimal.ZERO;
-        Payment payment = paymentRepository.findByBookingId(bookingId).orElse(null);
-        if (payment != null && "SUCCESS".equals(payment.getStatus())) {
-            penalty = payment.getAmount();
-        }
 
         // Deduct penalty from shop
         if (penalty.compareTo(BigDecimal.ZERO) > 0) {
@@ -1457,7 +1469,7 @@ public class BookingServiceImpl implements BookingService {
         // Notify Admin to refund User
         List<User> admins = userRepository.findByRoleName("ADMIN");
         String broadcastId = UUID.randomUUID().toString();
-        String amountText = NumberFormat.getCurrencyInstance(new Locale("vi", "VN")).format(penalty);
+        String amountText = NumberFormat.getCurrencyInstance(new Locale("vi", "VN")).format(refundAmount);
         String content = String.format("Shop %s đã chủ động hủy đơn #%d. Vui lòng hoàn lại toàn bộ số tiền %s cho khách hàng %s. Shop đã bị trừ phí phạt mất cọc.",
                 shop.getShopName(),
                 bookingId,
@@ -2061,5 +2073,12 @@ public class BookingServiceImpl implements BookingService {
         log.info("Booking {} CONFIRMED (Created by Shop) — customer={}", booking.getId(), customer.getEmail());
 
         return toResponse(booking);
+    }
+
+    private void sendBookingUpdateEvent(Integer shopId, Integer bookingId) {
+        if (shopId != null && messagingTemplate != null) {
+            messagingTemplate.convertAndSend("/topic/shop/" + shopId + "/notifications", 
+                java.util.Map.of("message", "BOOKING_UPDATED", "bookingId", bookingId));
+        }
     }
 }
