@@ -88,7 +88,7 @@ public interface WalletService {
     void confirmRefundForBooking(int bookingId);
 
     /** Cộng tiền bồi thường cho Shop khi khách hàng bị phạt (e.g., LATE_NO_SHOW). */
-    void creditShopPenalty(int bookingId, BigDecimal penaltyAmount);
+    void creditShopPenalty(int bookingId, BigDecimal penaltyAmount, String reason);
 
     /** Trừ tiền phạt của Shop (Shop hủy lịch), trừ trực tiếp vào availableBalance và totalEarned */
     void deductShopPenalty(int shopId, BigDecimal amount, int bookingId);

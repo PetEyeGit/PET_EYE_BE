@@ -870,7 +870,7 @@ public class TaskServiceImpl implements TaskService {
             if (refundAmount.compareTo(BigDecimal.ZERO) < 0) refundAmount = BigDecimal.ZERO;
 
             // Cộng ngay 30% vào ví Shop
-            walletService.creditShopPenalty(bookingId, shopPenalty);
+            walletService.creditShopPenalty(bookingId, shopPenalty, "No-show");
 
             // Ghi Transaction
             transactionRepository.findByBookingIdOrderByCreatedAtDesc(bookingId)

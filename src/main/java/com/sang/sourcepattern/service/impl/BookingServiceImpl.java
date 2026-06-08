@@ -1295,6 +1295,9 @@ public class BookingServiceImpl implements BookingService {
                 // Hủy sau 5 tiếng: Mất cọc + mất 50% tiền thiệt hại cho shop
                 BigDecimal penalty = totalPrice.multiply(new BigDecimal("0.5"));
                 refundAmount = totalPrice.subtract(deposit).subtract(penalty);
+                
+                // Cộng tiền bồi thường này vào ví Shop
+                walletService.creditShopPenalty(bookingId, penalty, "hủy muộn");
             }
             
             if (refundAmount.compareTo(BigDecimal.ZERO) < 0) {

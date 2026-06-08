@@ -1,6 +1,7 @@
 package com.sang.sourcepattern.controller;
 
 import com.sang.sourcepattern.dto.response.ApiResponse;
+import com.sang.sourcepattern.dto.response.PageResponse;
 import com.sang.sourcepattern.dto.response.TransactionResponse;
 import com.sang.sourcepattern.service.TransactionService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -13,6 +14,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -26,12 +28,27 @@ public class TransactionController {
 
     TransactionService transactionService;
 
-    @GetMapping("/my")
+    @GetMapping("/customer")
     @PreAuthorize("hasRole('USER')")
     @Operation(summary = "Lấy lịch sử giao dịch của khách hàng")
-    public ApiResponse<List<TransactionResponse>> getMyTransactions(@AuthenticationPrincipal Jwt jwt) {
-        return ApiResponse.<List<TransactionResponse>>builder()
-                .result(transactionService.getMyTransactions(jwt.getClaim("email")))
+    public ApiResponse<PageResponse<TransactionResponse>> getCustomerTransactions(
+            @AuthenticationPrincipal Jwt jwt,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        return ApiResponse.<PageResponse<TransactionResponse>>builder()
+                .result(transactionService.getCustomerTransactions(jwt.getClaim("email"), page, size))
+                .build();
+    }
+
+    @GetMapping("/shop")
+    @PreAuthorize("hasRole('SHOP_OWNER')")
+    @Operation(summary = "Lấy lịch sử biến động số dư của shop")
+    public ApiResponse<PageResponse<TransactionResponse>> getShopTransactions(
+            @AuthenticationPrincipal Jwt jwt,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        return ApiResponse.<PageResponse<TransactionResponse>>builder()
+                .result(transactionService.getShopTransactions(jwt.getClaim("email"), page, size))
                 .build();
     }
 }

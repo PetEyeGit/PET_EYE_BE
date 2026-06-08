@@ -674,7 +674,7 @@ public class WalletServiceImpl implements WalletService {
 
     @Override
     @Transactional
-    public void creditShopPenalty(int bookingId, BigDecimal penaltyAmount) {
+    public void creditShopPenalty(int bookingId, BigDecimal penaltyAmount, String reason) {
         Booking booking = bookingRepository.findById(bookingId)
                 .orElseThrow(() -> new AppException(ErrorCode.BOOKING_NOT_FOUND));
 
@@ -693,8 +693,7 @@ public class WalletServiceImpl implements WalletService {
                 .shop(booking.getShop())
                 .type("WALLET_CREDIT")
                 .amount(penaltyAmount)
-                .status("SUCCESS")
-                .description(String.format("Tiền bồi thường do khách hàng No-show đơn #%d", bookingId))
+                .description(String.format("Tiền bồi thường do khách hàng %s đơn #%d", reason, bookingId))
                 .completedAt(LocalDateTime.now())
                 .build());
 
