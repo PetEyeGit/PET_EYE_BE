@@ -24,10 +24,16 @@ public class TierUpgradeServiceImpl implements TierUpgradeService {
     MembershipTierRepository membershipTierRepository;
     VoucherRepository voucherRepository;
     UserVoucherRepository userVoucherRepository;
+    com.sang.sourcepattern.service.SystemConfigService systemConfigService;
 
     @Override
     @Transactional
     public void processTierUpgrade(User user) {
+        if (!systemConfigService.isVoucherServiceEnabled()) {
+            log.info("Tier upgrade skipped for user {} because voucher/tier service is globally disabled.", user.getEmail());
+            return;
+        }
+
         // 1. Calculate total spending from COMPLETED bookings
         List<Booking> completedBookings = bookingRepository.findByUserId(user.getId())
                 .stream()
