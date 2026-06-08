@@ -413,10 +413,12 @@ public class WalletServiceImpl implements WalletService {
                             .bankName(b.getBankName())
                             .bankAccount(b.getBankAccount())
                             .accountHolder(b.getAccountHolder())
-                            .note("Lý do huỷ: " + b.getNote())
+                            .note("Lý do huỷ: " + (b.getCancellationReason() != null ? b.getCancellationReason() : (b.getNote() != null ? b.getNote() : "Không có lý do")))
                             .status("PENDING") // Map WAITING_REFUND to PENDING so UI shows it in pending tab
                             .createdAt(b.getUpdatedAt() != null ? b.getUpdatedAt().format(FMT) : "")
                             .type("REFUND")
+                            .userId(b.getUser() != null ? b.getUser().getId() : null)
+                            .userEmail(b.getUser() != null ? b.getUser().getEmail() : null)
                             .build();
                 })
                 .collect(Collectors.toList());
@@ -696,6 +698,36 @@ public class WalletServiceImpl implements WalletService {
 
         log.info("Credited NO_SHOW penalty to Shop {} for booking {} - Amount: {}", 
                 booking.getShop().getShopName(), bookingId, penaltyAmount);
+    }
+
+    @Override
+    @Transactional
+    public void deductShopPenalty(int shopId, BigDecimal amount, int bookingId) {
+        if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
+            return;
+        }
+
+        Shop shop = shopRepository.findById(shopId)
+                .orElseThrow(() -> new AppException(ErrorCode.SHOP_NOT_FOUND));
+
+        ShopWallet wallet = getOrCreateWallet(shop);
+        
+        wallet.setAvailableBalance(safe(wallet.getAvailableBalance()).subtract(amount));
+        wallet.setTotalEarned(safe(wallet.getTotalEarned()).subtract(amount));
+        wallet.setUpdatedAt(LocalDateTime.now());
+        walletRepository.save(wallet);
+
+        transactionRepository.save(Transaction.builder()
+                .shop(shop)
+                .type("PENALTY")
+                .amount(amount)
+                .status("SUCCESS")
+                .description(String.format("Phí phạt mất cọc do Shop tự hủy đơn #%d", bookingId))
+                .completedAt(LocalDateTime.now())
+                .build());
+
+        log.info("Deducted PENALTY from Shop {} for booking {} - Amount: {}", 
+                shop.getShopName(), bookingId, amount);
     }
 
     @Override

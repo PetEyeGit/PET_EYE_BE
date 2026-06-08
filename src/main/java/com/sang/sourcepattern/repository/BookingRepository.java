@@ -44,8 +44,18 @@ public interface BookingRepository extends JpaRepository<Booking, Integer> {
     @Query("SELECT DISTINCT b FROM Booking b LEFT JOIN FETCH b.services WHERE b.status = :status")
     List<Booking> findByStatusWithServices(@Param("status") String status);
 
-    /** Tong doanh thu toan he thong tu bookings (CONFIRMED / IN_PROGRESS / COMPLETED) */
-    @Query("SELECT COALESCE(SUM(s.price), 0) FROM Booking b JOIN b.services s WHERE b.status IN ('CONFIRMED', 'IN_PROGRESS', 'COMPLETED')")
+    /** Tong doanh thu hoa hong cua Admin tu bookings (CONFIRMED / IN_PROGRESS / COMPLETED) */
+    @Query("""
+        SELECT COALESCE(SUM(
+            s.price * (
+                CASE 
+                    WHEN (LOWER(s.category) LIKE '%grooming%' OR LOWER(s.category) LIKE '%spa%') THEN 0.18
+                    WHEN (LOWER(s.category) LIKE '%boarding%' OR LOWER(s.category) LIKE '%hotel%') AND s.cameraEnabled = true THEN 0.25
+                    ELSE 0.10
+                END
+            )
+        ), 0) FROM Booking b JOIN b.services s WHERE b.status IN ('CONFIRMED', 'IN_PROGRESS', 'COMPLETED')
+    """)
     BigDecimal sumTotalRevenue();
 
     @Query("SELECT DISTINCT b FROM Booking b LEFT JOIN FETCH b.services WHERE b.status = 'COMPLETED'")
@@ -66,7 +76,17 @@ public interface BookingRepository extends JpaRepository<Booking, Integer> {
     @Query("SELECT DISTINCT b FROM Booking b LEFT JOIN FETCH b.services WHERE b.status = :status AND b.isReminderSent = false AND b.appointmentDatetime BETWEEN :start AND :end")
     List<Booking> findBookingsForReminder(@Param("status") String status, @Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
 
-    @Query("SELECT COALESCE(SUM(s.price), 0) FROM Booking b JOIN b.services s WHERE b.status IN ('CONFIRMED', 'IN_PROGRESS', 'COMPLETED') AND b.appointmentDatetime BETWEEN :start AND :end")
+    @Query("""
+        SELECT COALESCE(SUM(
+            s.price * (
+                CASE 
+                    WHEN (LOWER(s.category) LIKE '%grooming%' OR LOWER(s.category) LIKE '%spa%') THEN 0.18
+                    WHEN (LOWER(s.category) LIKE '%boarding%' OR LOWER(s.category) LIKE '%hotel%') AND s.cameraEnabled = true THEN 0.25
+                    ELSE 0.10
+                END
+            )
+        ), 0) FROM Booking b JOIN b.services s WHERE b.status IN ('CONFIRMED', 'IN_PROGRESS', 'COMPLETED') AND b.appointmentDatetime BETWEEN :start AND :end
+    """)
     BigDecimal sumRevenueBetween(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
 
     @Query("SELECT COUNT(b) FROM Booking b WHERE b.status != 'CANCELLED' AND b.appointmentDatetime BETWEEN :start AND :end")
@@ -91,6 +111,25 @@ public interface BookingRepository extends JpaRepository<Booking, Integer> {
         GROUP BY MONTH(b.appointmentDatetime)
     """)
     List<Object[]> revenueByMonth(@Param("year") int year);
+
+    /** Doanh thu theo thang trong nam cho Admin (chi tinh hoa hong) cho booking COMPLETED */
+    @Query("""
+        SELECT MONTH(b.appointmentDatetime),
+               COALESCE(SUM(
+                   s.price * (
+                       CASE 
+                           WHEN (LOWER(s.category) LIKE '%grooming%' OR LOWER(s.category) LIKE '%spa%') THEN 0.18
+                           WHEN (LOWER(s.category) LIKE '%boarding%' OR LOWER(s.category) LIKE '%hotel%') AND s.cameraEnabled = true THEN 0.25
+                           ELSE 0.10
+                       END
+                   )
+               ), 0)
+        FROM Booking b JOIN b.services s
+        WHERE b.status = 'COMPLETED'
+          AND YEAR(b.appointmentDatetime) = :year
+        GROUP BY MONTH(b.appointmentDatetime)
+    """)
+    List<Object[]> adminCommissionByMonth(@Param("year") int year);
 
     /** Số booking theo ngày trong khoảng thời gian, bỏ CANCELLED */
     @Query("""

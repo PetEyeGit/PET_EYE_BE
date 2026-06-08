@@ -37,6 +37,7 @@ public class BookingResponse {
     String accountHolder;
     Long payosOrderCode;
     LocalDateTime createdAt;
+    LocalDateTime updatedAt;
     LocalDateTime serviceStartDatetime;
     LocalDateTime serviceEndDatetime;
 
@@ -44,6 +45,7 @@ public class BookingResponse {
     String checkoutUrl;
     String paymentStatus;
     String paymentMethod;
+    BigDecimal paidAmount;
 
     String cameraRtspUrl;
     String cameraStreamUrl;
@@ -69,6 +71,7 @@ public class BookingResponse {
         String serviceName;
         BigDecimal servicePrice;
         String category;
+        int durationMinutes;
     }
     java.util.List<BookingServiceDto> services;
 }

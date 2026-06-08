@@ -3,6 +3,7 @@ package com.sang.sourcepattern.controller;
 import com.sang.sourcepattern.dto.request.BookingCreationRequest;
 import com.sang.sourcepattern.dto.request.CancelBookingRequest;
 import com.sang.sourcepattern.dto.request.InitiatePaymentRequest;
+import com.sang.sourcepattern.dto.request.ShopCancelBookingRequest;
 import com.sang.sourcepattern.dto.response.ApiResponse;
 import com.sang.sourcepattern.dto.response.BookingResponse;
 import com.sang.sourcepattern.dto.response.InitiatePaymentResponse;
@@ -162,6 +163,24 @@ public class BookingController {
         return ApiResponse.<BookingResponse>builder()
                 .result(bookingService.cancelBooking(id, jwt.getClaim("email")))
                 .message("Booking cancelled")
+                .build();
+    }
+
+    @PostMapping("/{id}/shop-cancel")
+    @PreAuthorize("hasAnyRole('SHOP_OWNER', 'STAFF')")
+    @Operation(summary = "Shop proactively cancels a booking")
+    public ApiResponse<BookingResponse> shopCancelBooking(
+            @PathVariable int id,
+            @RequestBody @Valid ShopCancelBookingRequest request,
+            @AuthenticationPrincipal Jwt jwt) {
+
+        return ApiResponse.<BookingResponse>builder()
+                .result(bookingService.shopCancelBooking(
+                        id,
+                        request.getReason(),
+                        jwt.getClaim("email")
+                ))
+                .message("Booking cancelled by shop")
                 .build();
     }
 
