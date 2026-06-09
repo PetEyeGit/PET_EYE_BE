@@ -134,7 +134,7 @@ public class BookingController {
 
     @GetMapping("/my")
     @PreAuthorize("hasRole('USER')")
-    @Operation(summary = "Get all bookings of the authenticated user (paginated)")
+    @Operation(summary = "Get bookings of the authenticated user (paginated, 10 per page). status: all | upcoming | active | completed | cancelled")
     public ApiResponse<com.sang.sourcepattern.dto.response.PageResponse<BookingResponse>> getMyBookings(
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "10") int size,
@@ -142,17 +142,6 @@ public class BookingController {
             @AuthenticationPrincipal Jwt jwt) {
         return ApiResponse.<com.sang.sourcepattern.dto.response.PageResponse<BookingResponse>>builder()
                 .result(bookingService.getMyBookings(jwt.getClaim("email"), page, size, status))
-                .build();
-    }
-
-    @GetMapping("/my/paged")
-    @PreAuthorize("hasRole('USER')")
-    @Operation(summary = "Get bookings of the authenticated user (paginated, 10 per page)")
-    public ApiResponse<com.sang.sourcepattern.dto.response.PageResponse<BookingResponse>> getMyBookingsPaged(
-            @RequestParam(defaultValue = "0") int page,
-            @AuthenticationPrincipal Jwt jwt) {
-        return ApiResponse.<com.sang.sourcepattern.dto.response.PageResponse<BookingResponse>>builder()
-                .result(bookingService.getMyBookingsPaged(jwt.getClaim("email"), page))
                 .build();
     }
 

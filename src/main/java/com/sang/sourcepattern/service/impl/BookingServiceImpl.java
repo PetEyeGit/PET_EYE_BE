@@ -1202,6 +1202,13 @@ public class BookingServiceImpl implements BookingService {
     // ─── Queries ──────────────────────────────────────────────────────────────
 
     @Override
+    public List<BookingResponse> getMyBookings(String userEmail) {
+        User user = resolveUser(userEmail);
+        return bookingRepository.findByUserIdWithServices(user.getId())
+                .stream().map(this::toResponse).collect(Collectors.toList());
+    }
+
+    @Override
     public com.sang.sourcepattern.dto.response.PageResponse<BookingResponse> getMyBookings(String userEmail, int page, int size, String status) {
         User user = resolveUser(userEmail);
         org.springframework.data.domain.Pageable pageable = org.springframework.data.domain.PageRequest.of(page - 1, size, org.springframework.data.domain.Sort.by(org.springframework.data.domain.Sort.Direction.DESC, "createdAt"));
@@ -1235,29 +1242,6 @@ public class BookingServiceImpl implements BookingService {
                 .totalElements(pageData.getTotalElements())
                 .totalPages(pageData.getTotalPages())
                 .last(pageData.isLast())
-                .build();
-    }
-
-    @Override
-    public com.sang.sourcepattern.dto.response.PageResponse<BookingResponse> getMyBookingsPaged(String userEmail, int page) {
-        User user = resolveUser(userEmail);
-        List<Booking> all = bookingRepository.findByUserIdWithServices(user.getId());
-        int pageSize = 10;
-        int total = all.size();
-        int totalPages = (int) Math.ceil((double) total / pageSize);
-        int fromIndex = Math.min(page * pageSize, total);
-        int toIndex   = Math.min(fromIndex + pageSize, total);
-        // Sort by createdAt desc
-        all.sort((a, b) -> b.getCreatedAt().compareTo(a.getCreatedAt()));
-        List<BookingResponse> content = all.subList(fromIndex, toIndex).stream()
-                .map(this::toResponse).collect(Collectors.toList());
-        return com.sang.sourcepattern.dto.response.PageResponse.<BookingResponse>builder()
-                .content(content)
-                .page(page)
-                .size(pageSize)
-                .totalElements(total)
-                .totalPages(totalPages)
-                .last(page >= totalPages - 1)
                 .build();
     }
 
