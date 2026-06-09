@@ -72,3 +72,15 @@ cloudinary:
   cloud-name: ${CLOUDINARY_CLOUD_NAME}
   api-key: ${CLOUDINARY_API_KEY}
   api-secret: ${CLOUDINARY_API_SECRET}
+
+# ===============================
+# Goong Map CONFIG (MAP FROM .env)
+# ===============================
+goong:
+  api:
+    key: ${GOONG_API_KEY}
+  geocode:
+    url: https://rsapi.goong.io/Geocode
+  distance:
+    matrix:
+      url: https://rsapi.goong.io/DistanceMatrix

@@ -118,7 +118,7 @@ goong:
   api:
     key: ${GOONG_API_KEY}
   geocode:
-    url: https://rsapi.goong.io/geocode
+    url: https://rsapi.goong.io/Geocode
   distance:
     matrix:
       url: https://rsapi.goong.io/DistanceMatrix
