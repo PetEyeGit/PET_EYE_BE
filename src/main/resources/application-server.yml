@@ -2,11 +2,6 @@ spring:
   application:
     name: PET_EYE_SHOP
 
-  # ===============================
-  # LOAD ENV FILE
-  # ===============================
-  config:
-    import: optional:file:.env[.properties]
 
   # ===============================
   # DATABASE (MYSQL)
