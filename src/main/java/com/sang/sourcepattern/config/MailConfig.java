@@ -1,49 +1,12 @@
 package com.sang.sourcepattern.config;
 
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
-import org.springframework.mail.javamail.JavaMailSender;
-import org.springframework.mail.javamail.JavaMailSenderImpl;
-import org.springframework.beans.factory.annotation.Value;
-
-import java.util.Properties;
-
-@Configuration
+// MailConfig has been disabled because Spring Boot's spring-boot-starter-mail 
+// automatically configures a JavaMailSender bean using the spring.mail properties 
+// defined in application.yml / application-server.yml.
+// 
+// Manual configuration with @Value placeholders like ${spring.mail.properties.mail.smtp.auth}
+// fails to resolve since those properties are mapped hierarchically as a Java Map 
+// rather than individual flat properties, preventing the custom JavaMailSender bean 
+// from initializing and causing UnsatisfiedDependencyException.
 public class MailConfig {
-
-    @Value("${spring.mail.host}")
-    private String host;
-
-    @Value("${spring.mail.port}")
-    private int port;
-
-    @Value("${spring.mail.username}")
-    private String username;
-
-    @Value("${spring.mail.password}")
-    private String password;
-
-    @Value("${spring.mail.properties.mail.smtp.auth}")
-    private String auth;
-
-    @Value("${spring.mail.properties.mail.smtp.starttls.enable}")
-    private String starttls;
-
-    @Bean
-    public JavaMailSender javaMailSender() {
-        JavaMailSenderImpl mailSender = new JavaMailSenderImpl();
-        mailSender.setHost(host);
-        mailSender.setPort(port);
-
-        mailSender.setUsername(username);
-        mailSender.setPassword(password);
-
-        Properties props = mailSender.getJavaMailProperties();
-        props.put("mail.transport.protocol", "smtp");
-        props.put("mail.smtp.auth", auth);
-        props.put("mail.smtp.starttls.enable", starttls);
-        props.put("mail.debug", "false");
-
-        return mailSender;
-    }
 }
