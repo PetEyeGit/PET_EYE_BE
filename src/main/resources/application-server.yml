@@ -36,6 +36,21 @@ spring:
         dialect: org.hibernate.dialect.MySQLDialect
         format_sql: false
 
+  # ===============================
+  # MAIL CONFIG
+  # ===============================
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    username: huyacsp3@gmail.com
+    password: wvbzarlmbtcptoar
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+
 # ===============================
 # JWT CONFIG (MAP FROM .env)
 # ===============================
