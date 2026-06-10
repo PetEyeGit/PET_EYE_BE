@@ -84,7 +84,12 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
-        config.setAllowedOriginPatterns(List.of("*")); // hoặc List.of("https://flexistudy-api-1.onrender.com")
+        config.setAllowedOriginPatterns(List.of(
+                "http://localhost:3000", 
+                "https://www.peteye.com.vn", 
+                "https://peteye.com.vn",
+                "https://*.vercel.app" // Cho phép tất cả các domain preview từ Vercel
+        ));
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
         config.setAllowedHeaders(List.of("Authorization", "Content-Type", "Accept"));
         config.setAllowCredentials(true);
