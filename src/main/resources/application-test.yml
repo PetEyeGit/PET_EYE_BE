@@ -1,0 +1,148 @@
+spring:
+  application:
+    name: PET_EYE_SHOP
+
+  # ===============================
+  # H2 DATABASE (IN-MEMORY FOR TESTS)
+  # ===============================
+  datasource:
+    url: jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    username: sa
+    password:
+    driver-class-name: org.h2.Driver
+
+  sql:
+    init:
+      mode: never
+
+  # ===============================
+  # JPA / HIBERNATE
+  # ===============================
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.H2Dialect
+        format_sql: false
+        globally_quoted_identifiers: true
+
+  # ===============================
+  # REDIS CONFIG (DISABLED FOR TESTS)
+  # ===============================
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      password:
+      timeout: 5000ms
+      repositories:
+        enabled: false
+
+  # ===============================
+  # MAIL CONFIG
+  # ===============================
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    username: test@gmail.com
+    password: test123456
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+
+
+# ===============================
+# JWT CONFIG
+# ===============================
+jwt:
+  signer-key: test-secret-key-for-testing-purposes-32-chars
+  valid-duration: 3600000
+  refreshable-duration: 86400000
+
+# ===============================
+# SERVER
+# ===============================
+server:
+  port: 8080
+  servlet:
+    context-path: /api
+
+# ===============================
+# LOGGING
+# ===============================
+logging:
+  level:
+    root: INFO
+    org:
+      hibernate:
+        SQL: OFF
+      springframework:
+        web: INFO
+
+# ===============================
+# Cloudinary CONFIG
+# ===============================
+cloudinary:
+  cloud-name: test-cloud
+  api-key: test-key
+  api-secret: test-secret
+
+# ===============================
+# Goong Map CONFIG
+# ===============================
+goong:
+  api:
+    key: test-goong-key
+  geocode:
+    url: https://rsapi.goong.io/Geocode
+  distance:
+    matrix:
+      url: https://rsapi.goong.io/DistanceMatrix
+
+# ===============================
+# PayOS CONFIG
+# ===============================
+payos:
+  client-id: test-payos-client-id
+  api-key: test-payos-api-key
+  checksum-key: test-payos-checksum-key
+  return-url: http://localhost:8080/api/bookings/payos-return
+  cancel-url: http://localhost:8080/api/bookings/payos-cancel
+
+# ===============================
+# Camera CONFIG
+# ===============================
+camera:
+  kbone:
+    stream-url: http://localhost:8554
+
+# ===============================
+# AI CONFIG
+# ===============================
+ai:
+  gemini:
+    keys:
+  memory:
+    max-turns: 10
+    max-tokens: 8000
+  safety:
+    max-input-length: 2000
+
+# ===============================
+# Social Login CONFIG
+# ===============================
+social:
+  zalo:
+    app-id:
+    app-secret:
+  facebook:
+    app-id:
+    app-secret:
+    redirect-uri: http://localhost:3000/login/facebook/callback
+
+

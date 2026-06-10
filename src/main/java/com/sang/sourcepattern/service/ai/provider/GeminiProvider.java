@@ -2,6 +2,7 @@ package com.sang.sourcepattern.service.ai.provider;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
 import org.springframework.stereotype.Component;
@@ -27,9 +28,10 @@ public class GeminiProvider implements AIProvider {
             "gemini-2.0-flash"
     );
 
-    @Value("${ai.gemini.keys}")
-    private List<String> apiKeys;
+    @Value("${ai.gemini.keys:}")
+    private String apiKeysString;
 
+    private List<String> apiKeys;
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper;
     private final AtomicInteger keyIndex = new AtomicInteger(0);
@@ -37,6 +39,20 @@ public class GeminiProvider implements AIProvider {
     public GeminiProvider(RestTemplate restTemplate, ObjectMapper objectMapper) {
         this.restTemplate = restTemplate;
         this.objectMapper = objectMapper;
+    }
+
+    @Autowired
+    private void initApiKeys() {
+        if (apiKeysString != null && !apiKeysString.isBlank()) {
+            // Split comma-separated keys
+            apiKeys = Arrays.stream(apiKeysString.split(","))
+                    .map(String::trim)
+                    .filter(s -> !s.isEmpty())
+                    .collect(Collectors.toList());
+        } else {
+            apiKeys = Collections.emptyList();
+        }
+        log.info("[Gemini] Initialized with {} API keys", apiKeys.size());
     }
 
     @Override

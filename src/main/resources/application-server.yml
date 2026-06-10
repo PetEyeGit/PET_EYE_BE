@@ -62,6 +62,13 @@ spring:
           auth: true
           starttls:
             enable: true
+
+# ===============================
+# AI CONFIG
+# ===============================
+ai:
+  gemini:
+    keys: ${AI_GEMINI_KEYS:}
 # ===============================
 # JWT CONFIG (MAP FROM .env)
 # ===============================
