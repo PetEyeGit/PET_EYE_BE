@@ -45,6 +45,8 @@ spring:
       port: ${REDIS_PORT:6379}
       password: ${REDIS_PASSWORD:}
       timeout: 5000ms
+      repositories:
+        enabled: false
 
   # ===============================
   # MAIL CONFIG
