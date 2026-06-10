@@ -65,17 +65,9 @@ public class GeminiProvider implements AIProvider {
                     log.debug("[Gemini] Trying model={} key={}...", model, key.substring(0, Math.min(8, key.length())));
                     return callGemini(model, key, request);
                 } catch (HttpClientErrorException e) {
-                    if (e.getStatusCode() == HttpStatus.TOO_MANY_REQUESTS) {
-                        log.warn("[Gemini] 429 on model={} key={}..., rotating key", model, key.substring(0, 8));
-                        errors.add(model + "/key" + attempt + ": 429");
-                        // continue to next key
-                    } else if (e.getStatusCode() == HttpStatus.BAD_REQUEST) {
-                        log.error("[Gemini] 400 Bad Request on model={}: {}", model, e.getMessage());
-                        throw new RuntimeException("Gemini bad request: " + e.getMessage());
-                    } else {
-                        log.error("[Gemini] HTTP {} on model={}: {}", e.getStatusCode(), model, e.getMessage());
-                        throw new RuntimeException("Gemini error " + e.getStatusCode() + ": " + e.getMessage());
-                    }
+                    log.error("[Gemini] HTTP {} on model={} key={}...: {}", e.getStatusCode(), model, key.substring(0, Math.min(8, key.length())), e.getResponseBodyAsString());
+                    errors.add(model + "/key" + attempt + ": " + e.getStatusCode());
+                    // continue to next key
                 } catch (HttpServerErrorException e) {
                     if (e.getStatusCode() == HttpStatus.SERVICE_UNAVAILABLE) {
                         log.warn("[Gemini] 503 on model={}, trying next model", model);

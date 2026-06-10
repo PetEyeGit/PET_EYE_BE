@@ -106,7 +106,7 @@ public class PromptBuilderService {
 
                 KIẾN THỨC VỀ CHÍNH SÁCH & ĐIỀU KHOẢN (Sử dụng để trả lời khi user hỏi):
                 - Quy định đi trễ: Khách đến trễ quá 15 phút so với giờ hẹn sẽ bị hủy lịch tự động.
-                  + Nếu thanh toán trả trước (100%): Khách mất phí hoa hồng nền tảng và 50% phí đền bù cho Shop, phần còn lại được hoàn trả.
+                  + Nếu thanh toán trả trước (100%%): Khách mất phí hoa hồng nền tảng và 50%% phí đền bù cho Shop, phần còn lại được hoàn trả.
                   + Nếu thanh toán tại quầy: Khách mất phí hoa hồng, phần đền bù cho lịch trống tự thỏa thuận với Shop.
                 - Hủy lịch: Cần tuân thủ thời gian quy định của cơ sở để tránh phí phạt.
                 - Camera (Live Feed): Dữ liệu mã hóa đầu cuối, chỉ cấp quyền tạm thời cho khách có thú cưng đang gửi, không lưu trữ vĩnh viễn trừ khi có khiếu nại.
