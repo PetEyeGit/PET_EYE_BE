@@ -8,11 +8,8 @@ services:
       dockerfile: Dockerfile
     container_name: pet_eye_be
     restart: always
-    # Không cần mở port 8080 ra ngoài nữa, Nginx sẽ đứng trước trung chuyển
     ports:
-        - "8080:8080"
-    expose:
-      - "8080"
+      - "8080:8080" # Mở cổng ra để Nginx trên Ubuntu kết nối vào API
     env_file:
       - .env
     environment:
@@ -42,9 +39,8 @@ services:
       MYSQL_USER: ${MYSQL_USER}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD}
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
-    # Nếu muốn an toàn, bỏ luôn map port 3306 này để bên ngoài không can thiệp được vào DB
     ports:
-      - "3306:3306" 
+      - "3306:3306"
     volumes:
       - mysql_data:/var/lib/mysql
     healthcheck:
@@ -80,21 +76,6 @@ services:
       - "8889:8889"  # WebRTC
     networks:
       - peteye-network
-
-  # 5. Reverse Proxy (Nginx) - Khuyến khích thêm vào sau khi cấu hình Domain
-  # nginx:
-  #   image: nginx:alpine
-  #   container_name: pet_eye_nginx
-  #   ports:
-  #     - "80:80"
-  #     - "443:443"
-  #   volumes:
-  #     - ./nginx.conf:/etc/nginx/nginx.conf:ro
-  #     - /etc/letsencrypt:/etc/letsencrypt:ro
-  #   depends_on:
-  #     - backend
-  #   networks:
-  #     - peteye-network
 
 volumes:
   mysql_data:
