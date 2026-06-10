@@ -102,10 +102,21 @@ public class AuthenticationServiceImpl implements AuthenticationService {
             throw new AppException(ErrorCode.WRONG_PASSWORD);
         }
 
-        if (!user.isActive()) {
-            throw new AppException(ErrorCode.ACCOUNT_DEACTIVATED);
+        // Check email verified trước — áp dụng cho cả user lẫn shop owner
+        if (!user.isEmailVerified()) {
+            throw new AppException(ErrorCode.EMAIL_NOT_VERIFIED);
         }
 
+        // Check active — tài khoản bị admin khóa hoặc shop owner chưa được duyệt
+        if (!user.isActive()) {
+            // Shop owner: active=false khi chờ admin duyệt shop → báo ACCOUNT_NOT_VERIFIED
+            boolean isShopOwner = user.getRoles().stream()
+                    .anyMatch(role -> role.getName().equals("SHOP_OWNER"));
+            if (isShopOwner) {
+                throw new AppException(ErrorCode.ACCOUNT_NOT_VERIFIED);
+            }
+            throw new AppException(ErrorCode.ACCOUNT_DEACTIVATED);
+        }
 
         boolean isAdmin = user.getRoles().stream()
                 .anyMatch(role -> role.getName().equals("ADMIN"));

@@ -54,7 +54,7 @@ public class UserServiceImpl implements UserService {
 
         User user = userMapper.toUser(request);
         user.setPassword(passwordEncoder.encode(request.getPassword()));
-        user.setActive(true);
+        user.setActive(true);         // active ngay, nhưng chưa dùng được đầy đủ cho đến khi verify email
         user.setEmailVerified(false);
 
         HashSet<Role> roles = new HashSet<>();
@@ -196,6 +196,7 @@ public class UserServiceImpl implements UserService {
         }
 
         user.setEmailVerified(true);
+        user.setActive(true);         // kích hoạt tài khoản sau khi xác thực email
         userRepository.save(user);
 
         verificationToken.setUsed(true);
@@ -269,7 +270,7 @@ public class UserServiceImpl implements UserService {
         log.info("Password reset successfully for user: {}", user.getEmail());
     }
 
-    // ---- helper ----
+    
     private void sendVerificationToken(User user) {
         String otp = String.format("%06d", new java.util.Random().nextInt(1_000_000));
         userTokenRepository.saveAndFlush(UserToken.builder()
@@ -278,8 +279,7 @@ public class UserServiceImpl implements UserService {
                 .user(user)
                 .expiresAt(LocalDateTime.now().plusMinutes(10))
                 .build());
-        // Gửi email đồng bộ — token đã flush xuống DB, transaction chưa commit
-        // nhưng email gửi async (@Async trong EmailServiceImpl) nên không block response
+       
         emailService.sendVerificationEmail(user.getEmail(), user.getFullName(), otp);
     }
 }
