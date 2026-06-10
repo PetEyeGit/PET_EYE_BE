@@ -99,3 +99,73 @@ goong:
   distance:
     matrix:
       url: https://rsapi.goong.io/DistanceMatrix
+
+# ===============================
+# SPRING ADDITIONAL CONFIGS
+# ===============================
+spring:
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 10MB
+  data:
+    redis:
+      host: ${REDIS_HOST}
+      port: ${REDIS_PORT}
+      password: ${REDIS_PASSWORD}
+      timeout: 5000ms
+
+# ===============================
+# PayOS CONFIG (MAP FROM .env)
+# ===============================
+payos:
+  client-id: ${PAYOS_CLIENT_ID}
+  api-key: ${PAYOS_API_KEY}
+  checksum-key: ${PAYOS_CHECKSUM_KEY}
+  return-url: ${PAYOS_RETURN_URL}
+  cancel-url: ${PAYOS_CANCEL_URL}
+
+# ===============================
+# SOCIAL CONFIG (MAP FROM .env)
+# ===============================
+social:
+  zalo:
+    app-id: ${ZALO_APP_ID}
+    app-secret: ${ZALO_APP_SECRET}
+  facebook:
+    app-id: ${FACEBOOK_APP_ID}
+    app-secret: ${FACEBOOK_APP_SECRET}
+    redirect-uri: ${FACEBOOK_REDIRECT_URI}
+
+# ===============================
+# APP CONFIG
+# ===============================
+app:
+  frontend-url: ${FRONTEND_URL:http://localhost:3000}
+
+# ===============================
+# AI GATEWAY CONFIG
+# ===============================
+ai:
+  gemini:
+    keys: ${GEMINI_KEY_1:},${GEMINI_KEY_2:},${GEMINI_KEY_3:},${GEMINI_KEY_4:},${GEMINI_KEY_5:}
+  memory:
+    max-turns: 10
+    max-tokens: 8000
+  safety:
+    max-input-length: 2000
+
+# ===============================
+# WALLET CONFIG
+# ===============================
+wallet:
+  admin-fee-rate: 0.10
+
+# ===============================
+# CAMERA CONFIG (MAP FROM .env)
+# ===============================
+camera:
+  stream-host: ${CAMERA_STREAM_HOST:localhost}
+  kbone:
+    sn: ${CAMERA_KBONE_SN}
+    stream-url: ${CAMERA_KBONE_STREAM_URL}
