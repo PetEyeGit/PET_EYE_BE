@@ -35,11 +35,31 @@ spring:
       hibernate:
         dialect: org.hibernate.dialect.MySQLDialect
         format_sql: false
+
+  # ===============================
+  # REDIS CONFIG
+  # ===============================
   data:
     redis:
       host: ${REDIS_HOST}
       port: ${REDIS_PORT:6379}
       password: ${REDIS_PASSWORD:}
+      timeout: 5000ms
+
+  # ===============================
+  # MAIL CONFIG
+  # ===============================
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    username: ${MAIL_USERNAME}
+    password: ${MAIL_PASSWORD}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
 # ===============================
 # JWT CONFIG (MAP FROM .env)
 # ===============================
@@ -88,4 +108,3 @@ goong:
   distance:
     matrix:
       url: https://rsapi.goong.io/DistanceMatrix
-
