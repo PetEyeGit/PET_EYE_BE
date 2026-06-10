@@ -9,6 +9,8 @@ services:
     container_name: pet_eye_be
     restart: always
     # Không cần mở port 8080 ra ngoài nữa, Nginx sẽ đứng trước trung chuyển
+    ports:
+        - "8080:8080"
     expose:
       - "8080"
     env_file:
