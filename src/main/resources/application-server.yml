@@ -35,7 +35,11 @@ spring:
       hibernate:
         dialect: org.hibernate.dialect.MySQLDialect
         format_sql: false
-
+  data:
+    redis:
+      host: ${REDIS_HOST}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
 # ===============================
 # JWT CONFIG (MAP FROM .env)
 # ===============================
@@ -84,3 +88,4 @@ goong:
   distance:
     matrix:
       url: https://rsapi.goong.io/DistanceMatrix
+
