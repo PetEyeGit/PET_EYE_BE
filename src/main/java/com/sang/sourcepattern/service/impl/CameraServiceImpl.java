@@ -33,15 +33,17 @@ public class CameraServiceImpl implements CameraService {
     @Override
     public String startStream(int bookingId, String rtspUrl) {
         String streamName = "booking-" + bookingId;
-        log.info("Configuring MediaMTX stream {} for RTSP: {}", streamName, rtspUrl);
+        log.info("Client requested stream {} for RTSP: {}", streamName, rtspUrl);
 
         try {
-            // Stop existing stream if any
-            stopStream(bookingId);
-
-            String apiUrl = cameraApiUrl + "/v3/config/paths/add/" + streamName;
+            // TRONG MÔ HÌNH PUSH (ĐẨY): 
+            // Chúng ta KHÔNG ĐƯỢC ra lệnh cho MediaMTX đi kéo (pull) luồng video.
+            // Nếu gửi API Pull, MediaMTX sẽ khóa đường dẫn này và đá văng FFmpeg ra ngoài.
+            // Do đó, toàn bộ đoạn code gọi HTTP Request tới MediaMTX ở dưới đã được ẩn đi.
             
-            // Construct JSON for MediaMTX to read from the RTSP source via TCP
+            /*
+            stopStream(bookingId);
+            String apiUrl = cameraApiUrl + "/v3/config/paths/add/" + streamName;
             String jsonBody = "{\"source\": \"" + rtspUrl + "\", \"sourceProtocol\": \"tcp\"}";
 
             HttpRequest request = HttpRequest.newBuilder()
@@ -56,8 +58,9 @@ public class CameraServiceImpl implements CameraService {
                 log.error("Failed to add MediaMTX stream. Status: {}, Body: {}", response.statusCode(), response.body());
                 throw new AppException(ErrorCode.DOCKER_NOT_RUNNING);
             }
+            */
             
-            log.info("Successfully configured MediaMTX stream {}", streamName);
+            log.info("MediaMTX config skipped for Push Mode: {}", streamName);
             
             // Format URL based on environment (direct HTTP locally vs Nginx HTTPS on VPS)
             return String.format(streamUrlFormat, streamHost, streamName);
@@ -75,6 +78,8 @@ public class CameraServiceImpl implements CameraService {
         String streamName = "booking-" + bookingId;
         log.info("Removing MediaMTX stream {}", streamName);
         try {
+            // Tương tự, không cần xóa cấu hình Pull nữa.
+            /*
             String apiUrl = cameraApiUrl + "/v3/config/paths/delete/" + streamName;
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(apiUrl))
@@ -82,8 +87,8 @@ public class CameraServiceImpl implements CameraService {
                     .build();
                     
             httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-            // Ignore response code, it might be 404 if it didn't exist
-            log.info("Successfully removed MediaMTX stream {}", streamName);
+            */
+            log.info("Successfully skipped removing MediaMTX stream for Push Mode: {}", streamName);
         } catch (Exception e) {
             log.warn("Failed to delete stream {}: {}", streamName, e.getMessage());
         }
