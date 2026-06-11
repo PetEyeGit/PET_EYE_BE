@@ -21,6 +21,7 @@ services:
       - REDIS_PORT=6379
       - REDIS_PASSWORD=${REDIS_PASSWORD}
       - CAMERA_STREAM_HOST=localhost
+      - CAMERA_API_URL=http://camera:9997
     depends_on:
       mysql:
         condition: service_healthy
@@ -69,13 +70,14 @@ services:
     image: bluenviron/mediamtx:latest
     container_name: pet_eye_camera
     restart: always
-    environment:
-      - MTX_API=yes
+    volumes:
+      - ./mediamtx.yml:/mediamtx.yml
     ports:
       - "8554:8554"  # RTSP
       - "1935:1935"  # RTMP
       - "8888:8888"  # HLS
       - "8889:8889"  # WebRTC
+      - "9997:9997"  # API
     networks:
       - peteye-network
 

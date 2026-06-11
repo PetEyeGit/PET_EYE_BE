@@ -20,7 +20,11 @@ public class CameraServiceImpl implements CameraService {
     @Value("${camera.stream-host:localhost}")
     private String streamHost;
 
-    private static final String MTX_API_BASE = "http://camera:9997/v3/config/paths/";
+    @Value("${camera.api-url:http://camera:9997}")
+    private String cameraApiUrl;
+
+    @Value("${camera.stream-url-format:https://%s/camera/%s/index.m3u8}")
+    private String streamUrlFormat;
 
     private final HttpClient httpClient = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(10))
@@ -35,7 +39,7 @@ public class CameraServiceImpl implements CameraService {
             // Stop existing stream if any
             stopStream(bookingId);
 
-            String apiUrl = MTX_API_BASE + "add/" + streamName;
+            String apiUrl = cameraApiUrl + "/v3/config/paths/add/" + streamName;
             
             // Construct JSON for MediaMTX to read from the RTSP source via TCP
             String jsonBody = "{\"source\": \"" + rtspUrl + "\", \"sourceProtocol\": \"tcp\"}";
@@ -55,9 +59,8 @@ public class CameraServiceImpl implements CameraService {
             
             log.info("Successfully configured MediaMTX stream {}", streamName);
             
-            // Return the Nginx proxied URL path (https://api.peteye.com.vn/camera/booking-X/index.m3u8)
-            // Note: Cloudflare and Browsers require HTTPS, and we proxy /camera/ to the global MediaMTX container
-            return "https://" + streamHost + "/camera/" + streamName + "/index.m3u8";
+            // Format URL based on environment (direct HTTP locally vs Nginx HTTPS on VPS)
+            return String.format(streamUrlFormat, streamHost, streamName);
             
         } catch (AppException e) {
             throw e;
@@ -72,7 +75,7 @@ public class CameraServiceImpl implements CameraService {
         String streamName = "booking-" + bookingId;
         log.info("Removing MediaMTX stream {}", streamName);
         try {
-            String apiUrl = MTX_API_BASE + "delete/" + streamName;
+            String apiUrl = cameraApiUrl + "/v3/config/paths/delete/" + streamName;
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(apiUrl))
                     .DELETE()
