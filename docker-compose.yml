@@ -20,7 +20,7 @@ services:
       - REDIS_HOST=redis
       - REDIS_PORT=6379
       - REDIS_PASSWORD=${REDIS_PASSWORD}
-      - CAMERA_STREAM_HOST=localhost
+      - CAMERA_STREAM_HOST=api.peteye.com.vn
       - CAMERA_API_URL=http://camera:9997
     depends_on:
       mysql:
