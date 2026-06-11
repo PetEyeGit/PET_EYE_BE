@@ -14,6 +14,9 @@ RUN mvn clean package -DskipTests
 FROM eclipse-temurin:21-jre-alpine
 WORKDIR /app
 
+# Install docker-cli to allow container to run docker commands
+RUN apk add --no-cache docker-cli
+
 # Copy the built jar from the build stage
 COPY --from=build /app/target/*.jar app.jar
 

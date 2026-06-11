@@ -20,12 +20,14 @@ services:
       - REDIS_HOST=redis
       - REDIS_PORT=6379
       - REDIS_PASSWORD=${REDIS_PASSWORD}
-      - CAMERA_STREAM_HOST=camera
+      - CAMERA_STREAM_HOST=localhost
     depends_on:
       mysql:
         condition: service_healthy
       redis:
         condition: service_started
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
     networks:
       - peteye-network
 
