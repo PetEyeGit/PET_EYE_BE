@@ -7,10 +7,11 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
-import java.io.BufferedReader;
-import java.io.InputStreamReader;
-import java.net.ServerSocket;
-import java.util.List;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.time.Duration;
 
 @Service
 @Slf4j
@@ -19,83 +20,69 @@ public class CameraServiceImpl implements CameraService {
     @Value("${camera.stream-host:localhost}")
     private String streamHost;
 
+    private static final String MTX_API_BASE = "http://camera:9997/v3/config/paths/";
+
+    private final HttpClient httpClient = HttpClient.newBuilder()
+            .connectTimeout(Duration.ofSeconds(10))
+            .build();
+
     @Override
     public String startStream(int bookingId, String rtspUrl) {
-        int port = findFreePort();
-        stopStream(bookingId); // Clean up any existing container for this booking
-
-        log.info("Starting MediaMTX Docker container for booking {} with RTSP: {} on port {}", bookingId, rtspUrl, port);
-
-        // Run Docker command in background:
-        List<String> command = List.of(
-                "docker", "run", "-d",
-                "--name", "peteye-camera-" + bookingId,
-                "-p", port + ":8888",
-                "-e", "MTX_PATHS_STREAM_SOURCE=" + rtspUrl,
-                "-e", "MTX_READCORS=yes",
-                "-e", "MTX_PATHS_STREAM_SOURCEPROTOCOL=tcp",
-                "bluenviron/mediamtx"
-        );
+        String streamName = "booking-" + bookingId;
+        log.info("Configuring MediaMTX stream {} for RTSP: {}", streamName, rtspUrl);
 
         try {
-            ProcessBuilder builder = new ProcessBuilder(command);
-            builder.redirectErrorStream(true);
-            Process process = builder.start();
-            
-            // Read output to avoid hang and print debug info
-            StringBuilder output = new StringBuilder();
-            try (BufferedReader r = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
-                String line;
-                while ((line = r.readLine()) != null) {
-                    output.append(line).append("\n");
-                }
-            }
+            // Stop existing stream if any
+            stopStream(bookingId);
 
-            int exitCode = process.waitFor();
-            if (exitCode != 0) {
-                log.error("Failed to start docker container for booking {}. Exit code: {}. Output: {}", bookingId, exitCode, output.toString().trim());
+            String apiUrl = MTX_API_BASE + "add/" + streamName;
+            
+            // Construct JSON for MediaMTX to read from the RTSP source via TCP
+            String jsonBody = "{\"source\": \"" + rtspUrl + "\", \"sourceProtocol\": \"tcp\"}";
+
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(apiUrl))
+                    .header("Content-Type", "application/json")
+                    .POST(HttpRequest.BodyPublishers.ofString(jsonBody))
+                    .build();
+
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+
+            if (response.statusCode() != 200 && response.statusCode() != 201) {
+                log.error("Failed to add MediaMTX stream. Status: {}, Body: {}", response.statusCode(), response.body());
                 throw new AppException(ErrorCode.DOCKER_NOT_RUNNING);
             }
             
-            log.info("Successfully started docker container for booking {}", bookingId);
-            return "http://" + streamHost + ":" + port + "/stream/index.m3u8";
+            log.info("Successfully configured MediaMTX stream {}", streamName);
+            
+            // Return the Nginx proxied URL path (https://api.peteye.com.vn/camera/booking-X/index.m3u8)
+            // Note: Cloudflare and Browsers require HTTPS, and we proxy /camera/ to the global MediaMTX container
+            return "https://" + streamHost + "/camera/" + streamName + "/index.m3u8";
+            
         } catch (AppException e) {
             throw e;
         } catch (Exception e) {
-            log.error("Error running docker for booking {}", bookingId, e);
+            log.error("Error configuring MediaMTX for booking {}", bookingId, e);
             throw new AppException(ErrorCode.DOCKER_NOT_RUNNING);
         }
     }
 
     @Override
     public void stopStream(int bookingId) {
-        log.info("Stopping and removing MediaMTX Docker container for booking {}", bookingId);
-        List<String> rmCommand = List.of("docker", "rm", "-f", "peteye-camera-" + bookingId);
+        String streamName = "booking-" + bookingId;
+        log.info("Removing MediaMTX stream {}", streamName);
         try {
-            ProcessBuilder builder = new ProcessBuilder(rmCommand);
-            builder.redirectErrorStream(true);
-            Process rmProc = builder.start();
-            
-            // Consume output to prevent process hang
-            try (BufferedReader r = new BufferedReader(new InputStreamReader(rmProc.getInputStream()))) {
-                while (r.readLine() != null) {
-                    // discard
-                }
-            }
-            rmProc.waitFor();
-            log.info("Successfully stopped and removed docker container for booking {}", bookingId);
+            String apiUrl = MTX_API_BASE + "delete/" + streamName;
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(apiUrl))
+                    .DELETE()
+                    .build();
+                    
+            httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            // Ignore response code, it might be 404 if it didn't exist
+            log.info("Successfully removed MediaMTX stream {}", streamName);
         } catch (Exception e) {
-            log.warn("Failed to stop container for booking {} (it may not exist): {}", bookingId, e.getMessage());
-        }
-    }
-
-    private int findFreePort() {
-        try (ServerSocket socket = new ServerSocket(0)) {
-            socket.setReuseAddress(true);
-            return socket.getLocalPort();
-        } catch (Exception e) {
-            log.error("Error finding free port, defaulting to 8888", e);
-            return 8888;
+            log.warn("Failed to delete stream {}: {}", streamName, e.getMessage());
         }
     }
 }
