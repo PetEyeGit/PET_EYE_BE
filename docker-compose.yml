@@ -26,8 +26,6 @@ services:
         condition: service_healthy
       redis:
         condition: service_started
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
     networks:
       - peteye-network
 
@@ -71,6 +69,8 @@ services:
     image: bluenviron/mediamtx:latest
     container_name: pet_eye_camera
     restart: always
+    environment:
+      - MTX_API=yes
     ports:
       - "8554:8554"  # RTSP
       - "1935:1935"  # RTMP
