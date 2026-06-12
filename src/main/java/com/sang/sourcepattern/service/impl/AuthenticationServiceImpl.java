@@ -341,6 +341,11 @@ public class AuthenticationServiceImpl implements AuthenticationService {
         body.add("grant_type", "authorization_code");
         body.add("code", request.getCode());
 
+        // PKCE – required by Zalo OAuth v4: must include code_verifier
+        if (request.getCodeVerifier() != null && !request.getCodeVerifier().isBlank()) {
+            body.add("code_verifier", request.getCodeVerifier());
+        }
+
         try {
             log.info("Exchanging Zalo code for token. AppId: {}, Code: {}", zaloAppId, request.getCode());
             
