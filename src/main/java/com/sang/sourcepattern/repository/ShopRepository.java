@@ -90,4 +90,21 @@ public interface ShopRepository extends JpaRepository<Shop, Integer> {
 
     /** Paginated: pending shops for admin */
     Page<Shop> findByStatusNot(com.sang.sourcepattern.enums.ShopStatus status, Pageable pageable);
+
+    @Query("""
+        SELECT DATE(s.createdAt), COUNT(s)
+        FROM Shop s
+        WHERE YEAR(s.createdAt) = :year AND MONTH(s.createdAt) = :month
+        GROUP BY DATE(s.createdAt)
+    """)
+    List<Object[]> shopCountByDateRange(@org.springframework.data.repository.query.Param("year") int year, @org.springframework.data.repository.query.Param("month") int month);
+
+    @Query("""
+        SELECT DATE(s.createdAt), COUNT(s)
+        FROM Shop s
+        WHERE YEAR(s.createdAt) = :year AND MONTH(s.createdAt) = :month
+          AND s.status = com.sang.sourcepattern.enums.ShopStatus.PENDING
+        GROUP BY DATE(s.createdAt)
+    """)
+    List<Object[]> pendingShopCountByDateRange(@org.springframework.data.repository.query.Param("year") int year, @org.springframework.data.repository.query.Param("month") int month);
 }

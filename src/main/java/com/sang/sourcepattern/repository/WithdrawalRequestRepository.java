@@ -30,5 +30,13 @@ public interface WithdrawalRequestRepository extends JpaRepository<WithdrawalReq
     /** Tìm tất cả PAYING đã quá :cutoff (dùng cho auto-expire job) */
     @Query("SELECT w FROM WithdrawalRequest w " +
            "WHERE w.status = 'PAYING' AND w.createdAt < :cutoff")
-    List<WithdrawalRequest> findStalePayouts(@Param("cutoff") LocalDateTime cutoff);
+    List<WithdrawalRequest> findStalePayouts(@org.springframework.data.repository.query.Param("cutoff") java.time.LocalDateTime cutoff);
+
+    @Query("""
+        SELECT DATE(w.createdAt), COUNT(w)
+        FROM WithdrawalRequest w
+        WHERE YEAR(w.createdAt) = :year AND MONTH(w.createdAt) = :month
+        GROUP BY DATE(w.createdAt)
+    """)
+    List<Object[]> withdrawalCountByDateRange(@org.springframework.data.repository.query.Param("year") int year, @org.springframework.data.repository.query.Param("month") int month);
 }

@@ -15,6 +15,8 @@ import com.sang.sourcepattern.repository.NotificationRepository;
 import com.sang.sourcepattern.repository.PaymentRepository;
 import com.sang.sourcepattern.repository.ShopRepository;
 import com.sang.sourcepattern.repository.UserRepository;
+import com.sang.sourcepattern.repository.TransactionRepository;
+import com.sang.sourcepattern.repository.WithdrawalRequestRepository;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
@@ -29,6 +31,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.Year;
+import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
@@ -50,6 +53,9 @@ public class AdminController {
     ShopRepository shopRepository;
     NotificationRepository notificationRepository;
     MessageRepository messageRepository;
+    TransactionRepository transactionRepository;
+    WithdrawalRequestRepository withdrawalRequestRepository;
+    com.sang.sourcepattern.repository.UserVoucherRepository userVoucherRepository;
     com.sang.sourcepattern.service.GoongMapService goongMapService;
 
     // ─── Dashboard ───────────────────────────────────────────────────────────
@@ -74,12 +80,15 @@ public class AdminController {
         BigDecimal totalRevenue = bookingRepository.sumTotalRevenue();
         if (totalRevenue == null) totalRevenue = BigDecimal.ZERO;
         long totalUsers = userRepository.count();
+        long activeUsers = userRepository.countByActiveTrue();
+        long inactiveUsers = userRepository.countByActiveFalse();
         long totalShops = shopRepository.count();
         long totalBookings = bookingRepository.count();
         long pendingShops = shopRepository.findAll().stream()
                 .filter(s -> s.getStatus() == com.sang.sourcepattern.enums.ShopStatus.PENDING).count();
         long unreadMessages = messageRepository
                 .countByShopIdAndChannelTypeAndIsReadFalseAndSenderRoleNot(0, "ADMIN_SUPPORT", "ADMIN");
+        long totalVouchers = userVoucherRepository.count();
 
         // Period stats
         BigDecimal periodRevenue = bookingRepository.sumRevenueBetween(periodStart, periodEnd);
@@ -140,6 +149,7 @@ public class AdminController {
         List<Integer> totalShopsSparkData = List.of(8, 10, 11, 14, 15, 18, 20, (int)totalShops);
         List<Integer> pendingShopsSparkData = List.of(12, 10, 9, 7, 8, 5, 4, (int)pendingShops);
         List<Integer> unreadMessagesSparkData = List.of(4, 6, 5, 8, 7, 5, 4, (int)unreadMessages);
+        List<Integer> totalVouchersSparkData = List.of(0, 5, 12, 15, 20, 22, 28, (int)totalVouchers);
 
         Map<String, Object> result = new java.util.HashMap<>();
         result.put("totalRevenue", totalRevenue);
@@ -149,6 +159,8 @@ public class AdminController {
         result.put("totalRevenueSparkData", totalRevenueSparkData);
 
         result.put("totalUsers", totalUsers);
+        result.put("activeUsers", activeUsers);
+        result.put("inactiveUsers", inactiveUsers);
         result.put("periodUsers", periodUsers);
         result.put("totalUsersTrend", totalUsersTrend);
         result.put("totalUsersTrendUp", totalUsersTrendUp);
@@ -171,6 +183,8 @@ public class AdminController {
         result.put("pendingShopsSparkData", pendingShopsSparkData);
 
         result.put("unreadMessages", unreadMessages);
+        result.put("totalVouchers", totalVouchers);
+        result.put("totalVouchersSparkData", totalVouchersSparkData);
 
         return ApiResponse.<Map<String, Object>>builder()
                 .result(result)
@@ -231,6 +245,63 @@ public class AdminController {
         }
 
         return ApiResponse.<List<DailyBookingResponse>>builder().result(result).build();
+    }
+
+    @GetMapping("/dashboard/monthly-history")
+    public ApiResponse<Map<String, List<Map<String, Object>>>> getMonthlyHistory(
+            @RequestParam int month,
+            @RequestParam int year) {
+
+        int daysInMonth = YearMonth.of(year, month).lengthOfMonth();
+
+        List<Object[]> revenueData = bookingRepository.adminCommissionByDateRange(year, month);
+        List<Object[]> balanceData = bookingRepository.adminBalanceByDateRange(year, month);
+        List<Object[]> usersData = userRepository.userCountByDateRange(year, month);
+        List<Object[]> activeUsersData = userRepository.activeUserCountByDateRange(year, month);
+        List<Object[]> inactiveUsersData = userRepository.inactiveUserCountByDateRange(year, month);
+        List<Object[]> shopsData = shopRepository.shopCountByDateRange(year, month);
+        List<Object[]> bookingsData = bookingRepository.bookingCountByDateRange(year, month);
+        List<Object[]> withdrawalData = withdrawalRequestRepository.withdrawalCountByDateRange(year, month);
+        List<Object[]> pendingShopsData = shopRepository.pendingShopCountByDateRange(year, month);
+        List<Object[]> messagesData = messageRepository.messageCountByDateRange(year, month);
+        List<Object[]> vouchersData = userVoucherRepository.voucherCountByDateRange(year, month);
+
+        Map<String, List<Map<String, Object>>> result = new java.util.HashMap<>();
+        
+        result.put("totalRevenue", buildDailySeries(daysInMonth, revenueData));
+        result.put("systemBalance", buildDailySeries(daysInMonth, balanceData));
+        result.put("totalUsers", buildDailySeries(daysInMonth, usersData));
+        result.put("activeUsers", buildDailySeries(daysInMonth, activeUsersData));
+        result.put("inactiveUsers", buildDailySeries(daysInMonth, inactiveUsersData));
+        result.put("totalShops", buildDailySeries(daysInMonth, shopsData));
+        result.put("totalBookings", buildDailySeries(daysInMonth, bookingsData));
+        result.put("pendingWithdrawals", buildDailySeries(daysInMonth, withdrawalData));
+        result.put("pendingShops", buildDailySeries(daysInMonth, pendingShopsData));
+        result.put("unreadMessages", buildDailySeries(daysInMonth, messagesData));
+        result.put("totalVouchers", buildDailySeries(daysInMonth, vouchersData));
+
+        return ApiResponse.<Map<String, List<Map<String, Object>>>>builder()
+                .result(result)
+                .build();
+    }
+
+    private List<Map<String, Object>> buildDailySeries(int daysInMonth, List<Object[]> queryData) {
+        Map<Integer, Number> map = new java.util.HashMap<>();
+        for (Object[] row : queryData) {
+            java.sql.Date date = (java.sql.Date) row[0];
+            int day = date.toLocalDate().getDayOfMonth();
+            Number val = (Number) row[1];
+            map.put(day, val);
+        }
+
+        List<Map<String, Object>> series = new java.util.ArrayList<>();
+        for (int i = 1; i <= daysInMonth; i++) {
+            Map<String, Object> point = new java.util.HashMap<>();
+            point.put("day", "Ngày " + i);
+            point.put("value", map.getOrDefault(i, 0));
+            series.add(point);
+        }
+        return series;
     }
 
     // ─── Notifications ───────────────────────────────────────────────────────    /** Admin xem danh sách thông báo đã gửi — group theo đợt gửi, phân trang */

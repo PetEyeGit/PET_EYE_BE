@@ -119,7 +119,7 @@ public interface BookingRepository extends JpaRepository<Booking, Integer> {
     """)
     List<Object[]> revenueByMonth(@Param("year") int year);
 
-    /** Doanh thu theo thang trong nam cho Admin (chi tinh hoa hong) cho booking COMPLETED */
+    /** Doanh thu theo thang trong nam cho Admin (chi tinh hoa hong) cho booking */
     @Query("""
         SELECT MONTH(b.appointmentDatetime),
                COALESCE(SUM(
@@ -132,7 +132,7 @@ public interface BookingRepository extends JpaRepository<Booking, Integer> {
                    )
                ), 0)
         FROM Booking b JOIN b.services s
-        WHERE b.status = 'COMPLETED'
+        WHERE b.status IN ('CONFIRMED', 'IN_PROGRESS', 'COMPLETED')
           AND YEAR(b.appointmentDatetime) = :year
         GROUP BY MONTH(b.appointmentDatetime)
     """)
@@ -217,4 +217,51 @@ public interface BookingRepository extends JpaRepository<Booking, Integer> {
 
     @Query("SELECT DISTINCT b.shop.id FROM Booking b WHERE b.user.email = :email")
     List<Integer> findShopIdsByUserEmail(@Param("email") String email);
+
+    @Query("""
+        SELECT DATE(b.appointmentDatetime),
+               COALESCE(SUM(
+                   s.price * (
+                       CASE 
+                           WHEN (LOWER(s.category) LIKE '%grooming%' OR LOWER(s.category) LIKE '%spa%') THEN 0.18
+                           WHEN (LOWER(s.category) LIKE '%boarding%' OR LOWER(s.category) LIKE '%hotel%') AND s.cameraEnabled = true THEN 0.25
+                           ELSE 0.10
+                       END
+                   )
+               ), 0)
+        FROM Booking b JOIN b.services s
+        WHERE b.status IN ('CONFIRMED', 'IN_PROGRESS', 'COMPLETED')
+          AND YEAR(b.appointmentDatetime) = :year
+          AND MONTH(b.appointmentDatetime) = :month
+        GROUP BY DATE(b.appointmentDatetime)
+    """)
+    List<Object[]> adminCommissionByDateRange(@Param("year") int year, @Param("month") int month);
+
+    @Query("""
+        SELECT DATE(b.appointmentDatetime),
+               COALESCE(SUM(
+                   s.price * (
+                       CASE 
+                           WHEN (LOWER(s.category) LIKE '%grooming%' OR LOWER(s.category) LIKE '%spa%') THEN 0.18
+                           WHEN (LOWER(s.category) LIKE '%boarding%' OR LOWER(s.category) LIKE '%hotel%') AND s.cameraEnabled = true THEN 0.25
+                           ELSE 0.10
+                       END
+                   )
+               ), 0)
+        FROM Booking b JOIN b.services s
+        WHERE b.status = 'COMPLETED'
+          AND YEAR(b.appointmentDatetime) = :year
+          AND MONTH(b.appointmentDatetime) = :month
+        GROUP BY DATE(b.appointmentDatetime)
+    """)
+    List<Object[]> adminBalanceByDateRange(@Param("year") int year, @Param("month") int month);
+
+    @Query("""
+        SELECT DATE(b.appointmentDatetime), COUNT(b)
+        FROM Booking b
+        WHERE b.status != 'CANCELLED'
+          AND YEAR(b.appointmentDatetime) = :year AND MONTH(b.appointmentDatetime) = :month
+        GROUP BY DATE(b.appointmentDatetime)
+    """)
+    List<Object[]> bookingCountByDateRange(@Param("year") int year, @Param("month") int month);
 }

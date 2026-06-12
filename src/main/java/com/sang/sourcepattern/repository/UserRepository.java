@@ -32,5 +32,32 @@ public interface UserRepository extends JpaRepository<User, Integer> {
 
     @Query("SELECT COUNT(u) FROM User u WHERE u.createdAt BETWEEN :start AND :end")
     long countUsersBetween(@Param("start") java.time.LocalDateTime start, @Param("end") java.time.LocalDateTime end);
+
+    @Query("""
+        SELECT DATE(u.createdAt), COUNT(u)
+        FROM User u
+        WHERE YEAR(u.createdAt) = :year AND MONTH(u.createdAt) = :month
+        GROUP BY DATE(u.createdAt)
+    """)
+    List<Object[]> userCountByDateRange(@Param("year") int year, @Param("month") int month);
+
+    @Query("""
+        SELECT DATE(u.createdAt), COUNT(u)
+        FROM User u
+        WHERE YEAR(u.createdAt) = :year AND MONTH(u.createdAt) = :month AND u.active = true
+        GROUP BY DATE(u.createdAt)
+    """)
+    List<Object[]> activeUserCountByDateRange(@Param("year") int year, @Param("month") int month);
+
+    @Query("""
+        SELECT DATE(u.createdAt), COUNT(u)
+        FROM User u
+        WHERE YEAR(u.createdAt) = :year AND MONTH(u.createdAt) = :month AND u.active = false
+        GROUP BY DATE(u.createdAt)
+    """)
+    List<Object[]> inactiveUserCountByDateRange(@Param("year") int year, @Param("month") int month);
+
+    long countByActiveTrue();
+    long countByActiveFalse();
 }
 

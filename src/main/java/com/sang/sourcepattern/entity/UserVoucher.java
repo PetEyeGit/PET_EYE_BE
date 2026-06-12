@@ -29,6 +29,9 @@ public class UserVoucher {
     @Builder.Default
     boolean isUsed = false;
 
+    @Builder.Default
+    LocalDateTime createdAt = LocalDateTime.now();
+
     LocalDateTime usedAt;
     
     LocalDateTime expiresAt;

@@ -40,7 +40,15 @@ public interface MessageRepository extends JpaRepository<Message, Integer> {
     void markAllAsRead(@Param("shopId") int shopId, @Param("channelType") String channelType, @Param("readerRole") String readerRole);
 
     @Modifying
-    @Transactional
+    @org.springframework.transaction.annotation.Transactional
     @Query("UPDATE Message m SET m.isRead = true WHERE m.shopId = :shopId AND m.channelType = :channelType AND m.recipientEmail = :recipientEmail AND m.senderRole <> :readerRole AND m.isRead = false")
-    void markRecipientAllAsRead(@Param("shopId") int shopId, @Param("channelType") String channelType, @Param("recipientEmail") String recipientEmail, @Param("readerRole") String readerRole);
+    void markRecipientAllAsRead(@org.springframework.data.repository.query.Param("shopId") int shopId, @org.springframework.data.repository.query.Param("channelType") String channelType, @org.springframework.data.repository.query.Param("recipientEmail") String recipientEmail, @org.springframework.data.repository.query.Param("readerRole") String readerRole);
+
+    @Query("""
+        SELECT DATE(m.createdAt), COUNT(m)
+        FROM Message m
+        WHERE YEAR(m.createdAt) = :year AND MONTH(m.createdAt) = :month
+        GROUP BY DATE(m.createdAt)
+    """)
+    List<Object[]> messageCountByDateRange(@org.springframework.data.repository.query.Param("year") int year, @org.springframework.data.repository.query.Param("month") int month);
 }

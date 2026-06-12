@@ -60,6 +60,9 @@ public class Shop {
     @Builder.Default
     ShopStatus status = ShopStatus.PENDING;
 
+    @Builder.Default
+    java.time.LocalDateTime createdAt = java.time.LocalDateTime.now();
+
     /** MANUAL | OPEN_POOL | AUTO — default: MANUAL */
     @Builder.Default
     String assignmentMode = "MANUAL";

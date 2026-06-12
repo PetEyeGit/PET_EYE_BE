@@ -39,4 +39,13 @@ public interface TransactionRepository extends JpaRepository<Transaction, Intege
     @Query("SELECT COALESCE(SUM(t.amount), 0) FROM Transaction t " +
            "WHERE t.type = 'BOOKING_PAYMENT' AND t.status = 'SUCCESS'")
     BigDecimal sumTotalRevenue();
+
+    @Query("""
+        SELECT DATE(t.createdAt), COALESCE(SUM(t.amount), 0)
+        FROM Transaction t
+        WHERE YEAR(t.createdAt) = :year AND MONTH(t.createdAt) = :month
+          AND t.status = 'SUCCESS'
+        GROUP BY DATE(t.createdAt)
+    """)
+    List<Object[]> transactionVolumeByDateRange(@org.springframework.data.repository.query.Param("year") int year, @org.springframework.data.repository.query.Param("month") int month);
 }
