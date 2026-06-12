@@ -64,8 +64,8 @@ public class ChatController {
                            roles.contains("STAFF") ? "STAFF" : "USER";
 
         String finalRecipient = request.getRecipientEmail();
-        // If USER is sending to CUSTOMER_CHAT, the recipient is themselves (channel identifier)
-        if ("USER".equals(senderRole) && "CUSTOMER_CHAT".equals(request.getChannelType())) {
+        // If USER is sending to CUSTOMER_CHAT or CAMERA_CHAT, the recipient is themselves (channel identifier)
+        if ("USER".equals(senderRole) && ("CUSTOMER_CHAT".equals(request.getChannelType()) || "CAMERA_CHAT".equals(request.getChannelType()))) {
             finalRecipient = senderEmail;
         }
 
@@ -75,8 +75,8 @@ public class ChatController {
             return;
         }
 
-        // BA Logic: STAFF can only message CUSTOMER_CHAT if they are assigned via a Booking
-        if ("STAFF".equals(senderRole) && "CUSTOMER_CHAT".equals(request.getChannelType())) {
+        // BA Logic: STAFF can only message CUSTOMER_CHAT or CAMERA_CHAT if they are assigned via a Booking
+        if ("STAFF".equals(senderRole) && ("CUSTOMER_CHAT".equals(request.getChannelType()) || "CAMERA_CHAT".equals(request.getChannelType()))) {
             boolean isAuthorized = false;
             Staff staff = staffRepository.findByUserEmail(senderEmail).orElse(null);
             if (staff != null) {
@@ -111,6 +111,8 @@ public class ChatController {
         if ("CUSTOMER_CHAT".equals(message.getChannelType())) {
             // Broadcast to a specific customer sub-topic
             destination = "/topic/chat/" + request.getShopId() + "/customer/" + message.getRecipientEmail();
+        } else if ("CAMERA_CHAT".equals(message.getChannelType())) {
+            destination = "/topic/chat/" + request.getShopId() + "/camera/" + message.getRecipientEmail();
         } else if ("DIRECT".equals(message.getChannelType())) {
             // 1-1 chat between Owner and Staff. We use the staff's email as the channel identifier.
             String staffEmail = roles.contains("SHOP_OWNER") ? message.getRecipientEmail() : senderEmail;
@@ -133,13 +135,15 @@ public class ChatController {
                            roles.contains("STAFF") ? "STAFF" : "USER";
 
         String finalRecipient = request.getRecipientEmail();
-        if ("USER".equals(senderRole) && "CUSTOMER_CHAT".equals(request.getChannelType())) {
+        if ("USER".equals(senderRole) && ("CUSTOMER_CHAT".equals(request.getChannelType()) || "CAMERA_CHAT".equals(request.getChannelType()))) {
             finalRecipient = senderEmail;
         }
 
         String destination;
         if ("CUSTOMER_CHAT".equals(request.getChannelType())) {
             destination = "/topic/chat/" + request.getShopId() + "/typing/customer/" + finalRecipient;
+        } else if ("CAMERA_CHAT".equals(request.getChannelType())) {
+            destination = "/topic/chat/" + request.getShopId() + "/typing/camera/" + finalRecipient;
         } else if ("DIRECT".equals(request.getChannelType())) {
             String staffEmail = roles.contains("SHOP_OWNER") ? request.getRecipientEmail() : senderEmail;
             destination = "/topic/chat/" + request.getShopId() + "/typing/direct/" + staffEmail;
@@ -191,7 +195,7 @@ public class ChatController {
 
         // Security check for USER role
         if (roles.contains("USER")) {
-            if (!"CUSTOMER_CHAT".equals(channelType) && !(shopId == 0 && "ADMIN_SUPPORT".equals(channelType))) {
+            if (!"CUSTOMER_CHAT".equals(channelType) && !"CAMERA_CHAT".equals(channelType) && !(shopId == 0 && "ADMIN_SUPPORT".equals(channelType))) {
                 throw new AppException(ErrorCode.UNAUTHORIZED);
             }
             // User can only see their own chat
@@ -214,7 +218,7 @@ public class ChatController {
                 shopId, channelType, recipientEmail, myEmail);
             messages.addAll(received);
             messages.sort((a,b) -> a.getCreatedAt().compareTo(b.getCreatedAt()));
-        } else if ("CUSTOMER_CHAT".equals(channelType)) {
+        } else if ("CUSTOMER_CHAT".equals(channelType) || "CAMERA_CHAT".equals(channelType)) {
             messages = messageRepository.findByShopIdAndChannelTypeAndRecipientEmailOrderByCreatedAtAsc(
                     shopId, channelType, recipientEmail);
         } else {
@@ -292,7 +296,7 @@ public class ChatController {
                            roles.contains("STAFF") ? "STAFF" : 
                            roles.contains("USER") ? "USER" : "SHOP_OWNER";
 
-        if ("CUSTOMER_CHAT".equals(channelType) || (shopId == 0 && "ADMIN_SUPPORT".equals(channelType))) {
+        if ("CUSTOMER_CHAT".equals(channelType) || "CAMERA_CHAT".equals(channelType) || (shopId == 0 && "ADMIN_SUPPORT".equals(channelType))) {
             String targetCustomer = roles.contains("USER") ? myEmail : recipientEmail;
             messageRepository.markRecipientAllAsRead(shopId, channelType, targetCustomer, readerRole);
         } else {

@@ -42,6 +42,7 @@ public class SecurityConfig {
             "/shops/public",
             "/shops/public/**",
             "/shops/nearby",
+            "/shops/*/directions",
             "/bookings/staff/**",
             "/bookings/shop/*/available-slots",
             "/bookings/shop/*/available-slots-by-services",
