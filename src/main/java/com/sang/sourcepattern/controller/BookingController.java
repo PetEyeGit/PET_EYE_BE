@@ -134,10 +134,10 @@ public class BookingController {
 
     @GetMapping("/my")
     @PreAuthorize("hasRole('USER')")
-    @Operation(summary = "Get bookings of the authenticated user (paginated, 10 per page). status: all | upcoming | active | completed | cancelled")
+    @Operation(summary = "Get bookings of the authenticated user (paginated, 5 per page). status: all | upcoming | active | completed | cancelled")
     public ApiResponse<com.sang.sourcepattern.dto.response.PageResponse<BookingResponse>> getMyBookings(
             @RequestParam(defaultValue = "1") int page,
-            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "5") int size,
             @RequestParam(required = false) String status,
             @AuthenticationPrincipal Jwt jwt) {
         return ApiResponse.<com.sang.sourcepattern.dto.response.PageResponse<BookingResponse>>builder()

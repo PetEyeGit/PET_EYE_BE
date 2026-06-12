@@ -34,7 +34,7 @@ public class TransactionController {
     public ApiResponse<PageResponse<TransactionResponse>> getCustomerTransactions(
             @AuthenticationPrincipal Jwt jwt,
             @RequestParam(defaultValue = "1") int page,
-            @RequestParam(defaultValue = "10") int size) {
+            @RequestParam(defaultValue = "5") int size) {
         return ApiResponse.<PageResponse<TransactionResponse>>builder()
                 .result(transactionService.getCustomerTransactions(jwt.getClaim("email"), page, size))
                 .build();
