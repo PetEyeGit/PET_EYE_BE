@@ -47,7 +47,15 @@ public class PrepareBookingTool implements AITool {
                                 "serviceKeyword", Map.of("type", "string",
                                         "description", "Tên dịch vụ cần đặt, ví dụ: tắm, cắt lông"),
                                 "petName", Map.of("type", "string",
-                                        "description", "Tên thú cưng (một phần cũng được)")
+                                        "description", "Tên thú cưng (một phần cũng được)"),
+                                "appointmentDate", Map.of("type", "string",
+                                        "description", "Ngày hẹn, định dạng YYYY-MM-DD (ví dụ: 2025-06-17)"),
+                                "appointmentTime", Map.of("type", "string",
+                                        "description", "Giờ hẹn, định dạng HH:mm (ví dụ: 16:00)"),
+                                "appointmentEndDate", Map.of("type", "string",
+                                        "description", "Ngày kết thúc (chỉ dùng cho dịch vụ lưu trú), định dạng YYYY-MM-DD"),
+                                "appointmentEndTime", Map.of("type", "string",
+                                        "description", "Giờ kết thúc (chỉ dùng cho dịch vụ lưu trú), định dạng HH:mm")
                         ),
                         "required", List.of("serviceKeyword")
                 )
@@ -65,6 +73,10 @@ public class PrepareBookingTool implements AITool {
         String serviceKw = ((String) args.get("serviceKeyword")).toLowerCase().trim();
         String petNameQuery = args.get("petName") instanceof String
                 ? ((String) args.get("petName")).toLowerCase().trim() : "";
+        String appDate = args.get("appointmentDate") instanceof String ? (String) args.get("appointmentDate") : null;
+        String appTime = args.get("appointmentTime") instanceof String ? (String) args.get("appointmentTime") : null;
+        String appEndDate = args.get("appointmentEndDate") instanceof String ? (String) args.get("appointmentEndDate") : null;
+        String appEndTime = args.get("appointmentEndTime") instanceof String ? (String) args.get("appointmentEndTime") : null;
 
         // 1. Find shop
         List<ShopResponse> shops = shopService.searchVerifiedShops(
@@ -74,24 +86,48 @@ public class PrepareBookingTool implements AITool {
             return ToolResult.error("Không tìm thấy shop: " + args.get("shopName"));
         }
 
-        ShopResponse matchedShop = shopNameQuery.isEmpty() ? shops.get(0) :
-                shops.stream()
-                        .filter(s -> s.getShopName().toLowerCase().contains(shopNameQuery))
+        ShopResponse matchedShop = null;
+        Service matchedService = null;
+
+        if (!shopNameQuery.isEmpty()) {
+            matchedShop = shops.stream()
+                    .filter(s -> s.getShopName().toLowerCase().contains(shopNameQuery))
+                    .findFirst()
+                    .orElse(shops.get(0));
+
+            // 2. Find service in that shop
+            List<Service> shopServices = serviceRepository.findByShopIdAndActiveTrue(matchedShop.getId());
+            matchedService = shopServices.stream()
+                    .filter(s -> s.getServiceName().toLowerCase().contains(serviceKw)
+                            || s.getCategory().toLowerCase().contains(serviceKw)
+                            || (s.getDescription() != null && s.getDescription().toLowerCase().contains(serviceKw)))
+                    .findFirst()
+                    .orElse(null);
+
+            if (matchedService == null) {
+                return ToolResult.error("Shop \"" + matchedShop.getShopName()
+                        + "\" không có dịch vụ \"" + args.get("serviceKeyword") + "\"");
+            }
+        } else {
+            // User didn't specify a shop, find ANY shop that has this service
+            for (ShopResponse shop : shops) {
+                List<Service> shopServices = serviceRepository.findByShopIdAndActiveTrue(shop.getId());
+                matchedService = shopServices.stream()
+                        .filter(s -> s.getServiceName().toLowerCase().contains(serviceKw)
+                                || s.getCategory().toLowerCase().contains(serviceKw)
+                                || (s.getDescription() != null && s.getDescription().toLowerCase().contains(serviceKw)))
                         .findFirst()
-                        .orElse(shops.get(0));
+                        .orElse(null);
+                
+                if (matchedService != null) {
+                    matchedShop = shop;
+                    break;
+                }
+            }
 
-        // 2. Find service in that shop
-        List<Service> shopServices = serviceRepository.findByShopIdAndActiveTrue(matchedShop.getId());
-        Service matchedService = shopServices.stream()
-                .filter(s -> s.getServiceName().toLowerCase().contains(serviceKw)
-                        || s.getCategory().toLowerCase().contains(serviceKw)
-                        || (s.getDescription() != null && s.getDescription().toLowerCase().contains(serviceKw)))
-                .findFirst()
-                .orElse(null);
-
-        if (matchedService == null) {
-            return ToolResult.error("Shop \"" + matchedShop.getShopName()
-                    + "\" không có dịch vụ \"" + args.get("serviceKeyword") + "\"");
+            if (matchedShop == null || matchedService == null) {
+                return ToolResult.error("Không tìm thấy shop nào có dịch vụ \"" + args.get("serviceKeyword") + "\"");
+            }
         }
 
         // 3. Find pet
@@ -119,6 +155,15 @@ public class PrepareBookingTool implements AITool {
         pickerData.put("servicePrice", matchedService.getPrice());
         pickerData.put("petId", matchedPet.getId());
         pickerData.put("petName", matchedPet.getName());
+        
+        boolean isBoarding = "BOARDING".equalsIgnoreCase(matchedService.getCategory()) 
+                          || "HOTEL".equalsIgnoreCase(matchedService.getCategory());
+        if (isBoarding) pickerData.put("isBoarding", true);
+        
+        if (appDate != null) pickerData.put("prefilledDate", appDate);
+        if (appTime != null) pickerData.put("prefilledTime", appTime);
+        if (appEndDate != null) pickerData.put("prefilledEndDate", appEndDate);
+        if (appEndTime != null) pickerData.put("prefilledEndTime", appEndTime);
 
         return ToolResult.builder()
                 .type("booking_picker")
@@ -128,6 +173,11 @@ public class PrepareBookingTool implements AITool {
                         "shopName", matchedShop.getShopName(),
                         "serviceName", matchedService.getServiceName(),
                         "petName", matchedPet.getName(),
+                        "isBoarding", isBoarding,
+                        "appointmentDate", appDate != null ? appDate : "",
+                        "appointmentTime", appTime != null ? appTime : "",
+                        "appointmentEndDate", appEndDate != null ? appEndDate : "",
+                        "appointmentEndTime", appEndTime != null ? appEndTime : "",
                         "message", "Đã tìm thấy đầy đủ thông tin, hiển thị form chọn ngày giờ"
                 ))
                 .build();
