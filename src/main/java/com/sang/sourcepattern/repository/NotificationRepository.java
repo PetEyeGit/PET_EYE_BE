@@ -21,6 +21,9 @@ public interface NotificationRepository extends JpaRepository<Notification, Inte
            ") ORDER BY n.createdAt DESC")
     Page<Notification> findDistinctBroadcasts(Pageable pageable);
 
+    @Query("SELECT COUNT(DISTINCT n.broadcastId) FROM Notification n")
+    long countDistinctBroadcasts();
+
     long countByBroadcastId(String broadcastId);
     long countByBroadcastIdAndIsReadTrue(String broadcastId);
 

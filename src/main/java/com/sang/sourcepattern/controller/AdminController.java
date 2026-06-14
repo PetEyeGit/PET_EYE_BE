@@ -89,6 +89,7 @@ public class AdminController {
         long unreadMessages = messageRepository
                 .countByShopIdAndChannelTypeAndIsReadFalseAndSenderRoleNot(0, "ADMIN_SUPPORT", "ADMIN");
         long totalVouchers = userVoucherRepository.count();
+        long totalBroadcasts = notificationRepository.countDistinctBroadcasts();
 
         // Period stats
         BigDecimal periodRevenue = bookingRepository.sumRevenueBetween(periodStart, periodEnd);
@@ -185,6 +186,7 @@ public class AdminController {
         result.put("unreadMessages", unreadMessages);
         result.put("totalVouchers", totalVouchers);
         result.put("totalVouchersSparkData", totalVouchersSparkData);
+        result.put("totalBroadcasts", totalBroadcasts);
 
         return ApiResponse.<Map<String, Object>>builder()
                 .result(result)
