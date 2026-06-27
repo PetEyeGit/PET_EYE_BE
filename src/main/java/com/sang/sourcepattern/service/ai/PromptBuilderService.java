@@ -93,14 +93,14 @@ public class PromptBuilderService {
                 5. Tư vấn cấp bậc tài khoản, hạng thành viên, đặc quyền và voucher khi user hỏi. (Lưu ý: Hệ thống sẽ tự động hiển thị thẻ thông tin cấp bậc chi tiết ngay bên dưới câu trả lời của bạn, vì vậy bạn chỉ cần phản hồi ngắn gọn, chúc mừng hoặc nhắc user xem thông tin ở thẻ bên dưới).
 
                 QUY TẮC CHỌN TOOL & ĐẶT LỊCH:
-                - ĐỂ ĐẶT LỊCH: Bạn PHẢI thu thập đủ 3 thông tin từ user: (1) Tên Shop, (2) Tên thú cưng, (3) Dịch vụ.
-                - Nếu user yêu cầu đặt lịch nhưng CUNG CẤP THIẾU bất kỳ thông tin nào trong 3 thông tin trên, KHÔNG GỌI TOOL ĐẶT LỊCH. Thay vào đó, hãy phản hồi bằng cách tóm tắt thông tin đã có và yêu cầu user bổ sung. 
-                  Ví dụ (nếu thiếu tên shop):
-                  "Shop: (chưa có)
-                  Thú cưng: Mochi
-                  Dịch vụ: Spa
-                  -> Vui lòng cung cấp thêm tên Shop bạn muốn đặt dịch vụ cho bé nhé!"
+                - ĐỂ ĐẶT LỊCH: Bạn CHỈ CẦN 2 thông tin từ user: (1) Tên thú cưng, (2) Dịch vụ.
+                - NẾU CHƯA CÓ TÊN SHOP hoặc user bảo "Tự tìm shop cho tôi": BẠN VẪN ĐƯỢC QUYỀN GỌI NGAY tool `prepare_booking`! TUYỆT ĐỐI ĐỪNG HỎI LẠI TÊN SHOP hay gọi tool tìm kiếm. Tool `prepare_booking` có khả năng tự động tìm shop tốt nhất để in ra form đặt lịch ngay lập tức!
+                - Nếu thiếu Tên thú cưng hoặc Dịch vụ, hãy hỏi lại user.
+                - Nếu user có nhắn thêm "chú ý", "nhắc nhở" hoặc "ghi chú" (ví dụ: "chú ý: bé bị đau bụng"), hãy truyền nội dung đó vào trường `note` của tool.
+                - KHI ĐÃ CÓ FORM ĐẶT LỊCH (vừa gọi xong `prepare_booking`) mà user CHƯA cung cấp ghi chú, BẠN BẮT BUỘC PHẢI HỎI THÊM một câu thân thiện: "Bạn có lưu ý gì đặc biệt cho bé không? (Ví dụ: bé nhát nước, cần vắt tuyến hôi...) để mình ghi chú lại cho Shop nhé!". Nếu user trả lời có, hãy gọi lại `prepare_booking` kèm trường `note` để cập nhật form.
                 - Đã có đủ tên shop + dịch vụ + tên thú cưng → dùng NGAY prepare_booking
+                - Hỏi xem hình ảnh, video, camera, hoặc thú cưng đang làm gì (khi đang lưu trú) → dùng view_live_camera
+                - Hỏi xem nhật ký, lịch trình, thú cưng đã làm gì trong lúc lưu trú → dùng get_pet_care_logs
                 - Hỏi về thú cưng → dùng get_my_pets
                 - Hỏi về dịch vụ cụ thể (tắm, cắt lông...) → dùng search_by_service
                 - Hỏi về shop theo tên/thành phố → dùng search_shops

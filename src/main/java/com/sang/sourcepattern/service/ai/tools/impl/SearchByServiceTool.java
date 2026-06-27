@@ -34,19 +34,25 @@ public class SearchByServiceTool implements AITool {
                 "parameters", Map.of(
                         "type", "object",
                         "properties", Map.of(
-                                "serviceKeyword", Map.of("type", "string",
-                                        "description", "Tên dịch vụ cần tìm, ví dụ: tắm, cắt lông, tiêm phòng"),
+                                "serviceKeywords", Map.of("type", "string",
+                                        "description", "Danh sách các dịch vụ cần tìm, cách nhau bằng dấu phẩy (ví dụ: cắt lông, siêu âm, tắm). Tool sẽ trả về shop có ĐẦY ĐỦ các dịch vụ này."),
                                 "city", Map.of("type", "string", "description", "Lọc theo thành phố (tuỳ chọn)"),
                                 "topN", Map.of("type", "number", "description", "Số lượng shop trả về, mặc định 5")
                         ),
-                        "required", List.of("serviceKeyword")
+                        "required", List.of("serviceKeywords")
                 )
         );
     }
 
     @Override
     public ToolResult execute(Map<String, Object> args, Jwt jwt) {
-        String serviceKeyword = ((String) args.get("serviceKeyword")).toLowerCase().trim();
+        String keywordStr = (String) args.getOrDefault("serviceKeywords", args.get("serviceKeyword"));
+        if (keywordStr == null) keywordStr = "";
+        String[] keywords = Arrays.stream(keywordStr.toLowerCase().split(","))
+                                  .map(String::trim)
+                                  .filter(k -> !k.isEmpty())
+                                  .toArray(String[]::new);
+
         String cityFilter = (String) args.get("city");
         int topN = args.get("topN") instanceof Number ? ((Number) args.get("topN")).intValue() : 5;
 
@@ -57,22 +63,40 @@ public class SearchByServiceTool implements AITool {
         List<Map<String, Object>> matched = new ArrayList<>();
         for (ShopResponse shop : allShops) {
             List<com.sang.sourcepattern.entity.Service> shopServices = serviceRepository.findByShopIdAndActiveTrue(shop.getId());
-            List<ServiceResponse> matchingServices = shopServices.stream()
-                    .filter(s -> s.getServiceName().toLowerCase().contains(serviceKeyword)
-                            || (s.getDescription() != null && s.getDescription().toLowerCase().contains(serviceKeyword))
-                            || s.getCategory().toLowerCase().contains(serviceKeyword))
-                    .map(s -> ServiceResponse.builder()
-                            .id(s.getId()).shopId(shop.getId()).shopName(shop.getShopName())
-                            .serviceName(s.getServiceName()).category(s.getCategory())
-                            .price(s.getPrice()).durationMinutes(s.getDurationMinutes())
-                            .description(s.getDescription()).active(s.isActive())
-                            .build())
-                    .collect(Collectors.toList());
+            
+            List<ServiceResponse> matchingServices = new ArrayList<>();
+            boolean hasAllRequired = true;
 
-            if (!matchingServices.isEmpty()) {
+            for (String kw : keywords) {
+                List<ServiceResponse> kwMatches = shopServices.stream()
+                        .filter(s -> s.getServiceName().toLowerCase().contains(kw)
+                                || (s.getDescription() != null && s.getDescription().toLowerCase().contains(kw))
+                                || s.getCategory().toLowerCase().contains(kw))
+                        .map(s -> ServiceResponse.builder()
+                                .id(s.getId()).shopId(shop.getId()).shopName(shop.getShopName())
+                                .serviceName(s.getServiceName()).category(s.getCategory())
+                                .price(s.getPrice()).durationMinutes(s.getDurationMinutes())
+                                .description(s.getDescription()).active(s.isActive())
+                                .build())
+                        .collect(Collectors.toList());
+                
+                if (kwMatches.isEmpty()) {
+                    hasAllRequired = false;
+                    break;
+                } else {
+                    matchingServices.addAll(kwMatches);
+                }
+            }
+
+            if (hasAllRequired && !matchingServices.isEmpty() && keywords.length > 0) {
+                // Remove duplicates if a service matched multiple keywords
+                List<ServiceResponse> uniqueServices = matchingServices.stream()
+                        .distinct()
+                        .collect(Collectors.toList());
+
                 Map<String, Object> entry = new LinkedHashMap<>();
                 entry.put("shop", shop);
-                entry.put("services", matchingServices);
+                entry.put("services", uniqueServices);
                 matched.add(entry);
             }
         }
@@ -94,7 +118,7 @@ public class SearchByServiceTool implements AITool {
         return ToolResult.builder()
                 .type("shop_list")
                 .data(result)
-                .geminiSummary(Map.of("serviceKeyword", serviceKeyword,
+                .geminiSummary(Map.of("serviceKeywords", keywordStr,
                         "count", result.size(), "shops", summary))
                 .build();
     }

@@ -65,7 +65,7 @@ public class CameraController {
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
 
         List<BookingResponse> activeCameras = bookingRepository.findByUserId(user.getId()).stream()
-                .filter(b -> List.of("CONFIRMED", "IN_PROGRESS", "COMPLETED").contains(b.getStatus()))
+                .filter(b -> List.of("CONFIRMED", "IN_PROGRESS").contains(b.getStatus()))
                 .filter(b -> b.getServices() != null && b.getServices().stream().anyMatch(s -> s.getCategory() != null &&
                         (s.getCategory().equalsIgnoreCase("BOARDING") ||
                                 s.getCategory().equalsIgnoreCase("Hotel"))))
