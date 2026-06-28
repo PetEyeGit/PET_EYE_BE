@@ -41,5 +41,7 @@ public class ServiceUpdateRequest {
 
     java.util.List<String> cageSize;
     java.util.List<String> roomType;
+    java.util.Map<String, Integer> roomTypePrices;
+
     java.util.List<java.math.BigDecimal> prices;
 }

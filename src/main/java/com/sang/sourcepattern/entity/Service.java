@@ -48,6 +48,9 @@ public class Service {
     // ── BOARDING-only details ────────────────────────────────────────────────
     String cageSize;
     String roomType;
+    @Column(columnDefinition = "TEXT")
+    String roomTypePrices;
+
     String prices;
 
     /**

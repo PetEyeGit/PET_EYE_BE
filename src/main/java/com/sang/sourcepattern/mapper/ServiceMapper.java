@@ -74,6 +74,7 @@ public interface ServiceMapper {
     @Mapping(target = "cameraTierLabels", expression = "java(mapStrToJson(request.getCameraTierLabels()))")
     @Mapping(target = "cageSize",         expression = "java(listToJson(request.getCageSize()))")
     @Mapping(target = "roomType",         expression = "java(listToJson(request.getRoomType()))")
+    @Mapping(target = "roomTypePrices",   expression = "java(mapIntToJson(request.getRoomTypePrices()))")
     @Mapping(target = "prices",           expression = "java(listBigDecimalToJson(request.getPrices()))")
     Service toService(ServiceCreationRequest request);
 
@@ -86,6 +87,7 @@ public interface ServiceMapper {
     @Mapping(target = "cameraTierLabels", expression = "java(jsonToMapStr(service.getCameraTierLabels()))")
     @Mapping(target = "cageSize",         expression = "java(jsonToList(service.getCageSize()))")
     @Mapping(target = "roomType",         expression = "java(jsonToList(service.getRoomType()))")
+    @Mapping(target = "roomTypePrices",   expression = "java(jsonToMapInt(service.getRoomTypePrices()))")
     @Mapping(target = "prices",           expression = "java(jsonToListBigDecimal(service.getPrices()))")
     ServiceResponse toServiceResponse(Service service);
 
@@ -100,6 +102,7 @@ public interface ServiceMapper {
     @Mapping(target = "cameraTierLabels", expression = "java(request.getCameraTierLabels() != null ? mapStrToJson(request.getCameraTierLabels()) : service.getCameraTierLabels())")
     @Mapping(target = "cageSize",         expression = "java(request.getCageSize() != null ? listToJson(request.getCageSize()) : service.getCageSize())")
     @Mapping(target = "roomType",         expression = "java(request.getRoomType() != null ? listToJson(request.getRoomType()) : service.getRoomType())")
+    @Mapping(target = "roomTypePrices",   expression = "java(request.getRoomTypePrices() != null ? mapIntToJson(request.getRoomTypePrices()) : service.getRoomTypePrices())")
     @Mapping(target = "prices",           expression = "java(request.getPrices() != null ? listBigDecimalToJson(request.getPrices()) : service.getPrices())")
     void updateService(@MappingTarget Service service, ServiceUpdateRequest request);
 }
