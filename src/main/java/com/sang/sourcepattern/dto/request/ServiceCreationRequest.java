@@ -43,4 +43,5 @@ public class ServiceCreationRequest {
 
     java.util.List<String> cageSize;
     java.util.List<String> roomType;
+    java.util.List<java.math.BigDecimal> prices;
 }

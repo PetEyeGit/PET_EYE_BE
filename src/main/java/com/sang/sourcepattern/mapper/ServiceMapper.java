@@ -29,6 +29,16 @@ public interface ServiceMapper {
         try { return JSON.readValue(json, new TypeReference<List<String>>() {}); } catch (Exception e) { return Collections.emptyList(); }
     }
 
+    default String listBigDecimalToJson(List<java.math.BigDecimal> list) {
+        if (list == null || list.isEmpty()) return null;
+        try { return JSON.writeValueAsString(list); } catch (Exception e) { return null; }
+    }
+
+    default List<java.math.BigDecimal> jsonToListBigDecimal(String json) {
+        if (json == null || json.isBlank()) return Collections.emptyList();
+        try { return JSON.readValue(json, new TypeReference<List<java.math.BigDecimal>>() {}); } catch (Exception e) { return Collections.emptyList(); }
+    }
+
     // ── Map<String,Integer> ↔ JSON string helpers ─────────────────────────────
 
     default String mapIntToJson(Map<String, Integer> map) {
@@ -64,6 +74,7 @@ public interface ServiceMapper {
     @Mapping(target = "cameraTierLabels", expression = "java(mapStrToJson(request.getCameraTierLabels()))")
     @Mapping(target = "cageSize",         expression = "java(listToJson(request.getCageSize()))")
     @Mapping(target = "roomType",         expression = "java(listToJson(request.getRoomType()))")
+    @Mapping(target = "prices",           expression = "java(listBigDecimalToJson(request.getPrices()))")
     Service toService(ServiceCreationRequest request);
 
     // ── toServiceResponse ─────────────────────────────────────────────────────
@@ -75,6 +86,7 @@ public interface ServiceMapper {
     @Mapping(target = "cameraTierLabels", expression = "java(jsonToMapStr(service.getCameraTierLabels()))")
     @Mapping(target = "cageSize",         expression = "java(jsonToList(service.getCageSize()))")
     @Mapping(target = "roomType",         expression = "java(jsonToList(service.getRoomType()))")
+    @Mapping(target = "prices",           expression = "java(jsonToListBigDecimal(service.getPrices()))")
     ServiceResponse toServiceResponse(Service service);
 
     // ── updateService ─────────────────────────────────────────────────────────
@@ -88,5 +100,6 @@ public interface ServiceMapper {
     @Mapping(target = "cameraTierLabels", expression = "java(request.getCameraTierLabels() != null ? mapStrToJson(request.getCameraTierLabels()) : service.getCameraTierLabels())")
     @Mapping(target = "cageSize",         expression = "java(request.getCageSize() != null ? listToJson(request.getCageSize()) : service.getCageSize())")
     @Mapping(target = "roomType",         expression = "java(request.getRoomType() != null ? listToJson(request.getRoomType()) : service.getRoomType())")
+    @Mapping(target = "prices",           expression = "java(request.getPrices() != null ? listBigDecimalToJson(request.getPrices()) : service.getPrices())")
     void updateService(@MappingTarget Service service, ServiceUpdateRequest request);
 }

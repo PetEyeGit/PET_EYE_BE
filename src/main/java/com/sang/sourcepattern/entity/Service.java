@@ -48,6 +48,7 @@ public class Service {
     // ── BOARDING-only details ────────────────────────────────────────────────
     String cageSize;
     String roomType;
+    String prices;
 
     /**
      * JSON array of supported camera tier IDs, e.g. ["BASIC","HD","AI"]
