@@ -156,6 +156,19 @@ public class BookingController {
                 .result(bookingService.getBookingById(id, jwt.getClaim("email")))
                 .build();
     }
+    @PutMapping("/{id}/update")
+    @PreAuthorize("hasRole('USER')")
+    @Operation(summary = "Update booking details (Pet, Staff, Services) for CONFIRMED bookings")
+    public ApiResponse<Object> updateBooking(
+            @PathVariable int id,
+            @RequestBody @Valid com.sang.sourcepattern.dto.request.UpdateBookingRequest request,
+            @AuthenticationPrincipal Jwt jwt) {
+
+        return ApiResponse.builder()
+                .result(bookingService.updateBooking(id, request, jwt.getClaim("email")))
+                .message("Booking update processed")
+                .build();
+    }
 
     @PostMapping("/{id}/cancel")
     @PreAuthorize("hasAnyRole('USER', 'SHOP_OWNER')")

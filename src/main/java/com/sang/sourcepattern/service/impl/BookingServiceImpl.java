@@ -103,6 +103,7 @@ public class BookingServiceImpl implements BookingService {
         String cageSize;
         String roomType;
         Integer userVoucherId;
+        Integer updateBookingId;
     }
 
     // ─── Redis helpers ────────────────────────────────────────────────────────
@@ -470,7 +471,7 @@ public class BookingServiceImpl implements BookingService {
                 request.getAppointmentDatetime(), request.getCheckIn(), request.getCheckOut(),
                 request.getNote(), amountVnd, description,
                 request.getCheckOut(), request.getCageSize(), request.getRoomType(),
-                request.getUserVoucherId()
+                request.getUserVoucherId(), null
         );
         savePending(orderCode, pending);
 
@@ -627,28 +628,40 @@ public class BookingServiceImpl implements BookingService {
             }
         }
 
-        // ── Tạo Booking ───────────────────────────────────────────────────────
+        // ── Tạo hoặc Update Booking ───────────────────────────────────────────────────────
         java.util.Set<Service> servicesSet = pendingServiceIds.stream()
                 .map(id -> serviceRepository.findById(id).orElse(null))
                 .filter(java.util.Objects::nonNull)
                 .collect(Collectors.toSet());
 
-        Booking booking = Booking.builder()
-                .user(user).shop(shop).pet(pet).staff(staff)
-                .services(servicesSet)
-                .appointmentDatetime(pending.getAppointmentDatetime())
-                .checkOutDatetime(pending.getCheckOutDatetime())
-                .cageSize(pending.getCageSize())
-                .roomType(pending.getRoomType())
-                .checkIn(pending.getCheckIn())
-                .checkOut(pending.getCheckOut())
-                .note(pending.getNote())
-                .status((staff != null && !"AUTO".equals(shop.getAssignmentMode())) ? "WAITING_SHOP_APPROVAL" : "CONFIRMED")
-                .payosOrderCode(orderCode)
-                .appliedVoucher(appliedVoucher)
-                .discountAmount(discountAmount)
-                .build();
-        booking = bookingRepository.save(booking);
+        Booking booking;
+        if (pending.getUpdateBookingId() != null) {
+            // Đây là luồng thanh toán thêm cọc khi Update Booking
+            booking = bookingRepository.findById(pending.getUpdateBookingId()).orElseThrow(() -> new AppException(ErrorCode.BOOKING_NOT_FOUND));
+            booking.setPet(pet);
+            booking.setStaff(staff);
+            booking.setServices(servicesSet);
+            booking.setCageSize(pending.getCageSize());
+            booking.setRoomType(pending.getRoomType());
+            booking = bookingRepository.save(booking);
+        } else {
+            booking = Booking.builder()
+                    .user(user).shop(shop).pet(pet).staff(staff)
+                    .services(servicesSet)
+                    .appointmentDatetime(pending.getAppointmentDatetime())
+                    .checkOutDatetime(pending.getCheckOutDatetime())
+                    .cageSize(pending.getCageSize())
+                    .roomType(pending.getRoomType())
+                    .checkIn(pending.getCheckIn())
+                    .checkOut(pending.getCheckOut())
+                    .note(pending.getNote())
+                    .status((staff != null && !"AUTO".equals(shop.getAssignmentMode())) ? "WAITING_SHOP_APPROVAL" : "CONFIRMED")
+                    .payosOrderCode(orderCode)
+                    .appliedVoucher(appliedVoucher)
+                    .discountAmount(discountAmount)
+                    .build();
+            booking = bookingRepository.save(booking);
+        }
 
         // ── Tạo Payment ───────────────────────────────────────────────────────
         Payment payment = Payment.builder()
@@ -954,7 +967,7 @@ public class BookingServiceImpl implements BookingService {
                 request.getPetId(), request.getStaffId(),
                 request.getAppointmentDatetime(), request.getCheckIn(), request.getCheckOut(),
                 request.getNote(), depositVnd, description,
-                request.getCheckOut(), request.getCageSize(), request.getRoomType(), null
+                request.getCheckOut(), request.getCageSize(), request.getRoomType(), null, null
         );
         redisTemplate.opsForValue().set(
                 CASH_PENDING_PREFIX + orderCode, pending,
@@ -1264,6 +1277,158 @@ public class BookingServiceImpl implements BookingService {
     }
 
     // ─── Cancel ───────────────────────────────────────────────────────────────
+
+    @Override
+    @Transactional
+    public Object updateBooking(int bookingId, com.sang.sourcepattern.dto.request.UpdateBookingRequest request, String userEmail) {
+        User user = resolveUser(userEmail);
+        Booking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new AppException(ErrorCode.BOOKING_NOT_FOUND));
+
+        if (booking.getUser().getId() != user.getId()) {
+            throw new AppException(ErrorCode.BOOKING_NOT_BELONG_TO_USER);
+        }
+
+        if (!"CONFIRMED".equals(booking.getStatus()) && !"WAITING_SHOP_APPROVAL".equals(booking.getStatus())) {
+            throw new AppException(ErrorCode.INVALID_REQUEST);
+        }
+
+        // Check if pet changed
+        if (request.getPetId() != null && (booking.getPet() == null || booking.getPet().getId() != request.getPetId())) {
+            Pet pet = petRepository.findById(request.getPetId())
+                    .orElseThrow(() -> new AppException(ErrorCode.PET_NOT_EXISTED));
+            if (pet.getOwner().getId() != user.getId()) {
+                throw new AppException(ErrorCode.PET_NOT_BELONG_TO_USER);
+            }
+            booking.setPet(pet);
+        }
+
+        // Check if staff changed
+        if (request.getStaffId() != null && (booking.getStaff() == null || booking.getStaff().getId() != request.getStaffId())) {
+            Staff staff = staffRepository.findById(request.getStaffId())
+                    .orElseThrow(() -> new AppException(ErrorCode.ROLE_NOT_FOUND));
+            if (staff.getShop().getId() != booking.getShop().getId()) {
+                throw new AppException(ErrorCode.STAFF_NOT_BELONG_TO_SHOP);
+            }
+            booking.setStaff(staff);
+        } else if (request.getStaffId() == null && booking.getStaff() != null) {
+            booking.setStaff(null);
+        }
+
+        // Check if services changed
+        boolean servicesChanged = false;
+        List<Integer> currentServiceIds = booking.getServices().stream().map(Service::getId).collect(Collectors.toList());
+        List<Integer> newServiceIds = request.getServiceIds();
+
+        if (newServiceIds != null && !newServiceIds.isEmpty()) {
+            if (currentServiceIds.size() != newServiceIds.size() || !currentServiceIds.containsAll(newServiceIds)) {
+                servicesChanged = true;
+            }
+        }
+
+        boolean boardingDetailsChanged = false;
+        if (request.getCageSize() != null && !request.getCageSize().equals(booking.getCageSize())) {
+            boardingDetailsChanged = true;
+        }
+        if (request.getRoomType() != null && !request.getRoomType().equals(booking.getRoomType())) {
+            boardingDetailsChanged = true;
+        }
+
+        if (!servicesChanged && !boardingDetailsChanged) {
+            // Only pet/staff changed -> Save and return BookingResponse
+            bookingRepository.save(booking);
+            return toResponse(booking);
+        }
+
+        // Services changed
+        List<Service> newServices = serviceRepository.findAllById(newServiceIds);
+        if (newServices.size() != newServiceIds.size()) {
+            throw new AppException(ErrorCode.SERVICE_NOT_FOUND);
+        }
+
+        java.math.BigDecimal newRawAmount = java.math.BigDecimal.ZERO;
+        for (Service s : newServices) {
+            java.math.BigDecimal price = s.getPrice();
+            if (s.getCategory() != null && (s.getCategory().equalsIgnoreCase("BOARDING") || s.getCategory().equalsIgnoreCase("Hotel"))) {
+                // If boarding, try to find price by cageSize
+                if (request.getCageSize() != null && s.getCageSize() != null) {
+                    try {
+                        List<String> cageSizes = new com.fasterxml.jackson.databind.ObjectMapper().readValue(s.getCageSize(), new com.fasterxml.jackson.core.type.TypeReference<List<String>>() {});
+                        List<java.math.BigDecimal> prices = null;
+                        if (s.getPrices() != null) {
+                            prices = new com.fasterxml.jackson.databind.ObjectMapper().readValue(s.getPrices(), new com.fasterxml.jackson.core.type.TypeReference<List<java.math.BigDecimal>>() {});
+                        }
+                        if (cageSizes != null && prices != null) {
+                            int idx = cageSizes.indexOf(request.getCageSize());
+                            if (idx != -1 && idx < prices.size() && prices.get(idx) != null) {
+                                price = prices.get(idx);
+                            }
+                        }
+                    } catch (Exception ignored) {
+                    }
+                }
+            }
+            if (price != null) newRawAmount = newRawAmount.add(price);
+        }
+
+        int newAmountVnd = newRawAmount.intValue();
+        int paidAmount = 0;
+        Payment payment = paymentRepository.findByBookingId(booking.getId()).orElse(null);
+        if (payment != null && "SUCCESS".equals(payment.getStatus())) {
+            paidAmount = payment.getAmount().intValue();
+        }
+
+        if (newAmountVnd <= paidAmount) {
+            // No extra payment needed
+            booking.setServices(new java.util.HashSet<>(newServices));
+            if (request.getCageSize() != null) booking.setCageSize(request.getCageSize());
+            if (request.getRoomType() != null) booking.setRoomType(request.getRoomType());
+            bookingRepository.save(booking);
+            return toResponse(booking);
+        }
+
+        // Extra payment needed
+        int extraAmount = newAmountVnd - paidAmount;
+        long orderCode = java.util.concurrent.ThreadLocalRandom.current().nextLong(10_000_000L, 99_999_999L);
+        String description = "Update " + booking.getId();
+        if (description.length() > 25) description = description.substring(0, 25);
+
+        PendingBooking pending = new PendingBooking(
+                user.getId(), booking.getShop().getId(), newServiceIds.get(0),
+                newServiceIds, request.getPetId() != null ? request.getPetId() : booking.getPet().getId(), 
+                request.getStaffId() != null ? request.getStaffId() : (booking.getStaff() != null ? booking.getStaff().getId() : null),
+                booking.getAppointmentDatetime(), booking.getCheckIn(), booking.getCheckOut(),
+                request.getNote() != null ? request.getNote() : booking.getNote(), 
+                extraAmount, description,
+                booking.getCheckOutDatetime(), 
+                request.getCageSize() != null ? request.getCageSize() : booking.getCageSize(), 
+                request.getRoomType() != null ? request.getRoomType() : booking.getRoomType(),
+                null, booking.getId()
+        );
+        savePending(orderCode, pending);
+
+        com.sang.sourcepattern.dto.response.PayOSCreateResponse payosResponse;
+        try {
+            payosResponse = payOSService.createPaymentLink(
+                    orderCode, extraAmount, description, returnUrl, cancelUrl);
+        } catch (Exception e) {
+            deletePending(orderCode);
+            throw new AppException(ErrorCode.PAYOS_ERROR);
+        }
+
+        if (payosResponse == null) {
+            deletePending(orderCode);
+            throw new AppException(ErrorCode.PAYOS_ERROR);
+        }
+
+        return InitiatePaymentResponse.builder()
+                .orderCode(orderCode)
+                .checkoutUrl(payosResponse.getData().getCheckoutUrl())
+                .qrCode(payosResponse.getData().getQrCode())
+                .amount(extraAmount)
+                .description(description)
+                .build();
+    }
 
     @Override
     @Transactional

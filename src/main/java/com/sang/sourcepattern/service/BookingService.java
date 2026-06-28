@@ -66,6 +66,9 @@ public interface BookingService {
     /** Get a single booking detail */
     BookingResponse getBookingById(int bookingId, String userEmail);
 
+    /** Update booking details */
+    Object updateBooking(int bookingId, com.sang.sourcepattern.dto.request.UpdateBookingRequest request, String userEmail);
+
     /** Cancel a booking */
     BookingResponse cancelBooking(int bookingId, String userEmail);
 
