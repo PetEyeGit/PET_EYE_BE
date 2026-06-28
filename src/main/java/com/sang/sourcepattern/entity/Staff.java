@@ -29,6 +29,9 @@ public class Staff {
     String role;
     String phone;
     String specialization;
+    
+    @Column(columnDefinition = "TEXT")
+    String avatar;
 
     @Builder.Default
     boolean isActive = true;

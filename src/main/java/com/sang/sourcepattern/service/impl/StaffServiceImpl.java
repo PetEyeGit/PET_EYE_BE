@@ -119,7 +119,7 @@ public class StaffServiceImpl implements StaffService {
                 .role(s.getRole())
                 .phone(s.getPhone())
                 .specialization(s.getSpecialization())
-                .avatar(s.getUser() != null ? s.getUser().getAvatar() : null)
+                .avatar(s.getAvatar() != null ? s.getAvatar() : (s.getUser() != null ? s.getUser().getAvatar() : null))
                 .isActive(s.isActive())
                 .certificates(certResponses)
                 .build();
@@ -164,6 +164,7 @@ public class StaffServiceImpl implements StaffService {
                 .role(request.getRole())
                 .phone(request.getPhone())
                 .specialization(request.getSpecialization())
+                .avatar(request.getAvatar())
                 .isActive(true)
                 .build();
 
@@ -232,6 +233,7 @@ public class StaffServiceImpl implements StaffService {
         staff.setPhone(request.getPhone());
         staff.setRole(request.getRole());
         staff.setSpecialization(request.getSpecialization());
+        staff.setAvatar(request.getAvatar());
 
         // Update linked User account too
         if (staff.getUser() != null) {

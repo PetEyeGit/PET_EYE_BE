@@ -16,4 +16,5 @@ public class StaffUpdateRequest {
     String phone;
     String role;
     String specialization;
+    String avatar;
 }
