@@ -693,7 +693,7 @@ public class ShopServiceImpl implements ShopService {
                             .role(s.getRole())
                             .phone(s.getPhone())
                             .specialization(s.getSpecialization())
-                            .avatar(s.getUser() != null ? s.getUser().getAvatar() : null)
+                            .avatar(s.getAvatar() != null ? s.getAvatar() : (s.getUser() != null ? s.getUser().getAvatar() : null))
                             .isActive(s.isActive())
                             .certificates(certs)
                             .build();

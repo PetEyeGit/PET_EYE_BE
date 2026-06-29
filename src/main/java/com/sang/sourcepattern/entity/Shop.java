@@ -34,7 +34,10 @@ public class Shop {
     /** Tọa độ địa lý — lấy từ Goong Geocoding API */
     Double latitude;
     Double longitude;
+    
+    @Column(columnDefinition = "TEXT")
     String description;
+    
     String licenseNumber;
     String licenseImageUrl;
     String logoUrl;
