@@ -42,6 +42,8 @@ public class Shop {
     String licenseImageUrl;
     String logoUrl;
     String bannerUrl;
+
+    @Column(columnDefinition = "TEXT")
     String galleryUrls;
 
     String openTime;
