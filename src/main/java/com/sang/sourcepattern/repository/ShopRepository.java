@@ -30,6 +30,7 @@ public interface ShopRepository extends JpaRepository<Shop, Integer> {
         SELECT DISTINCT s FROM Shop s
         LEFT JOIN FETCH s.services svc
         WHERE s.isVerified = true
+          AND s.owner.active = true
           AND (:keyword IS NULL OR :keyword = ''
                OR LOWER(s.shopName) LIKE LOWER(CONCAT('%', :keyword, '%'))
                OR LOWER(s.description) LIKE LOWER(CONCAT('%', :keyword, '%'))
@@ -54,6 +55,7 @@ public interface ShopRepository extends JpaRepository<Shop, Integer> {
     @Query(value = """
         SELECT DISTINCT s FROM Shop s
         WHERE s.isVerified = true
+          AND s.owner.active = true
           AND (:keyword IS NULL OR :keyword = ''
                OR LOWER(s.shopName) LIKE LOWER(CONCAT('%', :keyword, '%'))
                OR LOWER(s.description) LIKE LOWER(CONCAT('%', :keyword, '%'))
@@ -68,6 +70,7 @@ public interface ShopRepository extends JpaRepository<Shop, Integer> {
         countQuery = """
         SELECT COUNT(DISTINCT s) FROM Shop s
         WHERE s.isVerified = true
+          AND s.owner.active = true
           AND (:keyword IS NULL OR :keyword = ''
                OR LOWER(s.shopName) LIKE LOWER(CONCAT('%', :keyword, '%'))
                OR LOWER(s.description) LIKE LOWER(CONCAT('%', :keyword, '%'))

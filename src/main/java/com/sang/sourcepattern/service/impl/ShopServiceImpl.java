@@ -626,7 +626,7 @@ public class ShopServiceImpl implements ShopService {
     public ShopResponse getVerifiedShopById(int id) {
         Shop shop = shopRepository.findById(id)
                 .orElseThrow(() -> new AppException(ErrorCode.SHOP_NOT_FOUND));
-        if (!shop.isVerified()) {
+        if (!shop.isVerified() || shop.getOwner() == null || !shop.getOwner().isActive()) {
             throw new AppException(ErrorCode.SHOP_NOT_FOUND);
         }
         ShopResponse response = shopMapper.toShopResponse(shop);
@@ -707,9 +707,9 @@ public class ShopServiceImpl implements ShopService {
         
         LatLong userLocation = new LatLong(latitude, longitude);
         
-        // Get all verified shops
+        // Get all verified shops with active owners
         List<Shop> verifiedShops = shopRepository.findAll().stream()
-                .filter(Shop::isVerified)
+                .filter(shop -> shop.isVerified() && shop.getOwner() != null && shop.getOwner().isActive())
                 .toList();
         
         // Calculate distance for each shop and filter by radius
@@ -753,7 +753,7 @@ public class ShopServiceImpl implements ShopService {
         Shop shop = shopRepository.findById(shopId)
                 .orElseThrow(() -> new AppException(ErrorCode.SHOP_NOT_FOUND));
         
-        if (!shop.isVerified()) {
+        if (!shop.isVerified() || shop.getOwner() == null || !shop.getOwner().isActive()) {
             throw new AppException(ErrorCode.SHOP_NOT_FOUND);
         }
         

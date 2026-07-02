@@ -107,6 +107,11 @@ public class ServiceServiceImpl implements ServiceService {
 
     @Override
     public List<ServiceResponse> getServicesByShop(int shopId) {
+        Shop shop = shopRepository.findById(shopId)
+                .orElseThrow(() -> new AppException(ErrorCode.SHOP_NOT_FOUND));
+        if (!shop.isVerified() || shop.getOwner() == null || !shop.getOwner().isActive()) {
+            throw new AppException(ErrorCode.SHOP_NOT_FOUND);
+        }
         // Public: only active services
         return serviceRepository.findByShopIdAndActiveTrue(shopId)
                 .stream()
