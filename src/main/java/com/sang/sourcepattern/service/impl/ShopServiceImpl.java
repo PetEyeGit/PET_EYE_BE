@@ -98,11 +98,11 @@ public class ShopServiceImpl implements ShopService {
                 .max(java.time.LocalDateTime::compareTo)
                 .orElse(null);
 
-        String tier = "NEW";
+        String tier = "Đồng";
         if (totalSpent.compareTo(new java.math.BigDecimal("5000000")) >= 0 || userBookings.size() >= 20) {
-            tier = "VIP";
+            tier = "Vàng";
         } else if (userBookings.size() >= 10) {
-            tier = "REGULAR";
+            tier = "Bạc";
         }
 
         CustomerItemResponse info = CustomerItemResponse.builder()
@@ -110,6 +110,7 @@ public class ShopServiceImpl implements ShopService {
                 .name(customer.getFullName())
                 .email(customer.getEmail())
                 .phone(customer.getPhone())
+                .address(customer.getAddress())
                 .avatar(customer.getAvatar())
                 .pets(pets.size())
                 .totalBookings(userBookings.size())
@@ -155,11 +156,11 @@ public class ShopServiceImpl implements ShopService {
                     .orElse(null);
 
             // Determine Tier logic
-            String tier = "NEW";
+            String tier = "Đồng";
             if (totalSpent.compareTo(new java.math.BigDecimal("5000000")) >= 0 || userBookings.size() >= 20) {
-                tier = "VIP";
+                tier = "Vàng";
             } else if (userBookings.size() >= 10) {
-                tier = "REGULAR";
+                tier = "Bạc";
             }
 
             java.time.format.DateTimeFormatter formatter = java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy");
@@ -169,6 +170,7 @@ public class ShopServiceImpl implements ShopService {
                     .name(user.getFullName())
                     .email(user.getEmail())
                     .phone(user.getPhone())
+                    .address(user.getAddress())
                     .avatar(user.getAvatar())
                     .pets((int) petCount)
                     .totalBookings(userBookings.size())

@@ -456,4 +456,39 @@ public class EmailServiceImpl implements EmailService {
                 
         doSend(toEmail, subject, html);
     }
+
+    @Async
+    @Override
+    public void sendNewBookingToShopEmail(String toEmail, Booking booking) {
+        String subject = "[PET EYE] Đơn đặt lịch mới - Đơn hàng #" + booking.getId();
+        String customerName = booking.getUser() != null && booking.getUser().getFullName() != null ? booking.getUser().getFullName() : "Khách hàng";
+        String customerPhone = booking.getUser() != null && booking.getUser().getPhone() != null ? booking.getUser().getPhone() : "—";
+        String petName = booking.getPet() != null ? booking.getPet().getName() : "—";
+        
+        DateTimeFormatter dtFmt = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
+        String appointmentStr = booking.getAppointmentDatetime() != null
+                ? booking.getAppointmentDatetime().format(dtFmt) : "—";
+
+        String html = """
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 24px; border: 1px solid #e0e0e0; border-radius: 8px;">
+                    <h2 style="color: #4CAF50;">🎉 Bạn có một đơn đặt lịch mới!</h2>
+                    <p>Chào bạn,</p>
+                    <p>Khách hàng <strong>%s</strong> vừa đặt một lịch hẹn mới (Mã đơn: <strong>#%d</strong>).</p>
+                    
+                    <div style="background-color: #f9f9f9; padding: 16px; border-radius: 8px; margin: 16px 0; border-left: 4px solid #4CAF50;">
+                        <p style="margin: 4px 0;"><strong>Thời gian hẹn:</strong> <span style="color: #e53935; font-size: 16px; font-weight: bold;">%s</span></p>
+                        <p style="margin: 4px 0;"><strong>Khách hàng:</strong> %s</p>
+                        <p style="margin: 4px 0;"><strong>Số điện thoại:</strong> %s</p>
+                        <p style="margin: 4px 0;"><strong>Thú cưng:</strong> %s</p>
+                    </div>
+
+                    <p>Vui lòng đăng nhập vào hệ thống quản lý cửa hàng để xem chi tiết và chuẩn bị đón tiếp khách hàng.</p>
+
+                    <hr style="border: none; border-top: 1px solid #eee; margin: 24px 0;">
+                    <p style="color: #aaa; font-size: 12px; text-align: center;">PET EYE — Nền tảng chăm sóc thú cưng</p>
+                </div>
+                """.formatted(customerName, booking.getId(), appointmentStr, customerName, customerPhone, petName);
+                
+        doSend(toEmail, subject, html);
+    }
 }

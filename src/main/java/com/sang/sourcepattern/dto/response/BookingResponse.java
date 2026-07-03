@@ -26,6 +26,7 @@ public class BookingResponse {
     String customerName;
     String customerEmail;
     String customerPhone;
+    String customerAddress;
     Integer staffId;
     String staffName;
     LocalDateTime appointmentDatetime;

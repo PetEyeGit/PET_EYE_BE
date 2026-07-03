@@ -52,6 +52,7 @@ public class BookingMapper {
                 .customerName(booking.getUser() != null ? booking.getUser().getFullName() : null)
                 .customerEmail(booking.getUser() != null ? booking.getUser().getEmail() : null)
                 .customerPhone(booking.getUser() != null ? booking.getUser().getPhone() : null)
+                .customerAddress(booking.getUser() != null ? booking.getUser().getAddress() : null)
                 .staffId(booking.getStaff() != null ? booking.getStaff().getId() : null)
                 .staffName(booking.getStaff() != null ? booking.getStaff().getFullName() : null)
                 .appointmentDatetime(booking.getAppointmentDatetime())

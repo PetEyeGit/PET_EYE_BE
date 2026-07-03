@@ -15,6 +15,7 @@ public class CustomerItemResponse {
     String name;
     String email;
     String phone;
+    String address;
     String avatar;
     int pets;
     int totalBookings;

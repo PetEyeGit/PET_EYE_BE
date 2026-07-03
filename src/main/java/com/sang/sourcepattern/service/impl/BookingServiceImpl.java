@@ -238,6 +238,10 @@ public class BookingServiceImpl implements BookingService {
                 .services(serviceDtos)
                 .petId(booking.getPet().getId())
                 .petName(booking.getPet().getName())
+                .customerName(booking.getUser() != null ? booking.getUser().getFullName() : null)
+                .customerEmail(booking.getUser() != null ? booking.getUser().getEmail() : null)
+                .customerPhone(booking.getUser() != null ? booking.getUser().getPhone() : null)
+                .customerAddress(booking.getUser() != null ? booking.getUser().getAddress() : null)
                 .staffId(booking.getStaff() != null ? booking.getStaff().getId() : null)
                 .staffName(booking.getStaff() != null ? booking.getStaff().getFullName() : null)
                 .appointmentDatetime(booking.getAppointmentDatetime())
@@ -706,6 +710,14 @@ public class BookingServiceImpl implements BookingService {
         notificationRepository.save(notifOwner);
         messagingTemplate.convertAndSend("/topic/shop/" + shop.getId() + "/notifications", java.util.Map.of("message", "Có đơn hàng mới!"));
 
+        try {
+            if (shop.getEmail() != null && !shop.getEmail().isBlank()) {
+                emailService.sendNewBookingToShopEmail(shop.getEmail(), booking);
+            }
+        } catch (Exception e) {
+            log.warn("Failed to send new booking email to shop {}: {}", shop.getId(), e.getMessage());
+        }
+
         if (staff != null && staff.getUser() != null) {
             Notification notifStaff = Notification.builder()
                     .user(staff.getUser())
@@ -886,6 +898,14 @@ public class BookingServiceImpl implements BookingService {
                 .build();
         notificationRepository.save(notifOwner);
         messagingTemplate.convertAndSend("/topic/shop/" + shop.getId() + "/notifications", java.util.Map.of("message", "Có đơn hàng mới!"));
+
+        try {
+            if (shop.getEmail() != null && !shop.getEmail().isBlank()) {
+                emailService.sendNewBookingToShopEmail(shop.getEmail(), booking);
+            }
+        } catch (Exception e) {
+            log.warn("Failed to send new booking email to shop {}: {}", shop.getId(), e.getMessage());
+        }
 
         if (staff != null && staff.getUser() != null) {
             Notification notifStaff = Notification.builder()
@@ -1181,6 +1201,14 @@ public class BookingServiceImpl implements BookingService {
                 .build();
         notificationRepository.save(notifOwner);
         messagingTemplate.convertAndSend("/topic/shop/" + shop.getId() + "/notifications", java.util.Map.of("message", "Có đơn hàng mới!"));
+
+        try {
+            if (shop.getEmail() != null && !shop.getEmail().isBlank()) {
+                emailService.sendNewBookingToShopEmail(shop.getEmail(), booking);
+            }
+        } catch (Exception e) {
+            log.warn("Failed to send new booking email to shop {}: {}", shop.getId(), e.getMessage());
+        }
 
         if (staff != null && staff.getUser() != null) {
             Notification notifStaff = Notification.builder()
