@@ -39,7 +39,7 @@ public interface ShopRepository extends JpaRepository<Shop, Integer> {
           AND (:city IS NULL OR :city = ''
                OR LOWER(s.city) LIKE LOWER(CONCAT('%', :city, '%')))
           AND (:shopType IS NULL OR :shopType = ''
-               OR LOWER(s.shopType) = LOWER(:shopType)
+               OR LOWER(s.shopType) LIKE LOWER(CONCAT('%', :shopType, '%'))
                OR LOWER(s.shopType) = 'mixed')
         ORDER BY s.ratingAvg DESC
     """)
@@ -63,11 +63,11 @@ public interface ShopRepository extends JpaRepository<Shop, Integer> {
           AND (:city IS NULL OR :city = ''
                OR LOWER(s.city) LIKE LOWER(CONCAT('%', :city, '%')))
           AND (:shopType IS NULL OR :shopType = ''
-               OR LOWER(s.shopType) = LOWER(:shopType)
+               OR LOWER(s.shopType) LIKE LOWER(CONCAT('%', :shopType, '%'))
                OR LOWER(s.shopType) = 'mixed')
         ORDER BY s.ratingAvg DESC
         """,
-        countQuery = """
+            countQuery = """
         SELECT COUNT(DISTINCT s) FROM Shop s
         WHERE s.isVerified = true
           AND s.owner.active = true
@@ -78,7 +78,7 @@ public interface ShopRepository extends JpaRepository<Shop, Integer> {
           AND (:city IS NULL OR :city = ''
                OR LOWER(s.city) LIKE LOWER(CONCAT('%', :city, '%')))
           AND (:shopType IS NULL OR :shopType = ''
-               OR LOWER(s.shopType) = LOWER(:shopType)
+               OR LOWER(s.shopType) LIKE LOWER(CONCAT('%', :shopType, '%'))
                OR LOWER(s.shopType) = 'mixed')
         """)
     Page<Shop> searchVerifiedPaged(
