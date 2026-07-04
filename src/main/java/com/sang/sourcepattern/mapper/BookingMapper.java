@@ -73,7 +73,7 @@ public class BookingMapper {
                 .cameraConfiguredAt(booking.getCameraConfiguredAt())
                 .checkIn(booking.getCheckIn())
                 .checkOut(booking.getCheckOut())
-                .cageSize(booking.getCageSize())
+                .petWeight(booking.getPetWeight())
                 .roomType(booking.getRoomType())
                 .build();
     }

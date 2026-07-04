@@ -1,4 +1,4 @@
-﻿-- ============================================================================
+-- ============================================================================
 -- COMPLETE DATABASE RESET AND SEED DATA (1-CLICK RUN FOR DBEAVER)
 -- ============================================================================
 
@@ -119,6 +119,7 @@ CREATE TABLE IF NOT EXISTS `pet_service` (
                                              `shop_id` INT,
                                              `service_name` VARCHAR(150),
     `category` VARCHAR(50),
+    `pet_type` VARCHAR(20) DEFAULT 'DOG',
     `price` DOUBLE,
     `duration_minutes` INT,
     `description` TEXT,
@@ -126,7 +127,7 @@ CREATE TABLE IF NOT EXISTS `pet_service` (
     `active` TINYINT(1) DEFAULT 1,
     `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
     `camera_enabled` TINYINT(1) DEFAULT 0,
-    `cage_size` VARCHAR(50),
+    `pet_weight` VARCHAR(50),
     `room_type` VARCHAR(50),
     `camera_tiers` TEXT,
     `camera_tier_prices` TEXT,
@@ -159,7 +160,7 @@ CREATE TABLE IF NOT EXISTS `booking` (
                                          `check_out_datetime` DATETIME,
                                          `service_start_datetime` DATETIME,
                                          `service_end_datetime` DATETIME,
-                                         `cage_size` VARCHAR(50),
+                                         `pet_weight` VARCHAR(50),
     `room_type` VARCHAR(50),
     `status` VARCHAR(50),
     `note` TEXT,
@@ -607,7 +608,7 @@ INSERT INTO pet (id, owner_id, name, species, breed, gender, color, avatar, ster
 (7, 3, 'Luna',    'Cat', 'Siamese',           'Female', 'Kem và nâu',     NULL, 1, 3.5,  '2022-09-05', 'Khỏe mạnh, hiếu động',              'Pate cá, thịt gà',   'Không',   'Leo trèo, săn đồ chơi',NULL,                       1, NULL);
 
 -- 6. SERVICES (tên gọi thân thiện với thú cưng)
-INSERT INTO pet_service (id, shop_id, service_name, category, price, duration_minutes, description, image_url, active, created_at, camera_enabled, cage_size, room_type, camera_tiers, camera_tier_prices, camera_tier_labels, camera_description) VALUES
+INSERT INTO pet_service (id, shop_id, service_name, category, price, duration_minutes, description, image_url, active, created_at, camera_enabled, pet_weight, room_type, camera_tiers, camera_tier_prices, camera_tier_labels, camera_description) VALUES
 -- Clinic (shop 1)
 (1,  1, 'Khám sức khỏe tổng quát',     'CLINIC',   200000,  30,   'Kiểm tra toàn diện sức khỏe thú cưng: tim, phổi, răng, da, cân nặng', NULL, 1, '2024-01-01 10:00:00', 0, NULL, NULL, NULL, NULL, NULL, NULL),
 (2,  1, 'Tiêm phòng thú cưng',          'CLINIC',   150000,  15,   'Tiêm vaccine phòng dại, parvovirus, carré và các bệnh truyền nhiễm',   NULL, 1, '2024-01-01 10:00:00', 0, NULL, NULL, NULL, NULL, NULL, NULL),
@@ -641,7 +642,7 @@ INSERT INTO voucher (id, code, discount_type, discount_value, min_order_value, m
 -- customer3 (id=3): booking 3 COMPLETED + booking 7 CONFIRMED
 -- customer4 (id=4): booking 4 COMPLETED + booking 9 CONFIRMED
 -- customer5 (id=5): booking 6 COMPLETED + booking 10 CANCELLED
-INSERT INTO booking (id, user_id, shop_id, pet_id, staff_id, appointment_datetime, check_out_datetime, service_start_datetime, service_end_datetime, cage_size, room_type, status, note, voucher_id, discount_amount, cancellation_reason, bank_name, bank_account, account_holder, rtsp_link, completed_service_ids, completed_service_times, payos_order_code, camera_rtsp_url, camera_stream_url, camera_configured_at, check_in, check_out, created_at, updated_at) VALUES
+INSERT INTO booking (id, user_id, shop_id, pet_id, staff_id, appointment_datetime, check_out_datetime, service_start_datetime, service_end_datetime, pet_weight, room_type, status, note, voucher_id, discount_amount, cancellation_reason, bank_name, bank_account, account_holder, rtsp_link, completed_service_ids, completed_service_times, payos_order_code, camera_rtsp_url, camera_stream_url, camera_configured_at, check_in, check_out, created_at, updated_at) VALUES
 (1,  1, 1, 1,  1, '2024-05-10 10:00:00', NULL,                 '2024-05-10 10:00:00', '2024-05-10 10:30:00', NULL,    NULL,       'COMPLETED', 'Khám sức khỏe định kỳ cho Lucky',      1, 20000, NULL, NULL, NULL, NULL, NULL, '1',   '2024-05-10 10:30:00', 1001, NULL, NULL, NULL, '2024-05-10 10:00:00', '2024-05-10 10:30:00', '2024-05-08 15:00:00', '2024-05-10 10:30:00'),
 (2,  2, 1, 2,  2, '2024-05-12 14:00:00', NULL,                 '2024-05-12 14:00:00', '2024-05-12 14:15:00', NULL,    NULL,       'COMPLETED', 'Tiêm phòng định kỳ cho Miu Miu',       NULL, 0,    NULL, NULL, NULL, NULL, NULL, '2',   '2024-05-12 14:15:00', 1002, NULL, NULL, NULL, '2024-05-12 14:00:00', '2024-05-12 14:15:00', '2024-05-10 09:00:00', '2024-05-12 14:15:00'),
 (3,  3, 2, 3,  8, '2024-05-15 09:00:00', NULL,                 '2024-05-15 09:00:00', '2024-05-15 10:30:00', NULL,    NULL,       'COMPLETED', 'Tắm sấy và cắt tỉa lông cho Max',      3, 60000, NULL, NULL, NULL, NULL, NULL, '6,8', '2024-05-15 10:30:00', 1003, NULL, NULL, NULL, '2024-05-15 09:00:00', '2024-05-15 10:30:00', '2024-05-13 11:00:00', '2024-05-15 10:30:00'),

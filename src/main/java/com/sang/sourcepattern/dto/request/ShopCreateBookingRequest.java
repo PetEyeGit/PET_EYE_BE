@@ -38,6 +38,6 @@ public class ShopCreateBookingRequest {
 
     String note;
 
-    String cageSize;
+    String petWeight;
     String roomType;
 }

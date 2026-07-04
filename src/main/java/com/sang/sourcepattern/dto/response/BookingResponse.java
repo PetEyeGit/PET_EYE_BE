@@ -56,7 +56,7 @@ public class BookingResponse {
     LocalDateTime checkOut;
 
     // Service Boarding fields
-    String cageSize;
+    String petWeight;
     String roomType;
 
     // Category from primary service (BOARDING, CLINIC, GROOMING, etc.)

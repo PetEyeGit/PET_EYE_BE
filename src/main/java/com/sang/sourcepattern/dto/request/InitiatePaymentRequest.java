@@ -44,7 +44,7 @@ public class InitiatePaymentRequest {
     LocalDateTime checkOut;
 
     String note;
-    String cageSize;
+    String petWeight;
     String roomType;
 
     Integer userVoucherId;

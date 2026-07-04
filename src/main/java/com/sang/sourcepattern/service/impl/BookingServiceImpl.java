@@ -100,7 +100,7 @@ public class BookingServiceImpl implements BookingService {
         int amountVnd;
         String description;
         LocalDateTime checkOutDatetime;
-        String cageSize;
+        String petWeight;
         String roomType;
         Integer userVoucherId;
         Integer updateBookingId;
@@ -269,7 +269,7 @@ public class BookingServiceImpl implements BookingService {
                         : (booking.getAppointmentDatetime() != null
                                 ? booking.getAppointmentDatetime().plusMinutes(totalDuration)
                                 : null))
-                .cageSize(booking.getCageSize())
+                .petWeight(booking.getPetWeight())
                 .roomType(booking.getRoomType())
                 .category(isLodging ? "BOARDING" : (primaryService != null ? primaryService.getCategory() : null))
                 .build();
@@ -356,13 +356,67 @@ public class BookingServiceImpl implements BookingService {
         return java.util.Collections.singletonList(serviceId);
     }
 
+    private java.math.BigDecimal resolveSingleServicePrice(Service s, Integer petId, String petWeight) {
+        java.math.BigDecimal price = s.getPrice();
+        if (s.getPetWeight() != null) {
+            try {
+                List<String> weightTiers = new com.fasterxml.jackson.databind.ObjectMapper().readValue(s.getPetWeight(), new com.fasterxml.jackson.core.type.TypeReference<List<String>>() {});
+                List<java.math.BigDecimal> prices = null;
+                if (s.getPrices() != null) {
+                    prices = new com.fasterxml.jackson.databind.ObjectMapper().readValue(s.getPrices(), new com.fasterxml.jackson.core.type.TypeReference<List<java.math.BigDecimal>>() {});
+                }
+                if (weightTiers != null && !weightTiers.isEmpty() && prices != null && !prices.isEmpty()) {
+                    Double weight = null;
+                    if (petId != null) {
+                        Pet pet = petRepository.findById(petId).orElse(null);
+                        if (pet != null) {
+                            weight = (double) pet.getWeight();
+                        }
+                    }
+                    if (weight == null || weight <= 0) {
+                        if (petWeight != null) {
+                            try {
+                                weight = Double.parseDouble(petWeight.replaceAll("[^0-9.]", ""));
+                            } catch (Exception ignored) {}
+                        }
+                    }
+                    if (weight != null && weight > 0) {
+                        List<Double> thresholds = new java.util.ArrayList<>();
+                        for (String tier : weightTiers) {
+                            try {
+                                thresholds.add(Double.parseDouble(tier.replaceAll("[^0-9.]", "")));
+                            } catch (Exception e) {
+                                thresholds.add(0.0);
+                            }
+                        }
+                        int idx = 0;
+                        if (weight < thresholds.get(0)) {
+                            idx = 0;
+                        } else {
+                            for (int i = 0; i < thresholds.size(); i++) {
+                                if (weight >= thresholds.get(i)) {
+                                    idx = i;
+                                }
+                            }
+                        }
+                        if (idx < prices.size() && prices.get(idx) != null) {
+                            price = prices.get(idx);
+                        }
+                    }
+                }
+            } catch (Exception ignored) {
+            }
+        }
+        return price != null ? price : java.math.BigDecimal.ZERO;
+    }
+
     /**
      * Tính tổng giá của danh sách services.
      */
-    private java.math.BigDecimal resolveTotalPrice(List<Integer> ids) {
+    private java.math.BigDecimal resolveTotalPrice(List<Integer> ids, Integer petId, String petWeight) {
         return ids.stream()
                 .map(id -> serviceRepository.findById(id)
-                        .map(Service::getPrice)
+                        .map(s -> resolveSingleServicePrice(s, petId, petWeight))
                         .orElse(java.math.BigDecimal.ZERO))
                 .reduce(java.math.BigDecimal.ZERO, java.math.BigDecimal::add);
     }
@@ -437,7 +491,7 @@ public class BookingServiceImpl implements BookingService {
         long orderCode = ThreadLocalRandom.current().nextLong(10_000_000L, 99_999_999L);
         String description = "Booking" + orderCode % 100000;
         // Tổng giá tất cả services
-        int rawAmount = resolveTotalPrice(effectiveServiceIds).intValue();
+        int rawAmount = resolveTotalPrice(effectiveServiceIds, request.getPetId(), request.getPetWeight()).intValue();
 
         // --- Voucher Logic ---
         if (request.getUserVoucherId() != null) {
@@ -474,7 +528,7 @@ public class BookingServiceImpl implements BookingService {
                 request.getPetId(), request.getStaffId(),
                 request.getAppointmentDatetime(), request.getCheckIn(), request.getCheckOut(),
                 request.getNote(), amountVnd, description,
-                request.getCheckOut(), request.getCageSize(), request.getRoomType(),
+                request.getCheckOut(), request.getPetWeight(), request.getRoomType(),
                 request.getUserVoucherId(), null
         );
         savePending(orderCode, pending);
@@ -623,7 +677,7 @@ public class BookingServiceImpl implements BookingService {
                 userVoucherRepository.save(uv);
                 appliedVoucher = uv.getVoucher();
                 
-                int rawAmount = resolveTotalPrice(pendingServiceIds).intValue();
+                int rawAmount = resolveTotalPrice(pendingServiceIds, pending.getPetId(), pending.getPetWeight()).intValue();
                 if ("PERCENTAGE".equalsIgnoreCase(appliedVoucher.getDiscountType())) {
                     discountAmount = rawAmount * (appliedVoucher.getDiscountValue() / 100.0);
                 } else {
@@ -645,7 +699,7 @@ public class BookingServiceImpl implements BookingService {
             booking.setPet(pet);
             booking.setStaff(staff);
             booking.setServices(servicesSet);
-            booking.setCageSize(pending.getCageSize());
+            booking.setPetWeight(pending.getPetWeight());
             booking.setRoomType(pending.getRoomType());
             booking = bookingRepository.save(booking);
         } else {
@@ -654,7 +708,7 @@ public class BookingServiceImpl implements BookingService {
                     .services(servicesSet)
                     .appointmentDatetime(pending.getAppointmentDatetime())
                     .checkOutDatetime(pending.getCheckOutDatetime())
-                    .cageSize(pending.getCageSize())
+                    .petWeight(pending.getPetWeight())
                     .roomType(pending.getRoomType())
                     .checkIn(pending.getCheckIn())
                     .checkOut(pending.getCheckOut())
@@ -825,7 +879,7 @@ public class BookingServiceImpl implements BookingService {
                 userVoucherRepository.save(uv);
                 appliedVoucher = uv.getVoucher();
                 
-                int rawAmount = resolveTotalPrice(pendingServiceIds).intValue();
+                int rawAmount = resolveTotalPrice(pendingServiceIds, pending.getPetId(), pending.getPetWeight()).intValue();
                 if ("PERCENTAGE".equalsIgnoreCase(appliedVoucher.getDiscountType())) {
                     discountAmount = rawAmount * (appliedVoucher.getDiscountValue() / 100.0);
                 } else {
@@ -847,7 +901,7 @@ public class BookingServiceImpl implements BookingService {
                 .checkIn(pending.getCheckIn())
                 .checkOut(pending.getCheckOut())
                 .note(pending.getNote())
-                .cageSize(pending.getCageSize())
+                .petWeight(pending.getPetWeight())
                 .roomType(pending.getRoomType())
                 .status((staff != null && !"AUTO".equals(shop.getAssignmentMode())) ? "WAITING_SHOP_APPROVAL" : "CONFIRMED")
                 .payosOrderCode(orderCode)
@@ -972,7 +1026,7 @@ public class BookingServiceImpl implements BookingService {
         }
 
         // ── Tính tiền cọc = tổng phí hoa hồng admin cho các dịch vụ ─────────
-        BigDecimal rawDeposit = walletService.calculateAdminCommission(effectiveServiceIds);
+        BigDecimal rawDeposit = walletService.calculateAdminCommission(effectiveServiceIds, request.getPetWeight());
         int depositVnd = rawDeposit.setScale(0, java.math.RoundingMode.CEILING).intValue();
         depositVnd = Math.max(depositVnd, 2000);
         if (depositVnd % 1000 != 0) depositVnd = ((depositVnd / 1000) + 1) * 1000;
@@ -987,7 +1041,7 @@ public class BookingServiceImpl implements BookingService {
                 request.getPetId(), request.getStaffId(),
                 request.getAppointmentDatetime(), request.getCheckIn(), request.getCheckOut(),
                 request.getNote(), depositVnd, description,
-                request.getCheckOut(), request.getCageSize(), request.getRoomType(), null, null
+                request.getCheckOut(), request.getPetWeight(), request.getRoomType(), null, null
         );
         redisTemplate.opsForValue().set(
                 CASH_PENDING_PREFIX + orderCode, pending,
@@ -1145,12 +1199,12 @@ public class BookingServiceImpl implements BookingService {
                 .services(servicesSet)
                 .appointmentDatetime(pending.getAppointmentDatetime())
                 .checkOutDatetime(pending.getCheckOutDatetime())
-                .cageSize(pending.getCageSize())
+                .petWeight(pending.getPetWeight())
                 .roomType(pending.getRoomType())
                 .checkIn(pending.getCheckIn())
                 .checkOut(pending.getCheckOut())
                 .note(pending.getNote())
-                .cageSize(pending.getCageSize())
+                .petWeight(pending.getPetWeight())
                 .roomType(pending.getRoomType())
                 .status((staff != null && !"AUTO".equals(shop.getAssignmentMode())) ? "WAITING_SHOP_APPROVAL" : "CONFIRMED")
                 .payosOrderCode(orderCode)
@@ -1355,7 +1409,7 @@ public class BookingServiceImpl implements BookingService {
         }
 
         boolean boardingDetailsChanged = false;
-        if (request.getCageSize() != null && !request.getCageSize().equals(booking.getCageSize())) {
+        if (request.getPetWeight() != null && !request.getPetWeight().equals(booking.getPetWeight())) {
             boardingDetailsChanged = true;
         }
         if (request.getRoomType() != null && !request.getRoomType().equals(booking.getRoomType())) {
@@ -1376,26 +1430,7 @@ public class BookingServiceImpl implements BookingService {
 
         java.math.BigDecimal newRawAmount = java.math.BigDecimal.ZERO;
         for (Service s : newServices) {
-            java.math.BigDecimal price = s.getPrice();
-            if (s.getCategory() != null && (s.getCategory().equalsIgnoreCase("BOARDING") || s.getCategory().equalsIgnoreCase("Hotel"))) {
-                // If boarding, try to find price by cageSize
-                if (request.getCageSize() != null && s.getCageSize() != null) {
-                    try {
-                        List<String> cageSizes = new com.fasterxml.jackson.databind.ObjectMapper().readValue(s.getCageSize(), new com.fasterxml.jackson.core.type.TypeReference<List<String>>() {});
-                        List<java.math.BigDecimal> prices = null;
-                        if (s.getPrices() != null) {
-                            prices = new com.fasterxml.jackson.databind.ObjectMapper().readValue(s.getPrices(), new com.fasterxml.jackson.core.type.TypeReference<List<java.math.BigDecimal>>() {});
-                        }
-                        if (cageSizes != null && prices != null) {
-                            int idx = cageSizes.indexOf(request.getCageSize());
-                            if (idx != -1 && idx < prices.size() && prices.get(idx) != null) {
-                                price = prices.get(idx);
-                            }
-                        }
-                    } catch (Exception ignored) {
-                    }
-                }
-            }
+            java.math.BigDecimal price = resolveSingleServicePrice(s, request.getPetId(), request.getPetWeight());
             if (price != null) newRawAmount = newRawAmount.add(price);
         }
 
@@ -1409,7 +1444,7 @@ public class BookingServiceImpl implements BookingService {
         if (newAmountVnd <= paidAmount) {
             // No extra payment needed
             booking.setServices(new java.util.HashSet<>(newServices));
-            if (request.getCageSize() != null) booking.setCageSize(request.getCageSize());
+            if (request.getPetWeight() != null) booking.setPetWeight(request.getPetWeight());
             if (request.getRoomType() != null) booking.setRoomType(request.getRoomType());
             bookingRepository.save(booking);
             return toResponse(booking);
@@ -1429,7 +1464,7 @@ public class BookingServiceImpl implements BookingService {
                 request.getNote() != null ? request.getNote() : booking.getNote(), 
                 extraAmount, description,
                 booking.getCheckOutDatetime(), 
-                request.getCageSize() != null ? request.getCageSize() : booking.getCageSize(), 
+                request.getPetWeight() != null ? request.getPetWeight() : booking.getPetWeight(), 
                 request.getRoomType() != null ? request.getRoomType() : booking.getRoomType(),
                 null, booking.getId()
         );
@@ -1502,14 +1537,17 @@ public class BookingServiceImpl implements BookingService {
                     ? String.format("%s | %s | %s", booking.getBankName(), booking.getAccountHolder(), booking.getBankAccount())
                     : "Chưa có thông tin ngân hàng";
                     
-            BigDecimal totalPrice = (booking.getServices() != null && !booking.getServices().isEmpty())
-                    ? booking.getServices().stream().map(s -> s.getPrice() != null ? s.getPrice() : BigDecimal.ZERO).reduce(BigDecimal.ZERO, BigDecimal::add)
-                    : BigDecimal.ZERO;
+            BigDecimal totalPrice = BigDecimal.ZERO;
+            if (booking.getServices() != null && !booking.getServices().isEmpty()) {
+                for (com.sang.sourcepattern.entity.Service s : booking.getServices()) {
+                    totalPrice = totalPrice.add(resolveSingleServicePrice(s, booking.getPet() != null ? booking.getPet().getId() : null, booking.getPetWeight()));
+                }
+            }
                     
             List<Integer> serviceIds = booking.getServices().stream()
                     .map(com.sang.sourcepattern.entity.Service::getId)
                     .collect(Collectors.toList());
-            BigDecimal deposit = walletService.calculateAdminCommission(serviceIds);
+            BigDecimal deposit = walletService.calculateAdminCommission(serviceIds, booking.getPetWeight());
             
             long hoursToAppointment = 0;
             if (booking.getAppointmentDatetime() != null) {
@@ -2315,7 +2353,7 @@ public class BookingServiceImpl implements BookingService {
                 .checkOutDatetime(request.getCheckOut())
                 .checkIn(request.getCheckIn())
                 .checkOut(request.getCheckOut())
-                .cageSize(request.getCageSize())
+                .petWeight(request.getPetWeight())
                 .roomType(request.getRoomType())
                 .note(request.getNote())
                 .status("CONFIRMED")

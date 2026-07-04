@@ -17,6 +17,8 @@ public class ServiceUpdateRequest {
 
     String category;
 
+    String petType;
+
     @DecimalMin(value = "0.0", inclusive = false, message = "SERVICE_PRICE_INVALID")
     BigDecimal price;
 
@@ -39,7 +41,7 @@ public class ServiceUpdateRequest {
     java.util.Map<String, String> cameraTierLabels;
     String cameraDescription;
 
-    java.util.List<String> cageSize;
+    java.util.List<String> petWeight;
     java.util.List<String> roomType;
     java.util.Map<String, Integer> roomTypePrices;
 

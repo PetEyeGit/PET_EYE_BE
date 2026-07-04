@@ -47,7 +47,7 @@ public class BookingCreationRequest {
 
     String note;
 
-    String cageSize;
+    String petWeight;
     String roomType;
 
     /**

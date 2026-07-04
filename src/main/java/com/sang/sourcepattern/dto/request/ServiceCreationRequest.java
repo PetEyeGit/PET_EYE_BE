@@ -19,6 +19,8 @@ public class ServiceCreationRequest {
     @NotBlank(message = "SERVICE_CATEGORY_REQUIRED")
     String category;
 
+    String petType;
+
     @NotNull(message = "SERVICE_PRICE_REQUIRED")
     @DecimalMin(value = "0.0", inclusive = false, message = "SERVICE_PRICE_INVALID")
     BigDecimal price;
@@ -41,7 +43,7 @@ public class ServiceCreationRequest {
     java.util.Map<String, String> cameraTierLabels;
     String cameraDescription;
 
-    java.util.List<String> cageSize;
+    java.util.List<String> petWeight;
     java.util.List<String> roomType;
     java.util.Map<String, Integer> roomTypePrices;
 

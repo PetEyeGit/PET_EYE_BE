@@ -47,7 +47,7 @@ public class TaskResponse {
     LocalDateTime checkOutDatetime;
     LocalDateTime serviceStartDatetime;
     LocalDateTime serviceEndDatetime;
-    String cageSize;
+    String petWeight;
     String roomType;
 
     boolean cameraEnabled;

@@ -49,7 +49,7 @@ public class Booking {
     LocalDateTime serviceStartDatetime;
     LocalDateTime serviceEndDatetime;
 
-    String cageSize;
+    String petWeight;
     String roomType;
 
     /** PENDING_PAYMENT → CONFIRMED → COMPLETED | CANCELLED */

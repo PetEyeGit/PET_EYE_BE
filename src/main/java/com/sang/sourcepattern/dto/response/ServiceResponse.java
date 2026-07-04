@@ -17,6 +17,7 @@ public class ServiceResponse {
     String shopName;
     String serviceName;
     String category;
+    String petType;
     BigDecimal price;
     int durationMinutes;
     String description;
@@ -34,7 +35,7 @@ public class ServiceResponse {
     java.util.Map<String, String> cameraTierLabels;
     String cameraDescription;
     
-    java.util.List<String> cageSize;
+    java.util.List<String> petWeight;
     java.util.List<String> roomType;
     java.util.Map<String, Integer> roomTypePrices;
 

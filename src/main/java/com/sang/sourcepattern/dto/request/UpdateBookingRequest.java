@@ -25,7 +25,7 @@ public class UpdateBookingRequest {
     @NotNull(message = "SERVICE_IDS_REQUIRED")
     List<Integer> serviceIds;
 
-    String cageSize;
+    String petWeight;
     String roomType;
 
     String note;

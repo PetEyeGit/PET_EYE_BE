@@ -157,17 +157,64 @@ public class WalletServiceImpl implements WalletService {
         return adminFeeRate;
     }
 
+    private BigDecimal resolveSingleServicePrice(com.sang.sourcepattern.entity.Service s, String petWeight) {
+        BigDecimal price = s.getPrice();
+        if (s.getPetWeight() != null) {
+            try {
+                List<String> weightTiers = new com.fasterxml.jackson.databind.ObjectMapper().readValue(s.getPetWeight(), new com.fasterxml.jackson.core.type.TypeReference<List<String>>() {});
+                List<java.math.BigDecimal> prices = null;
+                if (s.getPrices() != null) {
+                    prices = new com.fasterxml.jackson.databind.ObjectMapper().readValue(s.getPrices(), new com.fasterxml.jackson.core.type.TypeReference<List<java.math.BigDecimal>>() {});
+                }
+                if (weightTiers != null && !weightTiers.isEmpty() && prices != null && !prices.isEmpty()) {
+                    Double weight = null;
+                    if (petWeight != null) {
+                        try {
+                            weight = Double.parseDouble(petWeight.replaceAll("[^0-9.]", ""));
+                        } catch (Exception ignored) {}
+                    }
+                    if (weight != null && weight > 0) {
+                        List<Double> thresholds = new java.util.ArrayList<>();
+                        for (String tier : weightTiers) {
+                            try {
+                                thresholds.add(Double.parseDouble(tier.replaceAll("[^0-9.]", "")));
+                            } catch (Exception e) {
+                                thresholds.add(0.0);
+                            }
+                        }
+                        int idx = 0;
+                        if (weight < thresholds.get(0)) {
+                            idx = 0;
+                        } else {
+                            for (int i = 0; i < thresholds.size(); i++) {
+                                if (weight >= thresholds.get(i)) {
+                                    idx = i;
+                                }
+                            }
+                        }
+                        if (idx < prices.size() && prices.get(idx) != null) {
+                            price = prices.get(idx);
+                        }
+                    }
+                }
+            } catch (Exception ignored) {
+            }
+        }
+        return price != null ? price : BigDecimal.ZERO;
+    }
+
     @Override
-    public BigDecimal calculateAdminCommission(List<Integer> serviceIds) {
+    public BigDecimal calculateAdminCommission(List<Integer> serviceIds, String petWeight) {
         if (serviceIds == null || serviceIds.isEmpty()) {
             return BigDecimal.ZERO;
         }
         BigDecimal totalCommission = BigDecimal.ZERO;
         for (Integer id : serviceIds) {
             com.sang.sourcepattern.entity.Service s = serviceRepository.findById(id).orElse(null);
-            if (s != null && s.getPrice() != null) {
+            if (s != null) {
+                BigDecimal price = resolveSingleServicePrice(s, petWeight);
                 BigDecimal rate = getCommissionRateForService(s);
-                totalCommission = totalCommission.add(s.getPrice().multiply(rate));
+                totalCommission = totalCommission.add(price.multiply(rate));
             }
         }
         return totalCommission;
@@ -179,10 +226,9 @@ public class WalletServiceImpl implements WalletService {
             return totalCommission;
         }
         for (com.sang.sourcepattern.entity.Service s : booking.getServices()) {
-            if (s.getPrice() != null) {
-                BigDecimal rate = getCommissionRateForService(s);
-                totalCommission = totalCommission.add(s.getPrice().multiply(rate));
-            }
+            BigDecimal price = resolveSingleServicePrice(s, booking.getPetWeight());
+            BigDecimal rate = getCommissionRateForService(s);
+            totalCommission = totalCommission.add(price.multiply(rate));
         }
         return totalCommission;
     }

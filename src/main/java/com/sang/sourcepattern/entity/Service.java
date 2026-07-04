@@ -26,6 +26,10 @@ public class Service {
 
     String serviceName;
     String category; // CLINIC, SPA, BOARDING, GROOMING, etc.
+
+    @Builder.Default
+    String petType = "DOG"; // DOG, CAT, OTHER
+
     BigDecimal price;
     int durationMinutes;
 
@@ -46,7 +50,7 @@ public class Service {
     boolean cameraEnabled = false;
 
     // ── BOARDING-only details ────────────────────────────────────────────────
-    String cageSize;
+    String petWeight;
     String roomType;
     @Column(columnDefinition = "TEXT")
     String roomTypePrices;

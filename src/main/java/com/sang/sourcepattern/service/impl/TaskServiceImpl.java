@@ -183,7 +183,7 @@ public class TaskServiceImpl implements TaskService {
                 .checkOut(b.getCheckOut())
                 .serviceStartDatetime(b.getServiceStartDatetime())
                 .serviceEndDatetime(b.getServiceEndDatetime())
-                .cageSize(b.getCageSize())
+                .petWeight(b.getPetWeight())
                 .roomType(b.getRoomType())
                 .status(b.getStatus())
                 .cameraEnabled(cameraEnabled)
@@ -296,7 +296,7 @@ public class TaskServiceImpl implements TaskService {
                 .checkOut(b.getCheckOut())
                 .serviceStartDatetime(b.getServiceStartDatetime())
                 .serviceEndDatetime(b.getServiceEndDatetime())
-                .cageSize(b.getCageSize()).roomType(b.getRoomType())
+                .petWeight(b.getPetWeight()).roomType(b.getRoomType())
                 .status(b.getStatus())
                 .cameraEnabled(cameraEnabled).rtspLink(b.getRtspLink())
                 .category("BOARDING")
@@ -348,7 +348,7 @@ public class TaskServiceImpl implements TaskService {
                 .checkOut(null)  // Không phải Lưu trú nên không có checkOut
                 .serviceStartDatetime(b.getServiceStartDatetime())
                 .serviceEndDatetime(null)
-                .cageSize(null).roomType(null)
+                .petWeight(null).roomType(null)
                 .status(b.getStatus())
                 .cameraEnabled(false).rtspLink(null)
                 .category(otherCategory)
@@ -857,12 +857,59 @@ public class TaskServiceImpl implements TaskService {
                 paymentRepository.save(payment);
             }
 
-            // Tính tiền phạt 30%
-            BigDecimal fullPrice = booking.getServices().stream()
-                    .map(s -> s.getPrice() != null ? s.getPrice() : BigDecimal.ZERO)
-                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            BigDecimal fullPrice = BigDecimal.ZERO;
+            for (com.sang.sourcepattern.entity.Service s : booking.getServices()) {
+                BigDecimal price = s.getPrice();
+                if (s.getPetWeight() != null) {
+                    try {
+                        List<String> weightTiers = new com.fasterxml.jackson.databind.ObjectMapper().readValue(s.getPetWeight(), new com.fasterxml.jackson.core.type.TypeReference<List<String>>() {});
+                        List<java.math.BigDecimal> prices = null;
+                        if (s.getPrices() != null) {
+                            prices = new com.fasterxml.jackson.databind.ObjectMapper().readValue(s.getPrices(), new com.fasterxml.jackson.core.type.TypeReference<List<java.math.BigDecimal>>() {});
+                        }
+                        if (weightTiers != null && !weightTiers.isEmpty() && prices != null && !prices.isEmpty()) {
+                            Double weight = null;
+                            if (booking.getPet() != null) {
+                                weight = (double) booking.getPet().getWeight();
+                            }
+                            if (weight == null || weight <= 0) {
+                                if (booking.getPetWeight() != null) {
+                                    try {
+                                        weight = Double.parseDouble(booking.getPetWeight().replaceAll("[^0-9.]", ""));
+                                    } catch (Exception ignored) {}
+                                }
+                            }
+                            if (weight != null && weight > 0) {
+                                List<Double> thresholds = new java.util.ArrayList<>();
+                                for (String tier : weightTiers) {
+                                    try {
+                                        thresholds.add(Double.parseDouble(tier.replaceAll("[^0-9.]", "")));
+                                    } catch (Exception e) {
+                                        thresholds.add(0.0);
+                                    }
+                                }
+                                int idx = 0;
+                                if (weight < thresholds.get(0)) {
+                                    idx = 0;
+                                } else {
+                                    for (int i = 0; i < thresholds.size(); i++) {
+                                        if (weight >= thresholds.get(i)) {
+                                            idx = i;
+                                        }
+                                    }
+                                }
+                                if (idx < prices.size() && prices.get(idx) != null) {
+                                    price = prices.get(idx);
+                                }
+                            }
+                        }
+                    } catch (Exception ignored) {
+                    }
+                }
+                if (price != null) fullPrice = fullPrice.add(price);
+            }
             List<Integer> serviceIds = booking.getServices().stream().map(com.sang.sourcepattern.entity.Service::getId).toList();
-            BigDecimal adminCommission = walletService.calculateAdminCommission(serviceIds);
+            BigDecimal adminCommission = walletService.calculateAdminCommission(serviceIds, booking.getPetWeight());
             BigDecimal shopPenalty = fullPrice.multiply(new BigDecimal("0.30")).setScale(0, java.math.RoundingMode.DOWN);
             BigDecimal refundAmount = fullPrice.subtract(adminCommission).subtract(shopPenalty);
             
