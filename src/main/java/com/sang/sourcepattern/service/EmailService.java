@@ -44,4 +44,9 @@ public interface EmailService {
      * Gửi email thông báo có đơn đặt lịch mới cho Shop.
      */
     void sendNewBookingToShopEmail(String toEmail, Booking booking);
+
+    /**
+     * Gửi email thông báo cho Admin khi có cửa hàng đăng ký mới cần duyệt.
+     */
+    void sendNewShopRegistrationToAdminEmail(String adminEmail, com.sang.sourcepattern.entity.Shop shop);
 }

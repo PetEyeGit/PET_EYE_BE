@@ -310,18 +310,41 @@ public class EmailServiceImpl implements EmailService {
 
     private String buildOtpEmailHtml(String fullName, String otp, String purpose, int minutes) {
         return """
-                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 24px; border: 1px solid #e0e0e0; border-radius: 8px;">
-                    <h2 style="color: #4CAF50;">🐾 PET EYE — Mã OTP %s</h2>
-                    <p>Xin chào <strong>%s</strong>,</p>
-                    <p>Đây là mã OTP để %s của bạn:</p>
-                    <div style="text-align: center; margin: 32px 0;">
-                        <span style="display: inline-block; background-color: #f5f5f5; border: 2px dashed #4CAF50; border-radius: 8px; padding: 16px 40px; font-size: 36px; font-weight: bold; letter-spacing: 8px; color: #333;">
-                            %s
-                        </span>
+                <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 550px; margin: 30px auto; border: 1px solid #eef2f5; border-radius: 16px; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.05); background-color: #ffffff;">
+                    <!-- Header -->
+                    <div style="background: linear-gradient(135deg, #2196F3 0%%, #1976D2 100%%); padding: 35px 24px; text-align: center; color: #ffffff;">
+                        <div style="font-size: 40px; margin-bottom: 10px;">🐾</div>
+                        <h2 style="margin: 0; font-size: 22px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase;">XÁC THỰC TÀI KHOẢN PET EYE</h2>
+                        <p style="margin: 5px 0 0 0; font-size: 14px; color: #e3f2fd; opacity: 0.9;">Mã OTP phục vụ yêu cầu %s</p>
                     </div>
-                    <p style="color: #888; font-size: 13px;">Mã có hiệu lực trong <strong>%d phút</strong>. Nếu bạn không thực hiện yêu cầu này, hãy bỏ qua email.</p>
-                    <hr style="border: none; border-top: 1px solid #eee; margin: 24px 0;">
-                    <p style="color: #aaa; font-size: 12px;">PET EYE — Nền tảng chăm sóc thú cưng</p>
+
+                    <!-- Body -->
+                    <div style="padding: 40px 30px; color: #333333; line-height: 1.6;">
+                        <p style="margin-top: 0; font-size: 16px;">Xin chào <strong style="color: #1976D2;">%s</strong>,</p>
+                        <p style="font-size: 15px; color: #555555; margin-bottom: 30px;">Cảm ơn bạn đã đồng hành cùng <strong>PET EYE</strong>. Để tiếp tục thực hiện việc <strong>%s</strong>, vui lòng sử dụng mã OTP bảo mật dưới đây:</p>
+                        
+                        <!-- OTP Display -->
+                        <div style="text-align: center; margin: 35px 0;">
+                            <div style="display: inline-block; background-color: #f4f8fb; border: 1px solid #bbdefb; border-radius: 12px; padding: 18px 30px; box-shadow: 0 4px 12px rgba(25, 118, 210, 0.08);">
+                                <span style="font-family: 'Courier New', Courier, monospace; font-size: 38px; font-weight: bold; letter-spacing: 10px; color: #0d47a1; padding-left: 10px;">%s</span>
+                            </div>
+                        </div>
+
+                        <!-- Security Warning & Expiry -->
+                        <div style="background-color: #fff9e6; border-left: 4px solid #ffb300; border-radius: 4px; padding: 15px; margin-top: 25px;">
+                            <p style="margin: 0; font-size: 13.5px; color: #665200; font-weight: 500;">
+                                ⚠️ Mã bảo mật này có hiệu lực trong vòng <strong style="color: #d32f2f;">%d phút</strong>. Vì lý do an toàn, tuyệt đối không cung cấp mã này cho bất kỳ ai khác.
+                            </p>
+                        </div>
+
+                        <p style="font-size: 14px; color: #777777; margin-top: 25px;">Nếu bạn không thực hiện yêu cầu này, vui lòng bỏ qua email hoặc liên hệ với đội ngũ hỗ trợ của chúng tôi.</p>
+                    </div>
+
+                    <!-- Footer -->
+                    <div style="background-color: #fafbfd; border-top: 1px solid #f0f3f6; padding: 24px; text-align: center; font-size: 12px; color: #888888;">
+                        <p style="margin: 0 0 5px 0; font-weight: bold; color: #666666;">PET EYE — Nền tảng chăm sóc và kết nối thú cưng</p>
+                        <p style="margin: 0;">Đây là email được gửi tự động, vui lòng không phản hồi trực tiếp qua email này.</p>
+                    </div>
                 </div>
                 """.formatted(purpose, fullName != null ? fullName : "bạn", purpose, otp, minutes);
     }
@@ -490,5 +513,41 @@ public class EmailServiceImpl implements EmailService {
                 """.formatted(customerName, booking.getId(), appointmentStr, customerName, customerPhone, petName);
                 
         doSend(toEmail, subject, html);
+    }
+
+    @Async
+    @Override
+    public void sendNewShopRegistrationToAdminEmail(String adminEmail, com.sang.sourcepattern.entity.Shop shop) {
+        String subject = "[PET EYE] Yêu cầu duyệt cửa hàng mới: " + shop.getShopName();
+        String html = """
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 24px; border: 1px solid #e0e0e0; border-radius: 8px;">
+                    <h2 style="color: #1976D2;">🔔 Yêu cầu duyệt cửa hàng mới</h2>
+                    <p>Chào Admin,</p>
+                    <p>Hệ thống vừa nhận được đơn đăng ký cửa hàng mới cần được phê duyệt:</p>
+                    
+                    <div style="background-color: #f9f9f9; padding: 16px; border-radius: 8px; margin: 16px 0; border-left: 4px solid #1976D2;">
+                        <p style="margin: 4px 0;"><strong>Tên cửa hàng:</strong> %s</p>
+                        <p style="margin: 4px 0;"><strong>Loại hình:</strong> %s</p>
+                        <p style="margin: 4px 0;"><strong>Email liên hệ:</strong> %s</p>
+                        <p style="margin: 4px 0;"><strong>Số điện thoại:</strong> %s</p>
+                        <p style="margin: 4px 0;"><strong>Địa chỉ:</strong> %s</p>
+                        <p style="margin: 4px 0;"><strong>Người đại diện:</strong> %s</p>
+                    </div>
+
+                    <p>Vui lòng đăng nhập vào trang quản trị (Admin Dashboard) để xem chi tiết giấy phép kinh doanh và phê duyệt hoặc từ chối đơn đăng ký này.</p>
+                    
+                    <hr style="border: none; border-top: 1px solid #eee; margin: 24px 0;">
+                    <p style="color: #aaa; font-size: 12px; text-align: center;">PET EYE — Nền tảng chăm sóc thú cưng</p>
+                </div>
+                """.formatted(
+                        shop.getShopName(),
+                        shop.getShopType() != null ? shop.getShopType() : "Chưa xác định",
+                        shop.getEmail(),
+                        shop.getPhone() != null ? shop.getPhone() : "Chưa xác định",
+                        shop.getAddress() != null ? shop.getAddress() : "Chưa xác định",
+                        shop.getOwner() != null ? shop.getOwner().getFullName() : "Chưa xác định"
+                );
+                
+        doSend(adminEmail, subject, html);
     }
 }

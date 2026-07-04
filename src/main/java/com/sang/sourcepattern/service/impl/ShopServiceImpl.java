@@ -474,6 +474,16 @@ public class ShopServiceImpl implements ShopService {
         // 4. Gửi email OTP (async — không block response)
         emailService.sendVerificationEmail(owner.getEmail(), owner.getFullName(), otp);
 
+        // 5. Gửi email thông báo cho Admin (async)
+        try {
+            List<User> admins = userRepository.findByRoleName("ADMIN");
+            for (User admin : admins) {
+                emailService.sendNewShopRegistrationToAdminEmail(admin.getEmail(), shop);
+            }
+        } catch (Exception e) {
+            log.error("Failed to send shop registration email to Admin: {}", e.getMessage());
+        }
+
         log.info("Shop registered successfully: {} (Pending Approval)", shop.getShopName());
 
         ShopResponse response = shopMapper.toShopResponse(shop);
