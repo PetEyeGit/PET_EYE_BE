@@ -46,21 +46,21 @@ public class DataInitializer {
             }
 
             // 2. Create Default Admin if it doesn't exist
-            if (userRepository.findByEmail("admin@peteye.com").isEmpty()) {
+            if (userRepository.findByEmail("vudinhsang0403@gmail.com").isEmpty()) {
                 Role adminRole = roleRepository.findByName("ADMIN").orElseThrow();
                 Set<Role> roles = new HashSet<>();
                 roles.add(adminRole);
 
                 User admin = User.builder()
-                        .email("admin@peteye.com")
-                        .password(passwordEncoder.encode("admin123"))
+                        .email("vudinhsang0403@gmail.com")
+                        .password(passwordEncoder.encode("admin@12345"))
                         .fullName("System Admin")
                         .active(true)
                         .roles(roles)
                         .build();
 
                 userRepository.save(admin);
-                log.info("Default admin created: admin@peteye.com / admin123");
+                log.info("Default admin created: vudinhsang0403@gmail.com / admin@12345");
             }
 
             log.info("Application data initialization complete.");
