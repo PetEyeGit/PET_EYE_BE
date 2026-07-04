@@ -48,8 +48,17 @@ public class UserServiceImpl implements UserService {
     @Transactional
     public UserResponse createUser(UserCreationRequest request) {
         log.info("createUser: {}", request.getEmail());
-        if (userRepository.findByEmail(request.getEmail()).isPresent()) {
-            throw new AppException(ErrorCode.USER_EXISTED);
+        java.util.Optional<User> existingUserOpt = userRepository.findByEmail(request.getEmail());
+        if (existingUserOpt.isPresent()) {
+            User existingUser = existingUserOpt.get();
+            if (!existingUser.isEmailVerified() && existingUser.getCreatedAt().plusMinutes(10).isBefore(LocalDateTime.now())) {
+                log.info("Deleting expired unverified user on re-registration: {}", existingUser.getEmail());
+                userTokenRepository.deleteByUserId(existingUser.getId());
+                userRepository.delete(existingUser);
+                userRepository.flush();
+            } else {
+                throw new AppException(ErrorCode.USER_EXISTED);
+            }
         }
 
         User user = userMapper.toUser(request);
@@ -281,5 +290,17 @@ public class UserServiceImpl implements UserService {
                 .build());
        
         emailService.sendVerificationEmail(user.getEmail(), user.getFullName(), otp);
+    }
+
+    @Override
+    @Transactional
+    public void deleteExpiredUnverifiedUsers() {
+        LocalDateTime cutoff = LocalDateTime.now().minusMinutes(10);
+        List<User> expiredUsers = userRepository.findByEmailVerifiedFalseAndCreatedAtBefore(cutoff);
+        for (User user : expiredUsers) {
+            log.info("Deleting expired unverified user: {}", user.getEmail());
+            userTokenRepository.deleteByUserId(user.getId());
+            userRepository.delete(user);
+        }
     }
 }

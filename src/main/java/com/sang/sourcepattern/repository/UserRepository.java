@@ -13,6 +13,7 @@ import java.util.Optional;
 public interface UserRepository extends JpaRepository<User, Integer> {
     Optional<User> findByEmail(String email);
     boolean existsByEmail(String email);
+    List<User> findByEmailVerifiedFalseAndCreatedAtBefore(java.time.LocalDateTime dateTime);
 
     @Query("SELECT u FROM User u JOIN u.roles r WHERE r.name = :roleName")
     List<User> findByRoleName(@Param("roleName") String roleName);

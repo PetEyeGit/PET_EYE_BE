@@ -39,4 +39,6 @@ public interface UserService {
     void forgotPassword(ForgotPasswordRequest request);
 
     void resetPassword(ResetPasswordRequest request);
+
+    void deleteExpiredUnverifiedUsers();
 }
