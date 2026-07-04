@@ -24,6 +24,7 @@ public class TaskResponse {
     String customerName;
     String customerEmail;
     String customerPhone;
+    String customerAddress;
 
     // Service info
     int serviceId;
