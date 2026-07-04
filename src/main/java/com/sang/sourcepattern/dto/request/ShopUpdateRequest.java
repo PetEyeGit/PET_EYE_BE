@@ -24,6 +24,9 @@ public class ShopUpdateRequest {
     String logoUrl;
     String bannerUrl;
     String galleryUrls;
+    String galleryLayout;
+    String customGalleryConfig;
+    Boolean useBannerInGallery;
     /** MANUAL | OPEN_POOL | AUTO */
     String assignmentMode;
     /** Số phút châm chước No-Show (5–30). Null = không thay đổi */

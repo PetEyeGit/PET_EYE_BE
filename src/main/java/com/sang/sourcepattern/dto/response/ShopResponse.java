@@ -24,6 +24,9 @@ public class ShopResponse {
     String logoUrl;
     String bannerUrl;
     String galleryUrls;
+    String galleryLayout;
+    String customGalleryConfig;
+    Boolean useBannerInGallery;
     java.util.List<StaffResponse> staffs;
     java.util.List<String> serviceNames;
     String openTime;

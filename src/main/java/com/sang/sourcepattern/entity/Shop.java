@@ -46,6 +46,15 @@ public class Shop {
     @Column(columnDefinition = "TEXT")
     String galleryUrls;
 
+    @Builder.Default
+    String galleryLayout = "AUTO";
+
+    @Column(columnDefinition = "TEXT")
+    String customGalleryConfig;
+
+    @Builder.Default
+    boolean useBannerInGallery = true;
+
     String openTime;
     String closeTime;
     String workingDays;
