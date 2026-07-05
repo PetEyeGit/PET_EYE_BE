@@ -193,7 +193,10 @@ public class BookingServiceImpl implements BookingService {
         // Tong gia = cong tat ca services
         java.math.BigDecimal totalServicePrice = (booking.getServices() != null)
                 ? booking.getServices().stream()
-                        .map(s -> s.getPrice() != null ? s.getPrice() : java.math.BigDecimal.ZERO)
+                        .map(s -> {
+                            java.math.BigDecimal price = walletService.resolveSingleServicePrice(s, booking.getPet() != null ? booking.getPet().getId() : null, booking.getPetWeight());
+                            return price != null ? price : java.math.BigDecimal.ZERO;
+                        })
                         .reduce(java.math.BigDecimal.ZERO, java.math.BigDecimal::add)
                 : java.math.BigDecimal.ZERO;
 
@@ -215,7 +218,7 @@ public class BookingServiceImpl implements BookingService {
                 ? booking.getServices().stream().map(s -> BookingResponse.BookingServiceDto.builder()
                         .serviceId(s.getId())
                         .serviceName(s.getServiceName())
-                        .servicePrice(s.getPrice())
+                        .servicePrice(walletService.resolveSingleServicePrice(s, booking.getPet() != null ? booking.getPet().getId() : null, booking.getPetWeight()))
                         .category(s.getCategory())
                         .durationMinutes(s.getDurationMinutes())
                         .build()).collect(Collectors.toList())
@@ -743,7 +746,7 @@ public class BookingServiceImpl implements BookingService {
                 .status("SUCCESS")
                 .payosOrderCode(orderCode)
                 .gatewayTransactionId(info.getData() != null ? info.getData().getId() : null)
-                .description("PayOS payment for booking #" + booking.getId())
+                .description("Thanh toán qua PayOS cho đơn #" + booking.getId())
                 .completedAt(LocalDateTime.now())
                 .build());
 
@@ -932,7 +935,7 @@ public class BookingServiceImpl implements BookingService {
                 .status("SUCCESS")
                 .payosOrderCode(orderCode)
                 .gatewayTransactionId("MOCK-" + orderCode)
-                .description("Mock payment for booking #" + booking.getId())
+                .description("Thanh toán giả lập cho đơn #" + booking.getId())
                 .completedAt(LocalDateTime.now())
                 .build());
 
@@ -1026,7 +1029,7 @@ public class BookingServiceImpl implements BookingService {
         }
 
         // ── Tính tiền cọc = tổng phí hoa hồng admin cho các dịch vụ ─────────
-        BigDecimal rawDeposit = walletService.calculateAdminCommission(effectiveServiceIds, request.getPetWeight());
+        BigDecimal rawDeposit = walletService.calculateAdminCommission(effectiveServiceIds, request.getPetId(), request.getPetWeight());
         int depositVnd = rawDeposit.setScale(0, java.math.RoundingMode.CEILING).intValue();
         depositVnd = Math.max(depositVnd, 2000);
         if (depositVnd % 1000 != 0) depositVnd = ((depositVnd / 1000) + 1) * 1000;
@@ -1213,6 +1216,7 @@ public class BookingServiceImpl implements BookingService {
 
         // ── Tạo Payment: ghi nhận tiền cọc đã thanh toán qua PayOS ───────
         BigDecimal depositAmount = new BigDecimal(pending.getAmountVnd());
+        String fullPriceStr = servicesSet.stream().map(s -> s.getPrice()).reduce(BigDecimal.ZERO, BigDecimal::add).toPlainString();
         Payment payment = Payment.builder()
                 .booking(booking)
                 .amount(depositAmount)
@@ -1220,8 +1224,8 @@ public class BookingServiceImpl implements BookingService {
                 .status("SUCCESS")
                 .payosOrderCode(orderCode)
                 .description(String.format(
-                        "Deposit (PayOS) for cash booking #%d — full price: %s VND",
-                        booking.getId(), service.getPrice().toPlainString()))
+                        "Tiền cọc (PayOS) cho đơn thu tiền mặt #%d — tổng giá: %s VND",
+                        booking.getId(), fullPriceStr))
                 .gatewayTransactionId(gatewayTxId)
                 .build();
         paymentRepository.save(payment);
@@ -1237,7 +1241,7 @@ public class BookingServiceImpl implements BookingService {
                 .payosOrderCode(orderCode)
                 .gatewayTransactionId(gatewayTxId)
                 .description(String.format(
-                        "Deposit paid (PayOS) for cash booking #%d", booking.getId()))
+                        "Đã thanh toán cọc (PayOS) cho đơn #%d", booking.getId()))
                 .completedAt(LocalDateTime.now())
                 .build());
 
@@ -1276,7 +1280,7 @@ public class BookingServiceImpl implements BookingService {
         // ------------------------------------------
 
         log.info("Cash booking {} CONFIRMED — deposit={}VND, remaining {}VND to be collected in cash",
-                booking.getId(), depositAmount, service.getPrice().subtract(depositAmount));
+                booking.getId(), depositAmount, new BigDecimal(fullPriceStr).subtract(depositAmount));
 
         // ── Gửi email xác nhận đặt cọc cho khách hàng ────────────────────────
         try {
@@ -1547,7 +1551,7 @@ public class BookingServiceImpl implements BookingService {
             List<Integer> serviceIds = booking.getServices().stream()
                     .map(com.sang.sourcepattern.entity.Service::getId)
                     .collect(Collectors.toList());
-            BigDecimal deposit = walletService.calculateAdminCommission(serviceIds, booking.getPetWeight());
+            BigDecimal deposit = walletService.calculateAdminCommission(serviceIds, booking.getPet() != null ? booking.getPet().getId() : null, booking.getPetWeight());
             
             long hoursToAppointment = 0;
             if (booking.getAppointmentDatetime() != null) {
@@ -2150,6 +2154,7 @@ public class BookingServiceImpl implements BookingService {
 
         // ── Tạo Payment: ghi nhận tiền cọc (MOCK) ───────
         BigDecimal depositAmount = new BigDecimal(pending.getAmountVnd());
+        String fullPriceStr = servicesSet.stream().map(s -> s.getPrice()).reduce(BigDecimal.ZERO, BigDecimal::add).toPlainString();
         Payment payment = Payment.builder()
                 .booking(booking)
                 .amount(depositAmount)
@@ -2157,8 +2162,8 @@ public class BookingServiceImpl implements BookingService {
                 .status("SUCCESS")
                 .payosOrderCode(orderCode)
                 .description(String.format(
-                        "Deposit (MOCK) for cash booking #%d — full price: %s VND",
-                        booking.getId(), service.getPrice().toPlainString()))
+                        "Tiền cọc (MOCK) cho đơn thu tiền mặt #%d — tổng giá: %s VND",
+                        booking.getId(), fullPriceStr))
                 .gatewayTransactionId("MOCK-" + orderCode)
                 .build();
         paymentRepository.save(payment);
@@ -2174,7 +2179,7 @@ public class BookingServiceImpl implements BookingService {
                 .payosOrderCode(orderCode)
                 .gatewayTransactionId("MOCK-" + orderCode)
                 .description(String.format(
-                        "Deposit paid (MOCK) for cash booking #%d", booking.getId()))
+                        "Đã thanh toán cọc (MOCK) cho đơn #%d", booking.getId()))
                 .completedAt(LocalDateTime.now())
                 .build());
 

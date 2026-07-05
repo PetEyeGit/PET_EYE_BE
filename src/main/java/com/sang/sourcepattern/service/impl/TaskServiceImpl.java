@@ -261,14 +261,17 @@ public class TaskServiceImpl implements TaskService {
         // ── Task 1: BOARDING ────────────────────────────────────────────────
         com.sang.sourcepattern.entity.Service boardingPrimary = boardingServices.get(0);
         java.math.BigDecimal boardingPrice = boardingServices.stream()
-                .map(s -> s.getPrice() != null ? s.getPrice() : java.math.BigDecimal.ZERO)
+                .map(s -> {
+                    java.math.BigDecimal price = walletService.resolveSingleServicePrice(s, b.getPet() != null ? b.getPet().getId() : null, b.getPetWeight());
+                    return price != null ? price : java.math.BigDecimal.ZERO;
+                })
                 .reduce(java.math.BigDecimal.ZERO, java.math.BigDecimal::add);
         boolean cameraEnabled = boardingServices.stream()
                 .anyMatch(com.sang.sourcepattern.entity.Service::isCameraEnabled);
         java.util.List<TaskResponse.ServiceItem> boardingItems = boardingServices.stream()
                 .map(s -> TaskResponse.ServiceItem.builder()
                         .serviceId(s.getId()).serviceName(s.getServiceName())
-                        .servicePrice(s.getPrice())
+                        .servicePrice(walletService.resolveSingleServicePrice(s, b.getPet() != null ? b.getPet().getId() : null, b.getPetWeight()))
                         .completedAt(serviceCompletionTimes.get(s.getId()))
                         .build())
                 .collect(java.util.stream.Collectors.toList());
@@ -276,7 +279,7 @@ public class TaskServiceImpl implements TaskService {
                 java.util.List<TaskResponse.ServiceItem> allItems = b.getServices().stream()
                 .map(s -> TaskResponse.ServiceItem.builder()
                         .serviceId(s.getId()).serviceName(s.getServiceName())
-                        .servicePrice(s.getPrice())
+                        .servicePrice(walletService.resolveSingleServicePrice(s, b.getPet() != null ? b.getPet().getId() : null, b.getPetWeight()))
                         .completedAt(serviceCompletionTimes.get(s.getId()))
                         .build())
                 .collect(java.util.stream.Collectors.toList());
@@ -313,7 +316,10 @@ public class TaskServiceImpl implements TaskService {
         // ── Task 2: Dịch vụ phụ (Spa, Clinic, Grooming...) ─────────────────
         com.sang.sourcepattern.entity.Service otherPrimary = otherServices.get(0);
         java.math.BigDecimal otherPrice = otherServices.stream()
-                .map(s -> s.getPrice() != null ? s.getPrice() : java.math.BigDecimal.ZERO)
+                .map(s -> {
+                    java.math.BigDecimal price = walletService.resolveSingleServicePrice(s, b.getPet() != null ? b.getPet().getId() : null, b.getPetWeight());
+                    return price != null ? price : java.math.BigDecimal.ZERO;
+                })
                 .reduce(java.math.BigDecimal.ZERO, java.math.BigDecimal::add);
         int otherDuration = otherServices.stream()
                 .mapToInt(com.sang.sourcepattern.entity.Service::getDurationMinutes).sum();
@@ -324,7 +330,7 @@ public class TaskServiceImpl implements TaskService {
         java.util.List<TaskResponse.ServiceItem> otherItems = otherServices.stream()
                 .map(s -> TaskResponse.ServiceItem.builder()
                         .serviceId(s.getId()).serviceName(s.getServiceName())
-                        .servicePrice(s.getPrice())
+                        .servicePrice(walletService.resolveSingleServicePrice(s, b.getPet() != null ? b.getPet().getId() : null, b.getPetWeight()))
                         .completedAt(serviceCompletionTimes.get(s.getId()))
                         .build())
                 .collect(java.util.stream.Collectors.toList());
@@ -862,57 +868,11 @@ public class TaskServiceImpl implements TaskService {
 
             BigDecimal fullPrice = BigDecimal.ZERO;
             for (com.sang.sourcepattern.entity.Service s : booking.getServices()) {
-                BigDecimal price = s.getPrice();
-                if (s.getPetWeight() != null) {
-                    try {
-                        List<String> weightTiers = new com.fasterxml.jackson.databind.ObjectMapper().readValue(s.getPetWeight(), new com.fasterxml.jackson.core.type.TypeReference<List<String>>() {});
-                        List<java.math.BigDecimal> prices = null;
-                        if (s.getPrices() != null) {
-                            prices = new com.fasterxml.jackson.databind.ObjectMapper().readValue(s.getPrices(), new com.fasterxml.jackson.core.type.TypeReference<List<java.math.BigDecimal>>() {});
-                        }
-                        if (weightTiers != null && !weightTiers.isEmpty() && prices != null && !prices.isEmpty()) {
-                            Double weight = null;
-                            if (booking.getPet() != null) {
-                                weight = (double) booking.getPet().getWeight();
-                            }
-                            if (weight == null || weight <= 0) {
-                                if (booking.getPetWeight() != null) {
-                                    try {
-                                        weight = Double.parseDouble(booking.getPetWeight().replaceAll("[^0-9.]", ""));
-                                    } catch (Exception ignored) {}
-                                }
-                            }
-                            if (weight != null && weight > 0) {
-                                List<Double> thresholds = new java.util.ArrayList<>();
-                                for (String tier : weightTiers) {
-                                    try {
-                                        thresholds.add(Double.parseDouble(tier.replaceAll("[^0-9.]", "")));
-                                    } catch (Exception e) {
-                                        thresholds.add(0.0);
-                                    }
-                                }
-                                int idx = 0;
-                                if (weight < thresholds.get(0)) {
-                                    idx = 0;
-                                } else {
-                                    for (int i = 0; i < thresholds.size(); i++) {
-                                        if (weight >= thresholds.get(i)) {
-                                            idx = i;
-                                        }
-                                    }
-                                }
-                                if (idx < prices.size() && prices.get(idx) != null) {
-                                    price = prices.get(idx);
-                                }
-                            }
-                        }
-                    } catch (Exception ignored) {
-                    }
-                }
+                BigDecimal price = walletService.resolveSingleServicePrice(s, booking.getPet() != null ? booking.getPet().getId() : null, booking.getPetWeight());
                 if (price != null) fullPrice = fullPrice.add(price);
             }
             List<Integer> serviceIds = booking.getServices().stream().map(com.sang.sourcepattern.entity.Service::getId).toList();
-            BigDecimal adminCommission = walletService.calculateAdminCommission(serviceIds, booking.getPetWeight());
+            BigDecimal adminCommission = walletService.calculateAdminCommission(serviceIds, booking.getPet() != null ? booking.getPet().getId() : null, booking.getPetWeight());
             BigDecimal shopPenalty = fullPrice.multiply(new BigDecimal("0.30")).setScale(0, java.math.RoundingMode.DOWN);
             BigDecimal refundAmount = fullPrice.subtract(adminCommission).subtract(shopPenalty);
             

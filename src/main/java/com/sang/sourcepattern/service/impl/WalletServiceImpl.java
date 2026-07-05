@@ -43,6 +43,7 @@ public class WalletServiceImpl implements WalletService {
     PayOSService                payOSService;
     com.sang.sourcepattern.service.CameraService cameraService;
     ServiceRepository           serviceRepository;
+    PetRepository               petRepository;
     org.springframework.messaging.simp.SimpMessagingTemplate messagingTemplate;
 
     private void sendBookingUpdateEvent(Integer shopId, Integer bookingId) {
@@ -157,7 +158,8 @@ public class WalletServiceImpl implements WalletService {
         return adminFeeRate;
     }
 
-    private BigDecimal resolveSingleServicePrice(com.sang.sourcepattern.entity.Service s, String petWeight) {
+    @Override
+    public BigDecimal resolveSingleServicePrice(com.sang.sourcepattern.entity.Service s, Integer petId, String petWeight) {
         BigDecimal price = s.getPrice();
         if (s.getPetWeight() != null) {
             try {
@@ -168,10 +170,18 @@ public class WalletServiceImpl implements WalletService {
                 }
                 if (weightTiers != null && !weightTiers.isEmpty() && prices != null && !prices.isEmpty()) {
                     Double weight = null;
-                    if (petWeight != null) {
-                        try {
-                            weight = Double.parseDouble(petWeight.replaceAll("[^0-9.]", ""));
-                        } catch (Exception ignored) {}
+                    if (petId != null && petRepository != null) {
+                        com.sang.sourcepattern.entity.Pet pet = petRepository.findById(petId).orElse(null);
+                        if (pet != null) {
+                            weight = (double) pet.getWeight();
+                        }
+                    }
+                    if (weight == null || weight <= 0) {
+                        if (petWeight != null) {
+                            try {
+                                weight = Double.parseDouble(petWeight.replaceAll("[^0-9.]", ""));
+                            } catch (Exception ignored) {}
+                        }
                     }
                     if (weight != null && weight > 0) {
                         List<Double> thresholds = new java.util.ArrayList<>();
@@ -183,12 +193,10 @@ public class WalletServiceImpl implements WalletService {
                             }
                         }
                         int idx = 0;
-                        if (weight < thresholds.get(0)) {
-                            idx = 0;
-                        } else {
-                            for (int i = 0; i < thresholds.size(); i++) {
+                        if (weight >= thresholds.get(0)) {
+                            for (int i = 0; i < thresholds.size() - 1; i++) {
                                 if (weight >= thresholds.get(i)) {
-                                    idx = i;
+                                    idx = i + 1;
                                 }
                             }
                         }
@@ -204,7 +212,7 @@ public class WalletServiceImpl implements WalletService {
     }
 
     @Override
-    public BigDecimal calculateAdminCommission(List<Integer> serviceIds, String petWeight) {
+    public BigDecimal calculateAdminCommission(List<Integer> serviceIds, Integer petId, String petWeight) {
         if (serviceIds == null || serviceIds.isEmpty()) {
             return BigDecimal.ZERO;
         }
@@ -212,7 +220,7 @@ public class WalletServiceImpl implements WalletService {
         for (Integer id : serviceIds) {
             com.sang.sourcepattern.entity.Service s = serviceRepository.findById(id).orElse(null);
             if (s != null) {
-                BigDecimal price = resolveSingleServicePrice(s, petWeight);
+                BigDecimal price = resolveSingleServicePrice(s, petId, petWeight);
                 BigDecimal rate = getCommissionRateForService(s);
                 totalCommission = totalCommission.add(price.multiply(rate));
             }
@@ -226,7 +234,7 @@ public class WalletServiceImpl implements WalletService {
             return totalCommission;
         }
         for (com.sang.sourcepattern.entity.Service s : booking.getServices()) {
-            BigDecimal price = resolveSingleServicePrice(s, booking.getPetWeight());
+            BigDecimal price = resolveSingleServicePrice(s, booking.getPet() != null ? booking.getPet().getId() : null, booking.getPetWeight());
             BigDecimal rate = getCommissionRateForService(s);
             totalCommission = totalCommission.add(price.multiply(rate));
         }
@@ -283,7 +291,7 @@ public class WalletServiceImpl implements WalletService {
                     .paymentMethod("CASH")
                     .status("SUCCESS")
                     .description(String.format(
-                            "Cash collected at venue for booking #%d (shop share of %s VND)",
+                            "Thu tiền mặt tại quầy cho đơn #%d (Phần của Shop: %s VND)",
                             bookingId, fullPrice.toPlainString()))
                     .completedAt(LocalDateTime.now())
                     .build());
@@ -344,7 +352,7 @@ public class WalletServiceImpl implements WalletService {
                         .amount(shopShare)
                         .paymentMethod(paymentMethod)
                         .status("SUCCESS")
-                        .description(String.format("Wallet credit for booking #%d (shop share of %s VND)",
+                        .description(String.format("Cộng tiền vào ví cho đơn #%d (Phần của Shop: %s VND)",
                                 bookingId, fullPrice.toPlainString()))
                         .completedAt(LocalDateTime.now())
                         .build());
@@ -364,7 +372,7 @@ public class WalletServiceImpl implements WalletService {
                         .amount(adminCommission)
                         .paymentMethod("SYSTEM")
                         .status("SUCCESS")
-                        .description(String.format("Deducted commission fee for cash booking #%d", bookingId))
+                        .description(String.format("Trừ phí hoa hồng cho đơn thu tiền mặt #%d", bookingId))
                         .completedAt(LocalDateTime.now())
                         .build());
 
@@ -703,7 +711,7 @@ public class WalletServiceImpl implements WalletService {
                 .type("REFUND")
                 .amount(refundAmount)
                 .status("SUCCESS")
-                .description("Refund for booking #" + bookingId + " to " + (booking.getUser() != null ? booking.getUser().getFullName() : "customer"))
+                .description("Hoàn tiền cho đơn #" + bookingId + " tới " + (booking.getUser() != null ? booking.getUser().getFullName() : "khách hàng"))
                 .completedAt(LocalDateTime.now())
                 .build());
 

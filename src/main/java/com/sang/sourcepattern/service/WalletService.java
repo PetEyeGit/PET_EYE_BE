@@ -22,7 +22,10 @@ public interface WalletService {
     BigDecimal getAdminFeeRate();
 
     /** Tính tổng phí hoa hồng admin cho danh sách service IDs */
-    BigDecimal calculateAdminCommission(List<Integer> serviceIds, String petWeight);
+    BigDecimal calculateAdminCommission(List<Integer> serviceIds, Integer petId, String petWeight);
+
+    /** Lấy giá tiền của 1 service cụ thể (có tính petWeight) */
+    BigDecimal resolveSingleServicePrice(com.sang.sourcepattern.entity.Service s, Integer petId, String petWeight);
 
     /** Lấy tỷ lệ phí hoa hồng admin cho 1 dịch vụ cụ thể */
     BigDecimal getCommissionRateForService(com.sang.sourcepattern.entity.Service service);
