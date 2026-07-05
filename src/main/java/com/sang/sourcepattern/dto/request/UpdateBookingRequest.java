@@ -29,4 +29,6 @@ public class UpdateBookingRequest {
     String roomType;
 
     String note;
+
+    String paymentMethod;
 }

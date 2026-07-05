@@ -1421,9 +1421,12 @@ public class BookingServiceImpl implements BookingService {
         }
 
         if (!servicesChanged && !boardingDetailsChanged) {
-            // Only pet/staff changed -> Save and return BookingResponse
-            bookingRepository.save(booking);
-            return toResponse(booking);
+            boolean wantsToPayBalance = "PAYOS".equals(request.getPaymentMethod());
+            if (!wantsToPayBalance) {
+                // Only pet/staff changed -> Save and return BookingResponse
+                bookingRepository.save(booking);
+                return toResponse(booking);
+            }
         }
 
         // Services changed
