@@ -23,6 +23,9 @@ public class ShopUpdateRequest {
     String licenseImageUrl;
     String logoUrl;
     String bannerUrl;
+    String facebookUrl;
+    String websiteUrl;
+    String socialLinks;
     String galleryUrls;
     String galleryLayout;
     String customGalleryConfig;

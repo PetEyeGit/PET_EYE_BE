@@ -42,6 +42,11 @@ public class Shop {
     String licenseImageUrl;
     String logoUrl;
     String bannerUrl;
+    String facebookUrl;
+    String websiteUrl;
+
+    @Column(columnDefinition = "TEXT")
+    String socialLinks;
 
     @Column(columnDefinition = "TEXT")
     String galleryUrls;
