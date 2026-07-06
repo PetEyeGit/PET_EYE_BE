@@ -569,6 +569,14 @@ public class ShopServiceImpl implements ShopService {
 
         shopMapper.updateShop(shop, request);
 
+        if (request.getShopName() != null && !request.getShopName().isEmpty()) {
+            User owner = shop.getOwner();
+            if (owner != null) {
+                owner.setFullName(request.getShopName());
+                userRepository.save(owner);
+            }
+        }
+
         String newOffDays = shop.getOffDays();
         if (newOffDays != null && !newOffDays.equals(oldOffDays)) {
             // Find all ADMINs and notify
