@@ -517,6 +517,39 @@ public class EmailServiceImpl implements EmailService {
 
     @Async
     @Override
+    public void sendNewBookingToAdminEmail(String adminEmail, Booking booking) {
+        String subject = "[PET EYE] Đơn đặt lịch mới trên hệ thống - Đơn hàng #" + booking.getId();
+        String customerName = booking.getUser() != null && booking.getUser().getFullName() != null ? booking.getUser().getFullName() : "Khách hàng";
+        String shopName = booking.getShop() != null && booking.getShop().getShopName() != null ? booking.getShop().getShopName() : "—";
+        
+        DateTimeFormatter dtFmt = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
+        String appointmentStr = booking.getAppointmentDatetime() != null
+                ? booking.getAppointmentDatetime().format(dtFmt) : "—";
+
+        String html = """
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 24px; border: 1px solid #e0e0e0; border-radius: 8px;">
+                    <h2 style="color: #1976D2;">🔔 Có đơn đặt lịch mới trên hệ thống</h2>
+                    <p>Chào Admin,</p>
+                    <p>Hệ thống vừa ghi nhận một đơn đặt lịch mới (Mã đơn: <strong>#%d</strong>).</p>
+                    
+                    <div style="background-color: #f9f9f9; padding: 16px; border-radius: 8px; margin: 16px 0; border-left: 4px solid #1976D2;">
+                        <p style="margin: 4px 0;"><strong>Cửa hàng:</strong> %s</p>
+                        <p style="margin: 4px 0;"><strong>Khách hàng:</strong> %s</p>
+                        <p style="margin: 4px 0;"><strong>Thời gian hẹn:</strong> <span style="color: #e53935; font-size: 16px; font-weight: bold;">%s</span></p>
+                    </div>
+
+                    <p>Vui lòng đăng nhập vào trang quản trị để xem thông tin chi tiết các giao dịch và đơn hàng trên hệ thống.</p>
+                    
+                    <hr style="border: none; border-top: 1px solid #eee; margin: 24px 0;">
+                    <p style="color: #aaa; font-size: 12px; text-align: center;">PET EYE — Nền tảng chăm sóc thú cưng</p>
+                </div>
+                """.formatted(booking.getId(), shopName, customerName, appointmentStr);
+                
+        doSend(adminEmail, subject, html);
+    }
+
+    @Async
+    @Override
     public void sendNewShopRegistrationToAdminEmail(String adminEmail, com.sang.sourcepattern.entity.Shop shop) {
         String subject = "[PET EYE] Yêu cầu duyệt cửa hàng mới: " + shop.getShopName();
         String html = """

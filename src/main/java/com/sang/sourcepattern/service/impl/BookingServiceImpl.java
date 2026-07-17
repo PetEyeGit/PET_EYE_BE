@@ -775,6 +775,17 @@ public class BookingServiceImpl implements BookingService {
             log.warn("Failed to send new booking email to shop {}: {}", shop.getId(), e.getMessage());
         }
 
+        try {
+            java.util.List<User> admins = userRepository.findByRoleName("ADMIN");
+            for (User admin : admins) {
+                if (admin.getEmail() != null && !admin.getEmail().isBlank()) {
+                    emailService.sendNewBookingToAdminEmail(admin.getEmail(), booking);
+                }
+            }
+        } catch (Exception e) {
+            log.warn("Failed to send new booking email to admin: {}", e.getMessage());
+        }
+
         if (staff != null && staff.getUser() != null) {
             Notification notifStaff = Notification.builder()
                     .user(staff.getUser())
@@ -962,6 +973,17 @@ public class BookingServiceImpl implements BookingService {
             }
         } catch (Exception e) {
             log.warn("Failed to send new booking email to shop {}: {}", shop.getId(), e.getMessage());
+        }
+
+        try {
+            java.util.List<User> admins = userRepository.findByRoleName("ADMIN");
+            for (User admin : admins) {
+                if (admin.getEmail() != null && !admin.getEmail().isBlank()) {
+                    emailService.sendNewBookingToAdminEmail(admin.getEmail(), booking);
+                }
+            }
+        } catch (Exception e) {
+            log.warn("Failed to send new booking email to admin: {}", e.getMessage());
         }
 
         if (staff != null && staff.getUser() != null) {
@@ -1266,6 +1288,17 @@ public class BookingServiceImpl implements BookingService {
             }
         } catch (Exception e) {
             log.warn("Failed to send new booking email to shop {}: {}", shop.getId(), e.getMessage());
+        }
+
+        try {
+            java.util.List<User> admins = userRepository.findByRoleName("ADMIN");
+            for (User admin : admins) {
+                if (admin.getEmail() != null && !admin.getEmail().isBlank()) {
+                    emailService.sendNewBookingToAdminEmail(admin.getEmail(), booking);
+                }
+            }
+        } catch (Exception e) {
+            log.warn("Failed to send new booking email to admin: {}", e.getMessage());
         }
 
         if (staff != null && staff.getUser() != null) {
