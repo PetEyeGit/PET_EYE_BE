@@ -68,7 +68,7 @@ public class WalletController {
     @Operation(summary = "Lấy tổng số dư ví Admin (tổng phí 10% đã thu)")
     public ApiResponse<Map<String, BigDecimal>> getAdminBalance() {
         return ApiResponse.<Map<String, BigDecimal>>builder()
-                .result(Map.of("adminBalance", walletService.getAdminBalance()))
+                .result(Map.of("adminBalance", walletService.getAdminBalance(), "totalFrozenBalance", walletService.getTotalFrozenBalance()))
                 .build();
     }
 

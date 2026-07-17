@@ -228,7 +228,8 @@ public class WalletServiceImpl implements WalletService {
         return totalCommission;
     }
 
-    private BigDecimal calculateAdminCommissionForBooking(Booking booking) {
+    @Override
+    public BigDecimal calculateAdminCommissionForBooking(Booking booking) {
         BigDecimal totalCommission = BigDecimal.ZERO;
         if (booking.getServices() == null || booking.getServices().isEmpty()) {
             return totalCommission;
@@ -243,13 +244,18 @@ public class WalletServiceImpl implements WalletService {
 
     @Override
     public BigDecimal getAdminBalance() {
-        // Tổng phí admin từ tất cả booking COMPLETED (tính riêng biệt theo dịch vụ)
-        List<Booking> completedBookings = bookingRepository.findCompletedBookingsWithServices();
+        // Tổng phí admin từ tất cả booking CONFIRMED, IN_PROGRESS, COMPLETED
+        List<Booking> activeBookings = bookingRepository.findActiveAndCompletedBookingsWithServices();
         BigDecimal totalCommission = BigDecimal.ZERO;
-        for (Booking booking : completedBookings) {
+        for (Booking booking : activeBookings) {
             totalCommission = totalCommission.add(calculateAdminCommissionForBooking(booking));
         }
         return totalCommission.setScale(0, RoundingMode.DOWN);
+    }
+
+    @Override
+    public BigDecimal getTotalFrozenBalance() {
+        return walletRepository.sumTotalFrozenBalance().add(walletRepository.sumAvailableBalance());
     }
 
     @Override
@@ -258,6 +264,34 @@ public class WalletServiceImpl implements WalletService {
     }
 
     // ─── Booking lifecycle hooks ───────────────────────────────────────────────
+
+    @Override
+    @Transactional
+    public void onBookingPaid(int bookingId) {
+        Booking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new AppException(ErrorCode.BOOKING_NOT_FOUND));
+
+        Payment payment = paymentRepository.findByBookingId(bookingId).orElse(null);
+        if (payment == null || !"SUCCESS".equals(payment.getStatus())) return;
+
+        boolean isPureCash = "CASH".equals(payment.getMethod());
+        boolean isCashDeposit = "CASH_DEPOSIT".equals(payment.getMethod());
+        boolean isOnlinePayment = !isPureCash && !isCashDeposit;
+
+        if (isOnlinePayment) {
+            BigDecimal fullPrice = (booking.getServices() != null && !booking.getServices().isEmpty())
+                    ? booking.getServices().stream().map(s -> s.getPrice() != null ? s.getPrice() : BigDecimal.ZERO).reduce(BigDecimal.ZERO, BigDecimal::add)
+                    : BigDecimal.ZERO;
+            BigDecimal adminCommission = calculateAdminCommissionForBooking(booking);
+            BigDecimal shopShare = fullPrice.subtract(adminCommission).setScale(0, RoundingMode.DOWN);
+
+            ShopWallet wallet = getOrCreateWallet(booking.getShop());
+            wallet.setFrozenBalance(safe(wallet.getFrozenBalance()).add(shopShare));
+            wallet.setUpdatedAt(LocalDateTime.now());
+            walletRepository.save(wallet);
+            log.info("Booking {} PAID via PayOS — added {} to frozenBalance", bookingId, shopShare);
+        }
+    }
 
     @Override
     @Transactional
@@ -331,6 +365,12 @@ public class WalletServiceImpl implements WalletService {
             wallet.setAvailableBalance(safe(wallet.getAvailableBalance()).subtract(adminCommission));
         } else if (isOnlinePayment) {
             // Khách trả 100% qua hệ thống (PayOS/MOCK), Admin giữ tiền. Admin trả lại shopShare cho Shop.
+            // Trừ khỏi frozenBalance vì đơn đã hoàn thành
+            BigDecimal newFrozen = safe(wallet.getFrozenBalance()).subtract(shopShare);
+            if (newFrozen.compareTo(BigDecimal.ZERO) < 0) newFrozen = BigDecimal.ZERO;
+            wallet.setFrozenBalance(newFrozen);
+            
+            // Cộng vào availableBalance
             wallet.setAvailableBalance(safe(wallet.getAvailableBalance()).add(shopShare));
         }
         // Với CASH_DEPOSIT: Khách đã trả cọc qua PayOS (đủ phần adminCommission), Admin đã nhận.
@@ -386,8 +426,33 @@ public class WalletServiceImpl implements WalletService {
     @Override
     @Transactional
     public void onBookingCancelled(int bookingId) {
-        // Booking bị huỷ → không làm gì với ví (tiền chưa bao giờ vào ví)
-        log.info("Booking {} CANCELLED — no wallet impact", bookingId);
+        Booking booking = bookingRepository.findById(bookingId).orElse(null);
+        if (booking == null) return;
+        
+        Payment payment = paymentRepository.findByBookingId(bookingId).orElse(null);
+        if (payment != null && "SUCCESS".equals(payment.getStatus())) {
+            boolean isPureCash = "CASH".equals(payment.getMethod());
+            boolean isCashDeposit = "CASH_DEPOSIT".equals(payment.getMethod());
+            boolean isOnlinePayment = !isPureCash && !isCashDeposit;
+
+            if (isOnlinePayment) {
+                BigDecimal fullPrice = (booking.getServices() != null && !booking.getServices().isEmpty())
+                        ? booking.getServices().stream().map(s -> s.getPrice() != null ? s.getPrice() : BigDecimal.ZERO).reduce(BigDecimal.ZERO, BigDecimal::add)
+                        : BigDecimal.ZERO;
+                BigDecimal adminCommission = calculateAdminCommissionForBooking(booking);
+                BigDecimal shopShare = fullPrice.subtract(adminCommission).setScale(0, RoundingMode.DOWN);
+
+                ShopWallet wallet = getOrCreateWallet(booking.getShop());
+                BigDecimal newFrozen = safe(wallet.getFrozenBalance()).subtract(shopShare);
+                if (newFrozen.compareTo(BigDecimal.ZERO) < 0) newFrozen = BigDecimal.ZERO;
+                wallet.setFrozenBalance(newFrozen);
+                wallet.setUpdatedAt(LocalDateTime.now());
+                walletRepository.save(wallet);
+                log.info("Booking {} CANCELLED — deducted {} from frozenBalance", bookingId, shopShare);
+            }
+        } else {
+            log.info("Booking {} CANCELLED — no wallet impact (not paid)", bookingId);
+        }
     }
 
     @Transactional

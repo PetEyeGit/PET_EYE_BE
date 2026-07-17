@@ -68,6 +68,15 @@ public interface BookingRepository extends JpaRepository<Booking, Integer> {
     @Query("SELECT DISTINCT b FROM Booking b LEFT JOIN FETCH b.services WHERE b.status = 'COMPLETED'")
     List<Booking> findCompletedBookingsWithServices();
 
+    @Query("SELECT DISTINCT b FROM Booking b LEFT JOIN FETCH b.services WHERE b.status IN ('WAITING_SHOP_APPROVAL', 'CONFIRMED', 'IN_PROGRESS', 'COMPLETED')")
+    List<Booking> findActiveAndCompletedBookingsWithServices();
+
+    @Query("SELECT DISTINCT b FROM Booking b LEFT JOIN FETCH b.services WHERE b.status = 'COMPLETED' AND YEAR(b.appointmentDatetime) = :year")
+    List<Booking> findCompletedBookingsWithServicesByYear(@Param("year") int year);
+
+    @Query("SELECT DISTINCT b FROM Booking b LEFT JOIN FETCH b.services WHERE b.status = 'COMPLETED' AND b.appointmentDatetime >= :start AND b.appointmentDatetime <= :end")
+    List<Booking> findCompletedBookingsWithServicesBetween(@Param("start") java.time.LocalDateTime start, @Param("end") java.time.LocalDateTime end);
+
     /** Tong doanh thu cua cac booking da hoan thanh */
     @Query("SELECT COALESCE(SUM(s.price), 0) FROM Booking b JOIN b.services s WHERE b.status = 'COMPLETED'")
     BigDecimal sumTotalCompletedRevenue();

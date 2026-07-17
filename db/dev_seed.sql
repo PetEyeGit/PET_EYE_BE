@@ -9,9 +9,10 @@
 --
 -- Shop: "Dev Pet Spa" — đã verified, mode MANUAL
 -- Dịch vụ:
---   ID 1 — Tắm & Sấy cơ bản     : 150,000đ  / 60 phút
---   ID 2 — Cắt tỉa lông          : 250,000đ  / 90 phút
---   ID 3 — Gói Spa thư giãn      : 450,000đ  / 120 phút
+--   ID 1 — Tắm & Sấy - Chó (< 5kg) : 150,000đ  / 60 phút
+--   ID 2 — Tắm & Sấy - Chó (5-10kg): 200,000đ  / 60 phút
+--   ID 3 — Cắt tỉa lông - Chó (< 5kg) : 250,000đ / 90 phút
+--   ... và các dịch vụ khác cho Mèo và theo số kg
 -- Pet: "Mochi" (Poodle, đực) — thuộc userdev
 -- Ví shop: 0đ (chưa có giao dịch nào)
 -- ============================================================
@@ -49,7 +50,7 @@ TRUNCATE TABLE user_roles;
 TRUNCATE TABLE role;
 TRUNCATE TABLE user;
 
-SET FOREIGN_KEY_CHECKS = 1;
+-- Không gán lại FOREIGN_KEY_CHECKS = 1 ở đây, sẽ để ở cuối file
 
 -- ============================================================
 -- ROLES
@@ -100,7 +101,7 @@ INSERT INTO user_roles (user_id, roles_id) VALUES
 INSERT INTO shop (id, owner_id, shop_name, shop_type, email, phone,
                   address, city, description, license_number,
                   is_verified, rating_avg, open_time, close_time,
-                  working_days, assignment_mode, late_grace_period) VALUES
+                  working_days, assignment_mode, late_grace_period, use_banner_in_gallery, show_cover_in_gallery, status) VALUES
 (1, 2,
  'Dev Pet Spa',
  'SPA',
@@ -115,44 +116,29 @@ INSERT INTO shop (id, owner_id, shop_name, shop_type, email, phone,
  '08:00',
  '20:00',
  'Mon,Tue,Wed,Thu,Fri,Sat,Sun',
- 'MANUAL', 15);  -- MANUAL: shop owner tự assign staff
+ 'MANUAL', 15, true, true, 'APPROVED');  -- Thêm use_banner_in_gallery, show_cover_in_gallery và status
 
 -- ============================================================
--- SERVICES (4 dịch vụ)
+-- SERVICES (Chia theo loại thú cưng và số kg)
 -- ============================================================
-INSERT INTO pet_service (id, shop_id, service_name, category, price, duration_minutes,
+INSERT INTO pet_service (id, shop_id, service_name, category, pet_type, price, duration_minutes,
                          description, active, camera_enabled, created_at) VALUES
-(1, 1,
- 'Tắm & Sấy cơ bản',
- 'SPA',
- 150000,
- 60,
- 'Tắm sạch bằng sữa tắm chuyên dụng, sấy khô hoàn toàn, vệ sinh tai và cắt móng.',
- true, false, NOW()),
+-- Dịch vụ cho Chó
+(1, 1, 'Tắm & Sấy - Chó (< 5kg)', 'SPA', 'DOG', 150000, 60, 'Tắm sấy cơ bản cho chó nhỏ dưới 5kg', true, false, NOW()),
+(2, 1, 'Tắm & Sấy - Chó (5 - 10kg)', 'SPA', 'DOG', 200000, 60, 'Tắm sấy cơ bản cho chó vừa từ 5-10kg', true, false, NOW()),
+(3, 1, 'Tắm & Sấy - Chó (> 10kg)', 'SPA', 'DOG', 250000, 60, 'Tắm sấy cơ bản cho chó lớn trên 10kg', true, false, NOW()),
+(4, 1, 'Cắt tỉa lông - Chó (< 5kg)', 'GROOMING', 'DOG', 250000, 90, 'Cắt tỉa lông cho chó nhỏ dưới 5kg', true, false, NOW()),
+(5, 1, 'Cắt tỉa lông - Chó (5 - 10kg)', 'GROOMING', 'DOG', 300000, 90, 'Cắt tỉa lông cho chó vừa từ 5-10kg', true, false, NOW()),
+(6, 1, 'Cắt tỉa lông - Chó (> 10kg)', 'GROOMING', 'DOG', 350000, 90, 'Cắt tỉa lông cho chó lớn trên 10kg', true, false, NOW()),
 
-(2, 1,
- 'Cắt tỉa lông toàn thân',
- 'GROOMING',
- 250000,
- 90,
- 'Cắt tỉa lông theo yêu cầu, tạo kiểu chuyên nghiệp. Bao gồm tắm và sấy.',
- true, false, NOW()),
+-- Dịch vụ cho Mèo
+(7, 1, 'Tắm & Sấy - Mèo (< 5kg)', 'SPA', 'CAT', 150000, 60, 'Tắm sấy cơ bản cho mèo nhỏ dưới 5kg', true, false, NOW()),
+(8, 1, 'Tắm & Sấy - Mèo (5 - 10kg)', 'SPA', 'CAT', 200000, 60, 'Tắm sấy cơ bản cho mèo vừa từ 5-10kg', true, false, NOW()),
+(9, 1, 'Cắt tỉa lông - Mèo (< 5kg)', 'GROOMING', 'CAT', 250000, 90, 'Cắt tỉa lông cho mèo nhỏ dưới 5kg', true, false, NOW()),
+(10, 1, 'Cắt tỉa lông - Mèo (5 - 10kg)', 'GROOMING', 'CAT', 300000, 90, 'Cắt tỉa lông cho mèo vừa từ 5-10kg', true, false, NOW()),
 
-(3, 1,
- 'Gói Spa thư giãn',
- 'SPA',
- 450000,
- 120,
- 'Tắm thơm, massage toàn thân, dưỡng lông mềm mượt, cắt móng, vệ sinh tai, xịt nước hoa.',
- true, false, NOW()),
-
-(4, 1,
- 'Lưu trú thú cưng kèm Camera',
- 'BOARDING',
- 300000,
- 1440,
- 'Dịch vụ lưu trú cao cấp có camera giám sát 24/7 giúp chủ nuôi dễ dàng theo dõi thú cưng.',
- true, true, NOW());
+-- Lưu trú
+(11, 1, 'Lưu trú thú cưng kèm Camera', 'BOARDING', 'DOG', 300000, 1440, 'Dịch vụ lưu trú cao cấp có camera giám sát 24/7', true, true, NOW());
 
 -- ============================================================
 -- STAFF (1 nhân viên)
@@ -235,126 +221,9 @@ INSERT INTO camera (id, cage_id, model_type, stream_url, access_token, status) V
 (2, 1, 'EZVIZ-C6N', 'rtsp://admin:123456@192.168.1.101:554/live', 'token456', 'ONLINE');
 
 -- ============================================================
--- BOOKINGS - Các đơn hàng với các trạng thái khác nhau
+-- KHÔNG CÓ DỮ LIỆU BOOKING
+-- (Chỉ có user, shop, services, staff, pet, cages & cameras)
 -- ============================================================
 
--- Booking 1: UPCOMING (Sắp diễn ra) - CONFIRMED status
--- Ngày mai, 10:00 AM
-INSERT INTO booking (id, user_id, shop_id, pet_id, staff_id, appointment_datetime, status, note, created_at, created_by) VALUES
-(1, 3, 1, 1, 1,
- DATE_ADD(CURDATE(), INTERVAL 1 DAY) + INTERVAL 10 HOUR,
- 'CONFIRMED',
- 'Tắm & sấy cơ bản cho Mochi - Sắp diễn ra',
- NOW(), 'USER');
 
--- Booking 2: UPCOMING (Sắp diễn ra) - CONFIRMED status
--- Ngày kia, 14:00 PM
-INSERT INTO booking (id, user_id, shop_id, pet_id, staff_id, appointment_datetime, status, note, created_at, created_by) VALUES
-(2, 3, 1, 1, 3,
- DATE_ADD(CURDATE(), INTERVAL 2 DAY) + INTERVAL 14 HOUR,
- 'CONFIRMED',
- 'Cắt tỉa lông toàn thân - Sắp diễn ra',
- NOW(), 'USER');
-
--- Booking 3: ONGOING (Đang diễn ra) - IN_PROGRESS status
--- Hôm nay, 11:00 AM (giả sử đang trong giờ làm việc)
-INSERT INTO booking (id, user_id, shop_id, pet_id, staff_id, appointment_datetime, status, note, created_at, created_by) VALUES
-(3, 3, 1, 1, 1,
- CURDATE() + INTERVAL 11 HOUR,
- 'IN_PROGRESS',
- 'Gói Spa thư giãn - Đang diễn ra',
- NOW(), 'USER');
-
--- Booking 4: COMPLETED (Hoàn thành) - COMPLETED status
--- Hôm qua, 09:00 AM
-INSERT INTO booking (id, user_id, shop_id, pet_id, staff_id, appointment_datetime, status, note, created_at, created_by) VALUES
-(4, 3, 1, 1, 3,
- DATE_SUB(CURDATE(), INTERVAL 1 DAY) + INTERVAL 9 HOUR,
- 'COMPLETED',
- 'Tắm & sấy cơ bản - Đã hoàn thành',
- DATE_SUB(NOW(), INTERVAL 1 DAY), 'USER');
-
--- Booking 5: COMPLETED (Hoàn thành) - COMPLETED status
--- 2 ngày trước, 15:00 PM
-INSERT INTO booking (id, user_id, shop_id, pet_id, staff_id, appointment_datetime, status, note, created_at, created_by) VALUES
-(5, 3, 1, 1, 1,
- DATE_SUB(CURDATE(), INTERVAL 2 DAY) + INTERVAL 15 HOUR,
- 'COMPLETED',
- 'Cắt tỉa lông - Đã hoàn thành',
- DATE_SUB(NOW(), INTERVAL 2 DAY), 'USER');
-
--- Booking 6: CANCELLED (Đã hủy) - CANCELLED status
--- 3 ngày trước, 10:00 AM
-INSERT INTO booking (id, user_id, shop_id, pet_id, staff_id, appointment_datetime, status, note, created_at, created_by) VALUES
-(6, 3, 1, 1, 3,
- DATE_SUB(CURDATE(), INTERVAL 3 DAY) + INTERVAL 10 HOUR,
- 'CANCELLED',
- 'Gói Spa thư giãn - Đã hủy',
- DATE_SUB(NOW(), INTERVAL 3 DAY), 'USER');
-
--- Booking 7: WAITING_SHOP_APPROVAL (Chờ phê duyệt) - WAITING_SHOP_APPROVAL status
--- Ngày mai, 16:00 PM
-INSERT INTO booking (id, user_id, shop_id, pet_id, staff_id, appointment_datetime, status, note, created_at, created_by) VALUES
-(7, 3, 1, 1, NULL,
- DATE_ADD(CURDATE(), INTERVAL 1 DAY) + INTERVAL 16 HOUR,
- 'WAITING_SHOP_APPROVAL',
- 'Tắm & sấy cơ bản - Chờ phê duyệt từ shop',
- NOW(), 'USER');
-
--- Booking 8: CONFIRMED - Dành cho Boarding kèm Camera
-INSERT INTO booking (id, user_id, shop_id, pet_id, staff_id, appointment_datetime, status, note, created_at, created_by) VALUES
-(8, 3, 1, 1, 1,
- DATE_ADD(CURDATE(), INTERVAL 1 DAY) + INTERVAL 10 HOUR,
- 'CONFIRMED',
- 'Lưu trú thú cưng kèm Camera',
- NOW(), 'USER');
-
--- Booking 9: Đơn do SHOP tạo tại quầy (Đã hoàn thành - COMPLETED)
--- Để test tính năng trừ tiền ví SHOP
-INSERT INTO booking (id, user_id, shop_id, pet_id, staff_id, appointment_datetime, status, note, created_at, created_by) VALUES
-(9, 3, 1, 1, 1,
- DATE_SUB(CURDATE(), INTERVAL 1 DAY) + INTERVAL 14 HOUR,
- 'COMPLETED',
- 'Tắm & sấy cơ bản - Đơn Shop tự tạo tại quầy',
- DATE_SUB(NOW(), INTERVAL 1 DAY), 'SHOP');
-
--- ============================================================
--- BOOKING SERVICES (Bảng trung gian Nhiều-Nhiều)
--- ============================================================
-INSERT INTO booking_services (booking_id, service_id) VALUES
-(1, 1),
-(2, 2),
-(3, 3),
-(4, 1),
-(5, 2),
-(6, 3),
-(7, 1),
-(8, 4),
-(9, 1);
-
-
--- ============================================================
--- PAYMENTS
--- ============================================================
-INSERT INTO payment (id, booking_id, amount, method, status, description, payment_time) VALUES
-(1, 8, 300000.00, 'PAYOS', 'SUCCESS', 'Payment for camera boarding booking 8', NOW());
-
--- ============================================================
--- BOARDING DETAILS
--- ============================================================
-INSERT INTO boarding_detail (id, booking_id, cage_id, check_in, check_out) VALUES
-(1, 8, 3, DATE_ADD(CURDATE(), INTERVAL 1 DAY) + INTERVAL 10 HOUR, DATE_ADD(CURDATE(), INTERVAL 2 DAY) + INTERVAL 10 HOUR);
-
--- Booking 10: CONFIRMED - Để test luồng Shop Hủy lịch (đã thanh toán PAYOS)
-INSERT INTO booking (id, user_id, shop_id, pet_id, staff_id, appointment_datetime, status, note, created_at, created_by) VALUES
-(10, 3, 1, 1, 1,
- DATE_ADD(CURDATE(), INTERVAL 3 DAY) + INTERVAL 9 HOUR,
- 'CONFIRMED',
- 'Booking để test Shop Hủy Lịch -> Hoàn tiền',
- NOW(), 'USER');
-
-INSERT INTO booking_services (booking_id, service_id) VALUES
-(10, 1);
-
-INSERT INTO payment (id, booking_id, amount, method, status, description, payment_time) VALUES
-(2, 10, 150000.00, 'PAYOS', 'SUCCESS', 'Test Payment for shop cancel refund flow', NOW());
+SET FOREIGN_KEY_CHECKS = 1;

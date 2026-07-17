@@ -736,6 +736,10 @@ public class BookingServiceImpl implements BookingService {
                 .build();
         paymentRepository.save(payment);
 
+        // Cộng tiền vào frozenBalance của Shop (do admin đang giữ hộ)
+        log.info("Đã cộng tiền: " + pending.getAmountVnd() + " vào frozenBalance của Shop " + shop.getId());
+        walletService.onBookingPaid(booking.getId());
+
         // ── Ghi Transaction ───────────────────────────────────────────────────
         transactionRepository.save(Transaction.builder()
                 .booking(booking)
@@ -935,6 +939,9 @@ public class BookingServiceImpl implements BookingService {
                 .gatewayTransactionId("MOCK-" + orderCode)
                 .build();
         paymentRepository.save(payment);
+
+        // Cộng tiền vào frozenBalance của Shop (do admin đang giữ hộ) - Mock Flow
+        walletService.onBookingPaid(booking.getId());
 
         // ── Ghi Transaction ───────────────────────────────────────────────────
         transactionRepository.save(Transaction.builder()

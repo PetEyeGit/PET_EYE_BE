@@ -57,6 +57,7 @@ public class AdminController {
     WithdrawalRequestRepository withdrawalRequestRepository;
     com.sang.sourcepattern.repository.UserVoucherRepository userVoucherRepository;
     com.sang.sourcepattern.service.GoongMapService goongMapService;
+    com.sang.sourcepattern.service.WalletService walletService;
 
     // ─── Dashboard ───────────────────────────────────────────────────────────
 
@@ -77,7 +78,7 @@ public class AdminController {
         LocalDateTime prevEnd = periodStart.minusSeconds(1);
 
         // Core stats
-        BigDecimal totalRevenue = bookingRepository.sumTotalRevenue();
+        BigDecimal totalRevenue = walletService.getAdminBalance();
         if (totalRevenue == null) totalRevenue = BigDecimal.ZERO;
         long totalUsers = userRepository.count();
         long activeUsers = userRepository.countByActiveTrue();
@@ -92,13 +93,21 @@ public class AdminController {
         long totalBroadcasts = notificationRepository.countDistinctBroadcasts();
 
         // Period stats
-        BigDecimal periodRevenue = bookingRepository.sumRevenueBetween(periodStart, periodEnd);
+        List<com.sang.sourcepattern.entity.Booking> periodBookingsList = bookingRepository.findCompletedBookingsWithServicesBetween(periodStart, periodEnd);
+        BigDecimal periodRevenue = BigDecimal.ZERO;
+        for (com.sang.sourcepattern.entity.Booking b : periodBookingsList) {
+            periodRevenue = periodRevenue.add(walletService.calculateAdminCommissionForBooking(b));
+        }
         if (periodRevenue == null) periodRevenue = BigDecimal.ZERO;
         long periodUsers = userRepository.countUsersBetween(periodStart, periodEnd);
         long periodBookings = bookingRepository.countBookingsBetween(periodStart, periodEnd);
 
         // Calculate Revenue Trend (Current vs Prev period)
-        BigDecimal revPrev = bookingRepository.sumRevenueBetween(prevStart, prevEnd);
+        List<com.sang.sourcepattern.entity.Booking> prevPeriodBookingsList = bookingRepository.findCompletedBookingsWithServicesBetween(prevStart, prevEnd);
+        BigDecimal revPrev = BigDecimal.ZERO;
+        for (com.sang.sourcepattern.entity.Booking b : prevPeriodBookingsList) {
+            revPrev = revPrev.add(walletService.calculateAdminCommissionForBooking(b));
+        }
         double revTrendVal = 0.0;
         if (revPrev != null && revPrev.compareTo(BigDecimal.ZERO) > 0 && periodRevenue.compareTo(BigDecimal.ZERO) > 0) {
             revTrendVal = periodRevenue.subtract(revPrev).doubleValue() / revPrev.doubleValue() * 100;
@@ -203,10 +212,11 @@ public class AdminController {
 
         // Build map month -> revenue từ query
         Map<Integer, BigDecimal> revenueMap = new java.util.HashMap<>();
-        for (Object[] row : bookingRepository.adminCommissionByMonth(targetYear)) {
-            int month = ((Number) row[0]).intValue();
-            BigDecimal revenue = new BigDecimal(row[1].toString());
-            revenueMap.put(month, revenue);
+        List<com.sang.sourcepattern.entity.Booking> bookings = bookingRepository.findCompletedBookingsWithServicesByYear(targetYear);
+        for (com.sang.sourcepattern.entity.Booking b : bookings) {
+            int month = b.getAppointmentDatetime().getMonthValue();
+            BigDecimal commission = walletService.calculateAdminCommissionForBooking(b);
+            revenueMap.put(month, revenueMap.getOrDefault(month, BigDecimal.ZERO).add(commission));
         }
 
         // Trả đủ 12 tháng, tháng không có thì 0

@@ -18,17 +18,29 @@ public interface WalletService {
     /** Lấy tổng số dư ví admin (tổng tiền phí đã thu) */
     BigDecimal getAdminBalance();
 
+    /** Lấy tổng số tiền đóng băng của tất cả các shop */
+    BigDecimal getTotalFrozenBalance();
+
     /** Lấy tỷ lệ phí hoa hồng admin (mặc định 10%) */
     BigDecimal getAdminFeeRate();
 
     /** Tính tổng phí hoa hồng admin cho danh sách service IDs */
     BigDecimal calculateAdminCommission(List<Integer> serviceIds, Integer petId, String petWeight);
 
+    /** Tính tổng phí hoa hồng admin cho 1 booking cụ thể */
+    BigDecimal calculateAdminCommissionForBooking(com.sang.sourcepattern.entity.Booking booking);
+
     /** Lấy giá tiền của 1 service cụ thể (có tính petWeight) */
     BigDecimal resolveSingleServicePrice(com.sang.sourcepattern.entity.Service s, Integer petId, String petWeight);
 
     /** Lấy tỷ lệ phí hoa hồng admin cho 1 dịch vụ cụ thể */
     BigDecimal getCommissionRateForService(com.sang.sourcepattern.entity.Service service);
+
+    /**
+     * Khi booking được thanh toán 100% qua cổng thanh toán (PayOS): 
+     * Tiền tạm thời nằm ở Admin, cộng shopShare vào frozenBalance của Shop.
+     */
+    void onBookingPaid(int bookingId);
 
     /**
      * Khi booking COMPLETED: chuyển tiền từ frozen → available (90%) và ghi nhận phí admin (10%).
