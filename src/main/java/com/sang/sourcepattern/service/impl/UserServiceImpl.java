@@ -43,6 +43,7 @@ public class UserServiceImpl implements UserService {
     UserTokenRepository userTokenRepository;
     com.sang.sourcepattern.repository.UserVoucherRepository userVoucherRepository;
     com.sang.sourcepattern.service.TierUpgradeService tierUpgradeService;
+    com.sang.sourcepattern.service.VoucherService voucherService;
 
     @Override
     @Transactional
@@ -205,11 +206,22 @@ public class UserServiceImpl implements UserService {
         }
 
         user.setEmailVerified(true);
-        user.setActive(true);         // kích hoạt tài khoản sau khi xác thực email
+        user.setActive(true);         // kich hoat tai khoan sau khi xac thuc email
         userRepository.save(user);
 
         verificationToken.setUsed(true);
         userTokenRepository.save(verificationToken);
+
+        // Phat voucher tan thu cho user moi dang ky thanh cong
+        try {
+            boolean issued = voucherService.issueNewcomerVouchers(user);
+            if (issued) {
+                user.setJustRegistered(true);
+                userRepository.save(user);
+            }
+        } catch (Exception e) {
+            log.error("Khong the phat voucher tan thu cho user {}:", user.getEmail(), e);
+        }
 
         log.info("Email verified for user: {}", user.getEmail());
     }

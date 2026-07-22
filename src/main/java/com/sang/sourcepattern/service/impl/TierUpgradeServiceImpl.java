@@ -76,7 +76,9 @@ public class TierUpgradeServiceImpl implements TierUpgradeService {
                 log.info("User {} upgraded to tier {}", user.getEmail(), newTier.getName());
 
                 // Issue vouchers for the new tier
-                List<Voucher> tierVouchers = voucherRepository.findByTargetTierName(newTier.getName());
+                // Chi phat voucher TIER dang ACTIVE (chua bi tat)
+                List<Voucher> tierVouchers = voucherRepository.findByTargetTierNameAndActiveTrue(newTier.getName());
+
                 for (Voucher voucher : tierVouchers) {
                     for (int i = 0; i < voucher.getIssueQuantity(); i++) {
                         UserVoucher userVoucher = UserVoucher.builder()

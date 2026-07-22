@@ -99,6 +99,27 @@ public class UserController {
                 .build();
     }
 
+    @PatchMapping("/me/acknowledge-registration")
+    @Transactional
+    ApiResponse<Void> acknowledgeRegistration(@AuthenticationPrincipal Jwt jwt) {
+        String identifier = jwt.getSubject();
+        User user;
+        if (identifier.contains("@")) {
+            user = userRepository.findByEmail(identifier)
+                    .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
+        } else {
+            user = userRepository.findById(Integer.parseInt(identifier))
+                    .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
+        }
+
+        user.setJustRegistered(false);
+        userRepository.save(user);
+
+        return ApiResponse.<Void>builder()
+                .message("Registration acknowledged")
+                .build();
+    }
+
     @GetMapping("/me/vouchers")
     @Transactional(readOnly = true)
     public ApiResponse<List<com.sang.sourcepattern.entity.UserVoucher>> getMyVouchers(@AuthenticationPrincipal Jwt jwt) {

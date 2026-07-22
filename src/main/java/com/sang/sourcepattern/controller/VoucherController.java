@@ -24,12 +24,15 @@ public class VoucherController {
 
     VoucherRepository voucherRepository;
     MembershipTierRepository membershipTierRepository;
+    com.sang.sourcepattern.repository.UserVoucherRepository userVoucherRepository;
 
     @GetMapping
     @PreAuthorize("hasRole('ADMIN')")
     public ApiResponse<List<Voucher>> getAllVouchers() {
+        List<Voucher> vouchers = voucherRepository.findAll();
+        vouchers.forEach(v -> v.setIssuedQuantity(userVoucherRepository.countByVoucherId(v.getId())));
         return ApiResponse.<List<Voucher>>builder()
-                .result(voucherRepository.findAll())
+                .result(vouchers)
                 .build();
     }
 
@@ -40,24 +43,48 @@ public class VoucherController {
                 .build();
     }
 
+    /**
+     * Lay danh sach cac voucher NEWCOMER (danh cho tan thu).
+     */
+    @GetMapping("/newcomer")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ApiResponse<List<Voucher>> getNewcomerVouchers() {
+        return ApiResponse.<List<Voucher>>builder()
+                .result(voucherRepository.findByVoucherType("NEWCOMER"))
+                .message("Danh sach voucher tan thu")
+                .build();
+    }
+
     @PostMapping
     @PreAuthorize("hasRole('ADMIN')")
     public ApiResponse<Voucher> createVoucher(@RequestBody VoucherCreationRequest request) {
-        MembershipTier targetTier = membershipTierRepository.findByName(request.getTargetTierName())
-                .orElseGet(() -> membershipTierRepository.save(
-                        MembershipTier.builder()
-                                .name(request.getTargetTierName())
-                                .requiredSpending(request.getRequiredSpending() != null ? request.getRequiredSpending() : 0.0)
-                                .build()
-                ));
+        String voucherType = (request.getVoucherType() != null && !request.getVoucherType().isBlank())
+                ? request.getVoucherType().toUpperCase()
+                : "TIER";
+
+        MembershipTier targetTier = null;
+        if ("TIER".equals(voucherType)) {
+            if (request.getTargetTierName() == null || request.getTargetTierName().isBlank()) {
+                throw new AppException(ErrorCode.INVALID_REQUEST);
+            }
+            targetTier = membershipTierRepository.findByName(request.getTargetTierName())
+                    .orElseGet(() -> membershipTierRepository.save(
+                            MembershipTier.builder()
+                                    .name(request.getTargetTierName())
+                                    .requiredSpending(request.getRequiredSpending() != null ? request.getRequiredSpending() : 0.0)
+                                    .build()
+                    ));
+        }
 
         Voucher voucher = Voucher.builder()
                 .code(request.getCode())
+                .voucherType(voucherType)
                 .targetTier(targetTier)
+                .targetServiceCategory(request.getTargetServiceCategory())
                 .discountType(request.getDiscountType())
                 .discountValue(request.getDiscountValue())
                 .minOrderValue(request.getMinOrderValue())
-                .validDays(request.getValidDays())
+                .validDays(request.getValidDays() != null ? request.getValidDays() : 30)
                 .issueQuantity(request.getIssueQuantity() != null ? request.getIssueQuantity() : 1)
                 .build();
 
@@ -73,21 +100,32 @@ public class VoucherController {
         Voucher voucher = voucherRepository.findById(id)
                 .orElseThrow(() -> new AppException(ErrorCode.UNCATEGORIZED_EXCEPTION));
 
-        MembershipTier targetTier = membershipTierRepository.findByName(request.getTargetTierName())
-                .orElseGet(() -> membershipTierRepository.save(
-                        MembershipTier.builder()
-                                .name(request.getTargetTierName())
-                                .requiredSpending(request.getRequiredSpending() != null ? request.getRequiredSpending() : 0.0)
-                                .build()
-                ));
+        String voucherType = (request.getVoucherType() != null && !request.getVoucherType().isBlank())
+                ? request.getVoucherType().toUpperCase()
+                : voucher.getVoucherType();
+
+        MembershipTier targetTier = voucher.getTargetTier();
+        if ("TIER".equals(voucherType) && request.getTargetTierName() != null && !request.getTargetTierName().isBlank()) {
+            targetTier = membershipTierRepository.findByName(request.getTargetTierName())
+                    .orElseGet(() -> membershipTierRepository.save(
+                            MembershipTier.builder()
+                                    .name(request.getTargetTierName())
+                                    .requiredSpending(request.getRequiredSpending() != null ? request.getRequiredSpending() : 0.0)
+                                    .build()
+                    ));
+        } else if ("NEWCOMER".equals(voucherType)) {
+            targetTier = null;
+        }
 
         voucher.setCode(request.getCode());
+        voucher.setVoucherType(voucherType);
         voucher.setTargetTier(targetTier);
+        voucher.setTargetServiceCategory(request.getTargetServiceCategory());
         voucher.setDiscountType(request.getDiscountType());
         voucher.setDiscountValue(request.getDiscountValue());
         voucher.setMinOrderValue(request.getMinOrderValue());
-        voucher.setValidDays(request.getValidDays());
-        voucher.setIssueQuantity(request.getIssueQuantity() != null ? request.getIssueQuantity() : 1);
+        if (request.getValidDays() != null) voucher.setValidDays(request.getValidDays());
+        if (request.getIssueQuantity() != null) voucher.setIssueQuantity(request.getIssueQuantity());
 
         return ApiResponse.<Voucher>builder()
                 .result(voucherRepository.save(voucher))
@@ -101,6 +139,24 @@ public class VoucherController {
         voucherRepository.deleteById(id);
         return ApiResponse.<Void>builder()
                 .message("Voucher deleted successfully")
+                .build();
+    }
+
+    /**
+     * Bat / tat tung voucher rieng le.
+     * PATCH /admin/vouchers/{id}/toggle
+     */
+    @org.springframework.web.bind.annotation.PatchMapping("/{id}/toggle")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ApiResponse<Voucher> toggleVoucher(@PathVariable Integer id) {
+        Voucher voucher = voucherRepository.findById(id)
+                .orElseThrow(() -> new AppException(ErrorCode.UNCATEGORIZED_EXCEPTION));
+        voucher.setActive(!voucher.isActive());
+        Voucher saved = voucherRepository.save(voucher);
+        String status = saved.isActive() ? "bat" : "tat";
+        return ApiResponse.<Voucher>builder()
+                .result(saved)
+                .message("Da " + status + " voucher " + saved.getCode())
                 .build();
     }
 }

@@ -19,6 +19,7 @@ public class UserResponse {
     String avatar;
     boolean active;
     boolean isBanned;
+    boolean justRegistered;
     Double totalSpending;
     Boolean justUpgraded;
     MembershipTierResponse currentTier;

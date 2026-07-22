@@ -23,7 +23,7 @@ public class Voucher {
 
     // e.g., "PERCENTAGE" or "FIXED_AMOUNT"
     @Column(nullable = false)
-    String discountType; 
+    String discountType;
 
     @Column(nullable = false)
     Double discountValue;
@@ -36,6 +36,31 @@ public class Voucher {
 
     @Builder.Default
     Integer issueQuantity = 1;
+
+    /**
+     * - "TIER"     : phát theo hạng thành viên (mặc định cũ)
+     * - "NEWCOMER" : phát cho người mới đăng ký tài khoản
+     */
+    @Column(nullable = false)
+    @Builder.Default
+    String voucherType = "TIER";
+
+    @Transient
+    Long issuedQuantity;
+
+    /**
+     * Giới hạn áp dụng theo category dịch vụ.
+     * null = áp dụng mọi dịch vụ; "SPA", "GROOMING", ... = giới hạn category.
+     */
+    String targetServiceCategory;
+
+    /**
+     * Bật/tắt từng voucher riêng lẻ.
+     * true = voucher đang hoạt động; false = voucher bị tạm ngừng.
+     */
+    @Builder.Default
+    @Column(nullable = false)
+    boolean active = true;
 
     @ManyToOne
     @JoinColumn(name = "target_tier_id")

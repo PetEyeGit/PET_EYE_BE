@@ -9,4 +9,13 @@ import java.util.List;
 @Repository
 public interface VoucherRepository extends JpaRepository<Voucher, Integer> {
     List<Voucher> findByTargetTierName(String targetTierName);
+
+    /** Lấy tất cả voucher theo loại (TIER / NEWCOMER) */
+    List<Voucher> findByVoucherType(String voucherType);
+
+    /** Chi lay voucher dang ACTIVE theo loai */
+    List<Voucher> findByVoucherTypeAndActiveTrue(String voucherType);
+
+    /** Chi lay voucher TIER dang ACTIVE theo ten hang */
+    List<Voucher> findByTargetTierNameAndActiveTrue(String targetTierName);
 }

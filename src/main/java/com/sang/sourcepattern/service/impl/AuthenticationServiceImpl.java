@@ -57,6 +57,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
     PasswordEncoder passwordEncoder;
     InvalidatedTokenRepository invalidatedTokenRepository;
     RestTemplate restTemplate;
+    com.sang.sourcepattern.service.VoucherService voucherService;
 
     @Value("${jwt.signer-key}")
     @NonFinal
@@ -462,7 +463,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
                     .avatar(picture)
                     .active(true)
                     .emailVerified(true)
-                    .roles(Collections.singleton(userRole))
+                    .roles(new java.util.HashSet<>(java.util.Collections.singleton(userRole)))
                     .build();
             if ("zalo".equals(provider)) newUser.setZaloId(socialId);
             else if ("facebook".equals(provider)) newUser.setFacebookId(socialId);
@@ -471,7 +472,21 @@ public class AuthenticationServiceImpl implements AuthenticationService {
             try {
                 User savedUser = userRepository.saveAndFlush(newUser);
                 log.info("Successfully created and persisted user: {} with ID: {}", email, savedUser.getId());
+
+                // Phat voucher tan thu cho user moi dang ky qua mang xa hoi
+                try {
+                    boolean issued = voucherService.issueNewcomerVouchers(savedUser);
+                    if (issued) {
+                        savedUser.setJustRegistered(true);
+                        userRepository.save(savedUser);
+                    }
+                } catch (Exception ex) {
+                    log.error("Khong the phat voucher tan thu cho social user {}:", email, ex);
+                }
+
                 return savedUser;
+            } catch (com.sang.sourcepattern.exception.AppException ae) {
+                throw ae;
             } catch (Exception e) {
                 log.error("Failed to persist new social user: " + email, e);
                 throw new AppException(ErrorCode.UNCATEGORIZED_EXCEPTION);
