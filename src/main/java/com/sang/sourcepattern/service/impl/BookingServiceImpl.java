@@ -55,6 +55,7 @@ public class BookingServiceImpl implements BookingService {
     com.sang.sourcepattern.service.CameraService cameraService;
     UserVoucherRepository userVoucherRepository;
     com.sang.sourcepattern.service.EmailService emailService;
+    com.sang.sourcepattern.service.VoucherService voucherService;
     /** Redis template để lưu PendingBooking thay vì in-memory */
     RedisTemplate<String, Object> redisTemplate;
     SimpMessagingTemplate messagingTemplate;
@@ -506,6 +507,13 @@ public class BookingServiceImpl implements BookingService {
             }
             
             Voucher v = uv.getVoucher();
+            if (v.getIssueQuantity() != null) {
+                long usedCount = userVoucherRepository.countByVoucherIdAndIsUsedTrue(v.getId());
+                if (usedCount >= v.getIssueQuantity()) {
+                    throw new AppException(ErrorCode.INVALID_REQUEST);
+                }
+            }
+
             if (v.getMinOrderValue() != null && rawAmount < v.getMinOrderValue()) {
                 throw new AppException(ErrorCode.INVALID_REQUEST);
             }
@@ -724,6 +732,13 @@ public class BookingServiceImpl implements BookingService {
             booking = bookingRepository.save(booking);
         }
 
+        // Phat voucher cho user neu con quota
+        try {
+            voucherService.issueFirstBookingVouchers(user);
+        } catch (Exception e) {
+            log.error("Loi khi phat voucher first booking cho user {}: {}", user.getEmail(), e.getMessage());
+        }
+
         // ── Tạo Payment ───────────────────────────────────────────────────────
         Payment payment = Payment.builder()
                 .booking(booking)
@@ -927,6 +942,13 @@ public class BookingServiceImpl implements BookingService {
                 .discountAmount(discountAmount)
                 .build();
         booking = bookingRepository.save(booking);
+
+        // Phat voucher cho user neu con quota
+        try {
+            voucherService.issueFirstBookingVouchers(user);
+        } catch (Exception e) {
+            log.error("Loi khi phat voucher first booking cho user {}: {}", user.getEmail(), e.getMessage());
+        }
 
         // ── Tạo Payment ───────────────────────────────────────────────────────
         Payment payment = Payment.builder()
@@ -1242,6 +1264,13 @@ public class BookingServiceImpl implements BookingService {
                 .payosOrderCode(orderCode)
                 .build();
         booking = bookingRepository.save(booking);
+
+        // Phat voucher cho user neu con quota
+        try {
+            voucherService.issueFirstBookingVouchers(user);
+        } catch (Exception e) {
+            log.error("Loi khi phat voucher first booking cho user {}: {}", user.getEmail(), e.getMessage());
+        }
 
         // ── Tạo Payment: ghi nhận tiền cọc đã thanh toán qua PayOS ───────
         BigDecimal depositAmount = new BigDecimal(pending.getAmountVnd());
@@ -2195,6 +2224,13 @@ public class BookingServiceImpl implements BookingService {
                 .build();
         booking = bookingRepository.save(booking);
 
+        // Phat voucher cho user neu con quota
+        try {
+            voucherService.issueFirstBookingVouchers(user);
+        } catch (Exception e) {
+            log.error("Loi khi phat voucher first booking cho user {}: {}", user.getEmail(), e.getMessage());
+        }
+
         // ── Tạo Payment: ghi nhận tiền cọc (MOCK) ───────
         BigDecimal depositAmount = new BigDecimal(pending.getAmountVnd());
         String fullPriceStr = servicesSet.stream().map(s -> s.getPrice()).reduce(BigDecimal.ZERO, BigDecimal::add).toPlainString();
@@ -2409,6 +2445,13 @@ public class BookingServiceImpl implements BookingService {
                 .build();
 
         booking = bookingRepository.save(booking);
+
+        // Phat voucher cho user neu con quota
+        try {
+            voucherService.issueFirstBookingVouchers(customer);
+        } catch (Exception e) {
+            log.error("Loi khi phat voucher first booking cho user {}: {}", customer.getEmail(), e.getMessage());
+        }
 
         Notification notifUser = Notification.builder()
                 .user(customer)

@@ -26,7 +26,7 @@ public class VoucherServiceImpl implements VoucherService {
     UserVoucherRepository userVoucherRepository;
 
     @Override
-    public boolean issueNewcomerVouchers(User user) {
+    public boolean issueFirstBookingVouchers(User user) {
         List<Voucher> newcomerVouchers = voucherRepository.findByVoucherTypeAndActiveTrue("NEWCOMER");
 
 
@@ -44,11 +44,11 @@ public class VoucherServiceImpl implements VoucherService {
                 continue;
             }
 
-            // Kiem tra quota
-            long issued = userVoucherRepository.countByVoucherId(voucher.getId());
-            if (voucher.getIssueQuantity() != null && issued >= voucher.getIssueQuantity()) {
-                log.info("Voucher {} da het quota ({}/{}), khong phat them.",
-                        voucher.getCode(), issued, voucher.getIssueQuantity());
+            // Kiem tra quota su dung
+            long used = userVoucherRepository.countByVoucherIdAndIsUsedTrue(voucher.getId());
+            if (voucher.getIssueQuantity() != null && used >= voucher.getIssueQuantity()) {
+                log.info("Voucher {} da het quota su dung ({}/{}), khong phat them.",
+                        voucher.getCode(), used, voucher.getIssueQuantity());
                 continue;
             }
 
@@ -65,14 +65,40 @@ public class VoucherServiceImpl implements VoucherService {
             userVoucherRepository.save(userVoucher);
             issuedAny = true;
 
-            log.info("Da phat voucher TAN THU '{}' (giam {}%) cho user '{}'. Quota: {}/{}",
+            log.info("Da phat voucher FIRST BOOKING '{}' (giam {}%) cho user '{}'. Quota da dung: {}/{}",
                     voucher.getCode(),
                     voucher.getDiscountValue(),
                     user.getEmail(),
-                    issued + 1,
+                    used,
                     voucher.getIssueQuantity());
         }
         
         return issuedAny;
+    }
+
+    @Override
+    public UserVoucher claimVoucherByCode(User user, String code) {
+        Voucher voucher = voucherRepository.findByCodeAndActiveTrue(code)
+                .orElseThrow(() -> new com.sang.sourcepattern.exception.AppException(com.sang.sourcepattern.exception.ErrorCode.VOUCHER_NOT_FOUND));
+
+        if (userVoucherRepository.existsByUserIdAndVoucherId(user.getId(), voucher.getId())) {
+            throw new com.sang.sourcepattern.exception.AppException(com.sang.sourcepattern.exception.ErrorCode.VOUCHER_ALREADY_SAVED);
+        }
+
+        long issued = userVoucherRepository.countByVoucherId(voucher.getId());
+        if (voucher.getIssueQuantity() != null && issued >= voucher.getIssueQuantity()) {
+            throw new com.sang.sourcepattern.exception.AppException(com.sang.sourcepattern.exception.ErrorCode.VOUCHER_OUT_OF_QUOTA);
+        }
+
+        int validDays = (voucher.getValidDays() != null) ? voucher.getValidDays() : 30;
+        LocalDateTime expiresAt = LocalDateTime.now().plusDays(validDays);
+
+        UserVoucher userVoucher = UserVoucher.builder()
+                .user(user)
+                .voucher(voucher)
+                .isUsed(false)
+                .expiresAt(expiresAt)
+                .build();
+        return userVoucherRepository.save(userVoucher);
     }
 }

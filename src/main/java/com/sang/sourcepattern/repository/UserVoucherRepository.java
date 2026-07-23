@@ -14,6 +14,9 @@ public interface UserVoucherRepository extends JpaRepository<UserVoucher, Intege
     /** Đếm tổng số lượt đã phát của một voucher (để kiểm tra quota issueQuantity) */
     long countByVoucherId(Integer voucherId);
 
+    /** Đếm tổng số lượt voucher đã được SỬ DỤNG (isUsed = true) */
+    long countByVoucherIdAndIsUsedTrue(Integer voucherId);
+
     /** Kiểm tra user đã nhận voucher này chưa (idempotent — tránh cấp trùng) */
     boolean existsByUserIdAndVoucherId(Integer userId, Integer voucherId);
 

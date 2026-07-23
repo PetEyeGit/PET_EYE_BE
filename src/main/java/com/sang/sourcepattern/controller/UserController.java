@@ -39,6 +39,7 @@ public class UserController {
     NotificationRepository notificationRepository;
     UserRepository userRepository;
     com.sang.sourcepattern.repository.UserVoucherRepository userVoucherRepository;
+    com.sang.sourcepattern.service.VoucherService voucherService;
 
     @PostMapping("/register")
     ApiResponse<UserResponse> createUser(@RequestBody @Valid UserCreationRequest request) {
@@ -121,7 +122,7 @@ public class UserController {
     }
 
     @GetMapping("/me/vouchers")
-    @Transactional(readOnly = true)
+    @Transactional
     public ApiResponse<List<com.sang.sourcepattern.entity.UserVoucher>> getMyVouchers(@AuthenticationPrincipal Jwt jwt) {
         String identifier = jwt.getSubject();
         User user;
@@ -137,6 +138,33 @@ public class UserController {
         return ApiResponse.<List<com.sang.sourcepattern.entity.UserVoucher>>builder()
                 .result(vouchers)
                 .build();
+    }
+
+    @PostMapping("/me/vouchers/claim")
+    @Transactional
+    public ApiResponse<com.sang.sourcepattern.entity.UserVoucher> claimVoucher(@RequestParam String code, @AuthenticationPrincipal Jwt jwt) {
+        String identifier = jwt.getSubject();
+        User user;
+        if (identifier.contains("@")) {
+            user = userRepository.findByEmail(identifier)
+                    .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
+        } else {
+            user = userRepository.findById(Integer.parseInt(identifier))
+                    .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
+        }
+        
+        try {
+            com.sang.sourcepattern.entity.UserVoucher userVoucher = voucherService.claimVoucherByCode(user, code);
+            return ApiResponse.<com.sang.sourcepattern.entity.UserVoucher>builder()
+                    .message("Lưu mã giảm giá thành công")
+                    .result(userVoucher)
+                    .build();
+        } catch (AppException e) {
+            if (e.getErrorCode() == ErrorCode.INVALID_REQUEST) {
+                throw new RuntimeException("Mã giảm giá đã hết lượt sử dụng hoặc bạn đã lưu mã này rồi.");
+            }
+            throw e;
+        }
     }
 
     // ─── Admin endpoints ─────────────────────────────────────────────────────

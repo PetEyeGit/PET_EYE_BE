@@ -18,4 +18,7 @@ public interface VoucherRepository extends JpaRepository<Voucher, Integer> {
 
     /** Chi lay voucher TIER dang ACTIVE theo ten hang */
     List<Voucher> findByTargetTierNameAndActiveTrue(String targetTierName);
+
+    /** Tìm voucher theo mã code và đang active */
+    java.util.Optional<Voucher> findByCodeAndActiveTrue(String code);
 }

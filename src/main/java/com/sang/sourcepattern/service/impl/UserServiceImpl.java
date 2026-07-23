@@ -212,17 +212,6 @@ public class UserServiceImpl implements UserService {
         verificationToken.setUsed(true);
         userTokenRepository.save(verificationToken);
 
-        // Phat voucher tan thu cho user moi dang ky thanh cong
-        try {
-            boolean issued = voucherService.issueNewcomerVouchers(user);
-            if (issued) {
-                user.setJustRegistered(true);
-                userRepository.save(user);
-            }
-        } catch (Exception e) {
-            log.error("Khong the phat voucher tan thu cho user {}:", user.getEmail(), e);
-        }
-
         log.info("Email verified for user: {}", user.getEmail());
     }
 

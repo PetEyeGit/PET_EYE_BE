@@ -473,17 +473,6 @@ public class AuthenticationServiceImpl implements AuthenticationService {
                 User savedUser = userRepository.saveAndFlush(newUser);
                 log.info("Successfully created and persisted user: {} with ID: {}", email, savedUser.getId());
 
-                // Phat voucher tan thu cho user moi dang ky qua mang xa hoi
-                try {
-                    boolean issued = voucherService.issueNewcomerVouchers(savedUser);
-                    if (issued) {
-                        savedUser.setJustRegistered(true);
-                        userRepository.save(savedUser);
-                    }
-                } catch (Exception ex) {
-                    log.error("Khong the phat voucher tan thu cho social user {}:", email, ex);
-                }
-
                 return savedUser;
             } catch (com.sang.sourcepattern.exception.AppException ae) {
                 throw ae;
