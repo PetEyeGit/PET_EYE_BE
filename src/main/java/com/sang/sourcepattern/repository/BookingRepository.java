@@ -68,13 +68,28 @@ public interface BookingRepository extends JpaRepository<Booking, Integer> {
     @Query("SELECT DISTINCT b FROM Booking b LEFT JOIN FETCH b.services WHERE b.status = 'COMPLETED'")
     List<Booking> findCompletedBookingsWithServices();
 
-    @Query("SELECT DISTINCT b FROM Booking b LEFT JOIN FETCH b.services WHERE b.status IN ('WAITING_SHOP_APPROVAL', 'CONFIRMED', 'IN_PROGRESS', 'COMPLETED')")
+    @Query("SELECT DISTINCT b FROM Booking b LEFT JOIN FETCH b.services WHERE b.status != 'CANCELLED'")
     List<Booking> findActiveAndCompletedBookingsWithServices();
 
-    @Query("SELECT DISTINCT b FROM Booking b LEFT JOIN FETCH b.services WHERE b.status = 'COMPLETED' AND YEAR(b.appointmentDatetime) = :year")
+    @Query("SELECT DISTINCT b FROM Booking b LEFT JOIN FETCH b.services WHERE b.status != 'CANCELLED' AND YEAR(COALESCE(b.appointmentDatetime, b.createdAt)) = :year")
+    List<Booking> findActiveAndCompletedBookingsWithServicesByYear(@Param("year") int year);
+
+    @Query("SELECT DISTINCT b FROM Booking b LEFT JOIN FETCH b.services WHERE b.status != 'CANCELLED' AND COALESCE(b.appointmentDatetime, b.createdAt) >= :start AND COALESCE(b.appointmentDatetime, b.createdAt) <= :end")
+    List<Booking> findActiveAndCompletedBookingsWithServicesBetween(@Param("start") java.time.LocalDateTime start, @Param("end") java.time.LocalDateTime end);
+
+    @Query("SELECT DISTINCT b FROM Booking b LEFT JOIN FETCH b.services WHERE b.status != 'CANCELLED' AND YEAR(COALESCE(b.appointmentDatetime, b.createdAt)) = :year AND MONTH(COALESCE(b.appointmentDatetime, b.createdAt)) = :month")
+    List<Booking> findActiveAndCompletedBookingsWithServicesByMonthAndYear(@Param("year") int year, @Param("month") int month);
+
+    @Query("SELECT DISTINCT b FROM Booking b LEFT JOIN FETCH b.services WHERE b.status NOT IN ('COMPLETED', 'CANCELLED') AND YEAR(COALESCE(b.appointmentDatetime, b.createdAt)) = :year AND MONTH(COALESCE(b.appointmentDatetime, b.createdAt)) = :month")
+    List<Booking> findFrozenBookingsWithServicesByMonthAndYear(@Param("year") int year, @Param("month") int month);
+
+    @Query("SELECT DISTINCT b FROM Booking b LEFT JOIN FETCH b.services WHERE b.status NOT IN ('COMPLETED', 'CANCELLED') AND COALESCE(b.appointmentDatetime, b.createdAt) >= :start AND COALESCE(b.appointmentDatetime, b.createdAt) <= :end")
+    List<Booking> findFrozenBookingsWithServicesBetween(@Param("start") java.time.LocalDateTime start, @Param("end") java.time.LocalDateTime end);
+
+    @Query("SELECT DISTINCT b FROM Booking b LEFT JOIN FETCH b.services WHERE b.status = 'COMPLETED' AND YEAR(COALESCE(b.appointmentDatetime, b.createdAt)) = :year")
     List<Booking> findCompletedBookingsWithServicesByYear(@Param("year") int year);
 
-    @Query("SELECT DISTINCT b FROM Booking b LEFT JOIN FETCH b.services WHERE b.status = 'COMPLETED' AND b.appointmentDatetime >= :start AND b.appointmentDatetime <= :end")
+    @Query("SELECT DISTINCT b FROM Booking b LEFT JOIN FETCH b.services WHERE b.status = 'COMPLETED' AND COALESCE(b.appointmentDatetime, b.createdAt) >= :start AND COALESCE(b.appointmentDatetime, b.createdAt) <= :end")
     List<Booking> findCompletedBookingsWithServicesBetween(@Param("start") java.time.LocalDateTime start, @Param("end") java.time.LocalDateTime end);
 
     /** Tong doanh thu cua cac booking da hoan thanh */
@@ -105,7 +120,7 @@ public interface BookingRepository extends JpaRepository<Booking, Integer> {
     """)
     BigDecimal sumRevenueBetween(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
 
-    @Query("SELECT COUNT(b) FROM Booking b WHERE b.status != 'CANCELLED' AND b.appointmentDatetime BETWEEN :start AND :end")
+    @Query("SELECT COUNT(b) FROM Booking b WHERE b.status != 'CANCELLED' AND COALESCE(b.appointmentDatetime, b.createdAt) BETWEEN :start AND :end")
     long countBookingsBetween(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
 
     /** Doanh thu theo thang trong nam cho shop (sau khi tru phi admin tuong ung) cho booking COMPLETED */
@@ -149,11 +164,11 @@ public interface BookingRepository extends JpaRepository<Booking, Integer> {
 
     /** Số booking theo ngày trong khoảng thời gian, bỏ CANCELLED */
     @Query("""
-        SELECT DATE(b.appointmentDatetime), COUNT(b)
+        SELECT DATE(COALESCE(b.appointmentDatetime, b.createdAt)), COUNT(b)
         FROM Booking b
-        WHERE b.appointmentDatetime >= :from
+        WHERE COALESCE(b.appointmentDatetime, b.createdAt) >= :from
           AND b.status != 'CANCELLED'
-        GROUP BY DATE(b.appointmentDatetime)
+        GROUP BY DATE(COALESCE(b.appointmentDatetime, b.createdAt))
     """)
     List<Object[]> bookingCountByDate(@Param("from") LocalDateTime from);
 
@@ -266,11 +281,11 @@ public interface BookingRepository extends JpaRepository<Booking, Integer> {
     List<Object[]> adminBalanceByDateRange(@Param("year") int year, @Param("month") int month);
 
     @Query("""
-        SELECT DATE(b.appointmentDatetime), COUNT(b)
+        SELECT DATE(COALESCE(b.appointmentDatetime, b.createdAt)), COUNT(b)
         FROM Booking b
         WHERE b.status != 'CANCELLED'
-          AND YEAR(b.appointmentDatetime) = :year AND MONTH(b.appointmentDatetime) = :month
-        GROUP BY DATE(b.appointmentDatetime)
+          AND YEAR(COALESCE(b.appointmentDatetime, b.createdAt)) = :year AND MONTH(COALESCE(b.appointmentDatetime, b.createdAt)) = :month
+        GROUP BY DATE(COALESCE(b.appointmentDatetime, b.createdAt))
     """)
     List<Object[]> bookingCountByDateRange(@Param("year") int year, @Param("month") int month);
 }

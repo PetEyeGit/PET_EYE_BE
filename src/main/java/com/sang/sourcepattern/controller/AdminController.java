@@ -93,7 +93,7 @@ public class AdminController {
         long totalBroadcasts = notificationRepository.countDistinctBroadcasts();
 
         // Period stats
-        List<com.sang.sourcepattern.entity.Booking> periodBookingsList = bookingRepository.findCompletedBookingsWithServicesBetween(periodStart, periodEnd);
+        List<com.sang.sourcepattern.entity.Booking> periodBookingsList = bookingRepository.findActiveAndCompletedBookingsWithServicesBetween(periodStart, periodEnd);
         BigDecimal periodRevenue = BigDecimal.ZERO;
         for (com.sang.sourcepattern.entity.Booking b : periodBookingsList) {
             periodRevenue = periodRevenue.add(walletService.calculateAdminCommissionForBooking(b));
@@ -103,7 +103,7 @@ public class AdminController {
         long periodBookings = bookingRepository.countBookingsBetween(periodStart, periodEnd);
 
         // Calculate Revenue Trend (Current vs Prev period)
-        List<com.sang.sourcepattern.entity.Booking> prevPeriodBookingsList = bookingRepository.findCompletedBookingsWithServicesBetween(prevStart, prevEnd);
+        List<com.sang.sourcepattern.entity.Booking> prevPeriodBookingsList = bookingRepository.findActiveAndCompletedBookingsWithServicesBetween(prevStart, prevEnd);
         BigDecimal revPrev = BigDecimal.ZERO;
         for (com.sang.sourcepattern.entity.Booking b : prevPeriodBookingsList) {
             revPrev = revPrev.add(walletService.calculateAdminCommissionForBooking(b));
@@ -141,6 +141,7 @@ public class AdminController {
 
         // Calculate Sparklines (Last 8 days)
         List<Double> totalRevenueSparkData = new java.util.ArrayList<>();
+        List<Double> systemBalanceSparkData = new java.util.ArrayList<>();
         List<Long> totalUsersSparkData = new java.util.ArrayList<>();
         List<Long> totalBookingsSparkData = new java.util.ArrayList<>();
 
@@ -148,8 +149,28 @@ public class AdminController {
             LocalDateTime dayStart = LocalDate.now().minusDays(i).atStartOfDay();
             LocalDateTime dayEnd = LocalDate.now().minusDays(i).atTime(23, 59, 59);
             
-            BigDecimal dayRev = bookingRepository.sumRevenueBetween(dayStart, dayEnd);
-            totalRevenueSparkData.add(dayRev != null ? dayRev.doubleValue() : 0.0);
+            List<com.sang.sourcepattern.entity.Booking> dayBookings = bookingRepository.findActiveAndCompletedBookingsWithServicesBetween(dayStart, dayEnd);
+            BigDecimal dayRev = BigDecimal.ZERO;
+            for (com.sang.sourcepattern.entity.Booking b : dayBookings) {
+                dayRev = dayRev.add(walletService.calculateAdminCommissionForBooking(b));
+            }
+            totalRevenueSparkData.add(dayRev.doubleValue());
+
+            List<com.sang.sourcepattern.entity.Booking> dayFrozenBookings = bookingRepository.findFrozenBookingsWithServicesBetween(dayStart, dayEnd);
+            BigDecimal dayFrozen = BigDecimal.ZERO;
+            for (com.sang.sourcepattern.entity.Booking b : dayFrozenBookings) {
+                BigDecimal fullPrice = BigDecimal.ZERO;
+                if (b.getServices() != null) {
+                    for (com.sang.sourcepattern.entity.Service s : b.getServices()) {
+                        fullPrice = fullPrice.add(walletService.resolveSingleServicePrice(s, b.getPet() != null ? b.getPet().getId() : null, b.getPetWeight()));
+                    }
+                }
+                BigDecimal commission = walletService.calculateAdminCommissionForBooking(b);
+                BigDecimal shopFrozen = fullPrice.subtract(commission);
+                if (shopFrozen.compareTo(BigDecimal.ZERO) < 0) shopFrozen = BigDecimal.ZERO;
+                dayFrozen = dayFrozen.add(shopFrozen);
+            }
+            systemBalanceSparkData.add(dayFrozen.doubleValue());
             
             totalUsersSparkData.add(userRepository.countUsersBetween(dayStart, dayEnd));
             totalBookingsSparkData.add(bookingRepository.countBookingsBetween(dayStart, dayEnd));
@@ -167,6 +188,7 @@ public class AdminController {
         result.put("totalRevenueTrend", totalRevenueTrend);
         result.put("totalRevenueTrendUp", totalRevenueTrendUp);
         result.put("totalRevenueSparkData", totalRevenueSparkData);
+        result.put("systemBalanceSparkData", systemBalanceSparkData);
 
         result.put("totalUsers", totalUsers);
         result.put("activeUsers", activeUsers);
@@ -196,6 +218,7 @@ public class AdminController {
         result.put("totalVouchers", totalVouchers);
         result.put("totalVouchersSparkData", totalVouchersSparkData);
         result.put("totalBroadcasts", totalBroadcasts);
+        result.put("unreadMessagesSparkData", unreadMessagesSparkData);
 
         return ApiResponse.<Map<String, Object>>builder()
                 .result(result)
@@ -205,55 +228,98 @@ public class AdminController {
     // ─── Dashboard charts ─────────────────────────────────────────────────────
 
     @GetMapping("/dashboard/revenue-monthly")
-    public ApiResponse<List<MonthlyRevenueResponse>> getMonthlyRevenue(
-            @RequestParam(required = false) Integer year) {
-
-        int targetYear = (year != null) ? year : Year.now().getValue();
-
-        // Build map month -> revenue từ query
-        Map<Integer, BigDecimal> revenueMap = new java.util.HashMap<>();
-        List<com.sang.sourcepattern.entity.Booking> bookings = bookingRepository.findCompletedBookingsWithServicesByYear(targetYear);
-        for (com.sang.sourcepattern.entity.Booking b : bookings) {
-            int month = b.getAppointmentDatetime().getMonthValue();
-            BigDecimal commission = walletService.calculateAdminCommissionForBooking(b);
-            revenueMap.put(month, revenueMap.getOrDefault(month, BigDecimal.ZERO).add(commission));
+    public ApiResponse<List<Map<String, Object>>> getMonthlyRevenue(@RequestParam int year) {
+        List<com.sang.sourcepattern.entity.Booking> yearBookings = bookingRepository.findActiveAndCompletedBookingsWithServicesByYear(year);
+        
+        Map<Integer, BigDecimal> monthMap = new java.util.HashMap<>();
+        for (com.sang.sourcepattern.entity.Booking b : yearBookings) {
+            LocalDateTime dt = b.getAppointmentDatetime() != null ? b.getAppointmentDatetime() : b.getCreatedAt();
+            if (dt != null) {
+                int month = dt.getMonthValue();
+                BigDecimal commission = walletService.calculateAdminCommissionForBooking(b);
+                monthMap.put(month, monthMap.getOrDefault(month, BigDecimal.ZERO).add(commission));
+            }
         }
 
-        // Trả đủ 12 tháng, tháng không có thì 0
-        List<MonthlyRevenueResponse> result = new java.util.ArrayList<>();
+        List<Map<String, Object>> result = new java.util.ArrayList<>();
         for (int m = 1; m <= 12; m++) {
-            result.add(MonthlyRevenueResponse.builder()
-                    .month(m)
-                    .revenue(revenueMap.getOrDefault(m, BigDecimal.ZERO))
-                    .build());
+            Map<String, Object> item = new java.util.HashMap<>();
+            item.put("month", m);
+            item.put("revenue", monthMap.getOrDefault(m, BigDecimal.ZERO));
+            result.add(item);
         }
 
-        return ApiResponse.<List<MonthlyRevenueResponse>>builder().result(result).build();
+        return ApiResponse.<List<Map<String, Object>>>builder()
+                .result(result)
+                .build();
     }
 
     @GetMapping("/dashboard/bookings-weekly")
-    public ApiResponse<List<DailyBookingResponse>> getWeeklyBookings() {
-
+    public ApiResponse<List<DailyBookingResponse>> getWeeklyBookings(
+            @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) LocalDate endDate
+    ) {
         LocalDate today = LocalDate.now();
-        LocalDateTime from = today.minusDays(6).atStartOfDay();
-        DateTimeFormatter fmt = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+        LocalDate end = (endDate != null) ? endDate : today;
+        LocalDate start = (startDate != null) ? startDate : end.minusDays(6);
 
-        // Build map date -> count từ query
-        Map<String, Long> countMap = new java.util.HashMap<>();
-        for (Object[] row : bookingRepository.bookingCountByDate(from)) {
-            String date = row[0].toString().substring(0, 10); // đảm bảo format yyyy-MM-dd
-            long count = ((Number) row[1]).longValue();
-            countMap.put(date, count);
+        if (start.isAfter(end)) {
+            LocalDate temp = start;
+            start = end;
+            end = temp;
         }
 
-        // Trả đủ 7 ngày, ngày không có thì 0
+        DateTimeFormatter fmt = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+        List<com.sang.sourcepattern.entity.Booking> allBookings = bookingRepository.findAll();
+        Map<String, Long> countMap = new java.util.HashMap<>();
+
+        for (com.sang.sourcepattern.entity.Booking b : allBookings) {
+            if ("CANCELLED".equalsIgnoreCase(b.getStatus())) {
+                continue;
+            }
+
+            LocalDate targetDate = null;
+            // 1. Ưu tiên ngày tạo booking nếu nằm trong khoảng thời gian đã chọn
+            if (b.getCreatedAt() != null) {
+                LocalDate cDate = b.getCreatedAt().toLocalDate();
+                if (!cDate.isBefore(start) && !cDate.isAfter(end)) {
+                    targetDate = cDate;
+                }
+            }
+            // 2. Nếu ngày tạo không nằm trong khoảng, kiểm tra ngày hẹn dịch vụ
+            if (targetDate == null && b.getAppointmentDatetime() != null) {
+                LocalDate aDate = b.getAppointmentDatetime().toLocalDate();
+                if (!aDate.isBefore(start) && !aDate.isAfter(end)) {
+                    targetDate = aDate;
+                }
+            }
+            // 3. Fallback bất kỳ mốc thời gian nào của booking
+            if (targetDate == null) {
+                LocalDateTime fallback = b.getAppointmentDatetime() != null ? b.getAppointmentDatetime() : b.getCreatedAt();
+                if (fallback != null) {
+                    LocalDate fDate = fallback.toLocalDate();
+                    if (!fDate.isBefore(start) && !fDate.isAfter(end)) {
+                        targetDate = fDate;
+                    }
+                }
+            }
+
+            if (targetDate != null) {
+                String dateStr = targetDate.format(fmt);
+                countMap.put(dateStr, countMap.getOrDefault(dateStr, 0L) + 1L);
+            }
+        }
+
+        // Trả đủ danh sách ngày từ start đến end
         List<DailyBookingResponse> result = new java.util.ArrayList<>();
-        for (int i = 6; i >= 0; i--) {
-            String date = today.minusDays(i).format(fmt);
+        LocalDate curr = start;
+        while (!curr.isAfter(end)) {
+            String dateStr = curr.format(fmt);
             result.add(DailyBookingResponse.builder()
-                    .date(date)
-                    .count(countMap.getOrDefault(date, 0L))
+                    .date(dateStr)
+                    .count(countMap.getOrDefault(dateStr, 0L))
                     .build());
+            curr = curr.plusDays(1);
         }
 
         return ApiResponse.<List<DailyBookingResponse>>builder().result(result).build();
@@ -266,13 +332,60 @@ public class AdminController {
 
         int daysInMonth = YearMonth.of(year, month).lengthOfMonth();
 
-        List<Object[]> revenueData = bookingRepository.adminCommissionByDateRange(year, month);
-        List<Object[]> balanceData = bookingRepository.adminBalanceByDateRange(year, month);
+        List<com.sang.sourcepattern.entity.Booking> monthBookings = bookingRepository.findActiveAndCompletedBookingsWithServicesByMonthAndYear(year, month);
+        Map<Integer, BigDecimal> dailyRevenueMap = new java.util.HashMap<>();
+        Map<Integer, BigDecimal> dailyFrozenMap = new java.util.HashMap<>();
+        Map<Integer, Long> dailyBookingCountMap = new java.util.HashMap<>();
+
+        for (com.sang.sourcepattern.entity.Booking b : monthBookings) {
+            LocalDateTime dt = b.getAppointmentDatetime() != null ? b.getAppointmentDatetime() : b.getCreatedAt();
+            if (dt != null) {
+                int day = dt.getDayOfMonth();
+                dailyBookingCountMap.put(day, dailyBookingCountMap.getOrDefault(day, 0L) + 1L);
+
+                BigDecimal commission = walletService.calculateAdminCommissionForBooking(b);
+                dailyRevenueMap.put(day, dailyRevenueMap.getOrDefault(day, BigDecimal.ZERO).add(commission));
+
+                BigDecimal fullPrice = BigDecimal.ZERO;
+                if (b.getServices() != null && !b.getServices().isEmpty()) {
+                    for (com.sang.sourcepattern.entity.Service s : b.getServices()) {
+                        BigDecimal p = walletService.resolveSingleServicePrice(s, b.getPet() != null ? b.getPet().getId() : null, b.getPetWeight());
+                        if (p == null || p.compareTo(BigDecimal.ZERO) == 0) {
+                            p = s.getPrice() != null ? s.getPrice() : BigDecimal.ZERO;
+                        }
+                        fullPrice = fullPrice.add(p);
+                    }
+                }
+                BigDecimal shopFrozen = fullPrice.subtract(commission);
+                if (shopFrozen.compareTo(BigDecimal.ZERO) < 0) shopFrozen = BigDecimal.ZERO;
+                dailyFrozenMap.put(day, dailyFrozenMap.getOrDefault(day, BigDecimal.ZERO).add(shopFrozen));
+            }
+        }
+
+        List<Map<String, Object>> revenueSeries = new java.util.ArrayList<>();
+        List<Map<String, Object>> frozenSeries = new java.util.ArrayList<>();
+        List<Map<String, Object>> bookingSeries = new java.util.ArrayList<>();
+        for (int i = 1; i <= daysInMonth; i++) {
+            Map<String, Object> revPoint = new java.util.HashMap<>();
+            revPoint.put("day", "Ngày " + i);
+            revPoint.put("value", dailyRevenueMap.getOrDefault(i, BigDecimal.ZERO));
+            revenueSeries.add(revPoint);
+
+            Map<String, Object> frozenPoint = new java.util.HashMap<>();
+            frozenPoint.put("day", "Ngày " + i);
+            frozenPoint.put("value", dailyFrozenMap.getOrDefault(i, BigDecimal.ZERO));
+            frozenSeries.add(frozenPoint);
+
+            Map<String, Object> bookPoint = new java.util.HashMap<>();
+            bookPoint.put("day", "Ngày " + i);
+            bookPoint.put("value", dailyBookingCountMap.getOrDefault(i, 0L));
+            bookingSeries.add(bookPoint);
+        }
+
         List<Object[]> usersData = userRepository.userCountByDateRange(year, month);
         List<Object[]> activeUsersData = userRepository.activeUserCountByDateRange(year, month);
         List<Object[]> inactiveUsersData = userRepository.inactiveUserCountByDateRange(year, month);
         List<Object[]> shopsData = shopRepository.shopCountByDateRange(year, month);
-        List<Object[]> bookingsData = bookingRepository.bookingCountByDateRange(year, month);
         List<Object[]> withdrawalData = withdrawalRequestRepository.withdrawalCountByDateRange(year, month);
         List<Object[]> pendingShopsData = shopRepository.pendingShopCountByDateRange(year, month);
         List<Object[]> messagesData = messageRepository.messageCountByDateRange(year, month);
@@ -280,13 +393,13 @@ public class AdminController {
 
         Map<String, List<Map<String, Object>>> result = new java.util.HashMap<>();
         
-        result.put("totalRevenue", buildDailySeries(daysInMonth, revenueData));
-        result.put("systemBalance", buildDailySeries(daysInMonth, balanceData));
+        result.put("totalRevenue", revenueSeries);
+        result.put("systemBalance", frozenSeries);
         result.put("totalUsers", buildDailySeries(daysInMonth, usersData));
         result.put("activeUsers", buildDailySeries(daysInMonth, activeUsersData));
         result.put("inactiveUsers", buildDailySeries(daysInMonth, inactiveUsersData));
         result.put("totalShops", buildDailySeries(daysInMonth, shopsData));
-        result.put("totalBookings", buildDailySeries(daysInMonth, bookingsData));
+        result.put("totalBookings", bookingSeries);
         result.put("pendingWithdrawals", buildDailySeries(daysInMonth, withdrawalData));
         result.put("pendingShops", buildDailySeries(daysInMonth, pendingShopsData));
         result.put("unreadMessages", buildDailySeries(daysInMonth, messagesData));
