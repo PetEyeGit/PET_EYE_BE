@@ -109,10 +109,13 @@ public class TaskServiceImpl implements TaskService {
         // Primary service = first in Set
         com.sang.sourcepattern.entity.Service primarySvc =
                 (b.getServices() != null && !b.getServices().isEmpty()) ? b.getServices().iterator().next() : null;
-        // Total price = sum all services
+        // Total price = sum all services with weight-based pricing
         java.math.BigDecimal totalPrice = (b.getServices() != null)
                 ? b.getServices().stream()
-                    .map(s -> s.getPrice() != null ? s.getPrice() : java.math.BigDecimal.ZERO)
+                    .map(s -> {
+                        java.math.BigDecimal p = walletService.resolveSingleServicePrice(s, b.getPet() != null ? b.getPet().getId() : null, b.getPetWeight());
+                        return p != null ? p : java.math.BigDecimal.ZERO;
+                    })
                     .reduce(java.math.BigDecimal.ZERO, java.math.BigDecimal::add)
                 : java.math.BigDecimal.ZERO;
         // Category: boarding if any service is boarding
@@ -143,7 +146,7 @@ public class TaskServiceImpl implements TaskService {
                 ? b.getServices().stream().map(s -> TaskResponse.ServiceItem.builder()
                         .serviceId(s.getId())
                         .serviceName(s.getServiceName())
-                        .servicePrice(s.getPrice())
+                        .servicePrice(walletService.resolveSingleServicePrice(s, b.getPet() != null ? b.getPet().getId() : null, b.getPetWeight()))
                         .completedAt(serviceCompletionTimes.get(s.getId()))
                         .build())
                         .collect(java.util.stream.Collectors.toList())
@@ -152,6 +155,16 @@ public class TaskServiceImpl implements TaskService {
         Payment payment = paymentRepository.findByBookingId(b.getId()).orElse(null);
         String paymentMethod = (payment != null) ? payment.getMethod() : "N/A";
         String paymentStatus = (payment != null) ? payment.getStatus() : "N/A";
+
+        java.math.BigDecimal paidAmount = java.math.BigDecimal.ZERO;
+        if (payment != null && "SUCCESS".equalsIgnoreCase(payment.getStatus())) {
+            paidAmount = payment.getAmount() != null ? payment.getAmount() : java.math.BigDecimal.ZERO;
+        }
+        java.math.BigDecimal discountAmount = b.getDiscountAmount() != null
+                ? java.math.BigDecimal.valueOf(b.getDiscountAmount())
+                : java.math.BigDecimal.ZERO;
+        java.math.BigDecimal totalAmount = totalPrice.subtract(discountAmount).max(java.math.BigDecimal.ZERO);
+        java.math.BigDecimal remainingAmount = totalAmount.subtract(paidAmount).max(java.math.BigDecimal.ZERO);
 
         java.util.List<Integer> completedServiceIds = java.util.Collections.emptyList();
         if (b.getCompletedServiceIds() != null && !b.getCompletedServiceIds().isBlank()) {
@@ -193,6 +206,10 @@ public class TaskServiceImpl implements TaskService {
                 .note(b.getNote())
                 .paymentMethod(paymentMethod)
                 .paymentStatus(paymentStatus)
+                .paidAmount(paidAmount)
+                .discountAmount(discountAmount)
+                .totalAmount(totalAmount)
+                .remainingAmount(remainingAmount)
                 .cancellationReason(b.getCancellationReason())
                 .bankName(b.getBankName())
                 .bankAccount(b.getBankAccount())
@@ -236,6 +253,24 @@ public class TaskServiceImpl implements TaskService {
         Payment payment = paymentRepository.findByBookingId(b.getId()).orElse(null);
         String paymentMethod = (payment != null) ? payment.getMethod() : "N/A";
         String paymentStatus = (payment != null) ? payment.getStatus() : "N/A";
+
+        java.math.BigDecimal paidAmount = java.math.BigDecimal.ZERO;
+        if (payment != null && "SUCCESS".equalsIgnoreCase(payment.getStatus())) {
+            paidAmount = payment.getAmount() != null ? payment.getAmount() : java.math.BigDecimal.ZERO;
+        }
+        java.math.BigDecimal discountAmount = b.getDiscountAmount() != null
+                ? java.math.BigDecimal.valueOf(b.getDiscountAmount())
+                : java.math.BigDecimal.ZERO;
+        java.math.BigDecimal totalBookingPrice = (b.getServices() != null)
+                ? b.getServices().stream()
+                    .map(s -> {
+                        java.math.BigDecimal p = walletService.resolveSingleServicePrice(s, b.getPet() != null ? b.getPet().getId() : null, b.getPetWeight());
+                        return p != null ? p : java.math.BigDecimal.ZERO;
+                    })
+                    .reduce(java.math.BigDecimal.ZERO, java.math.BigDecimal::add)
+                : java.math.BigDecimal.ZERO;
+        java.math.BigDecimal totalAmount = totalBookingPrice.subtract(discountAmount).max(java.math.BigDecimal.ZERO);
+        java.math.BigDecimal remainingAmount = totalAmount.subtract(paidAmount).max(java.math.BigDecimal.ZERO);
 
         java.util.Map<Integer, String> serviceCompletionTimes = new java.util.HashMap<>();
         if (b.getCompletedServiceTimes() != null && !b.getCompletedServiceTimes().isBlank()) {
@@ -307,6 +342,10 @@ public class TaskServiceImpl implements TaskService {
                 .category("BOARDING")
                 .note(b.getNote())
                 .paymentMethod(paymentMethod).paymentStatus(paymentStatus)
+                .paidAmount(paidAmount)
+                .discountAmount(discountAmount)
+                .totalAmount(totalAmount)
+                .remainingAmount(remainingAmount)
                 .cancellationReason(b.getCancellationReason())
                 .bankName(b.getBankName()).bankAccount(b.getBankAccount()).accountHolder(b.getAccountHolder())
                 .createdAt(b.getCreatedAt()).updatedAt(b.getUpdatedAt())
@@ -363,6 +402,10 @@ public class TaskServiceImpl implements TaskService {
                 .category(otherCategory)
                 .note(b.getNote())
                 .paymentMethod(paymentMethod).paymentStatus(paymentStatus)
+                .paidAmount(paidAmount)
+                .discountAmount(discountAmount)
+                .totalAmount(totalAmount)
+                .remainingAmount(remainingAmount)
                 .cancellationReason(b.getCancellationReason())
                 .bankName(b.getBankName()).bankAccount(b.getBankAccount()).accountHolder(b.getAccountHolder())
                 .createdAt(b.getCreatedAt()).updatedAt(b.getUpdatedAt())

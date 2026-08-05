@@ -63,6 +63,10 @@ public class TaskResponse {
     String note;
     String paymentMethod; // e.g. "PAYOS" or "CASH_DEPOSIT"
     String paymentStatus; // e.g. "SUCCESS", "PENDING"
+    java.math.BigDecimal paidAmount;
+    java.math.BigDecimal discountAmount;
+    java.math.BigDecimal totalAmount;
+    java.math.BigDecimal remainingAmount;
     String cancellationReason;
     String bankName;
     String bankAccount;

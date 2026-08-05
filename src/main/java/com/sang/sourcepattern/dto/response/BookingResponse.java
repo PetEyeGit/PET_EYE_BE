@@ -47,6 +47,9 @@ public class BookingResponse {
     String paymentStatus;
     String paymentMethod;
     BigDecimal paidAmount;
+    BigDecimal discountAmount;
+    BigDecimal totalAmount;
+    BigDecimal remainingAmount;
 
     String cameraRtspUrl;
     String cameraStreamUrl;

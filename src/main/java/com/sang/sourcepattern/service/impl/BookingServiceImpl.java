@@ -227,8 +227,14 @@ public class BookingServiceImpl implements BookingService {
 
         java.math.BigDecimal paidAmount = java.math.BigDecimal.ZERO;
         if (payment != null && "SUCCESS".equals(payment.getStatus())) {
-            paidAmount = payment.getAmount();
+            paidAmount = payment.getAmount() != null ? payment.getAmount() : java.math.BigDecimal.ZERO;
         }
+
+        java.math.BigDecimal discountAmount = booking.getDiscountAmount() != null
+                ? java.math.BigDecimal.valueOf(booking.getDiscountAmount())
+                : java.math.BigDecimal.ZERO;
+        java.math.BigDecimal totalAmount = totalServicePrice.subtract(discountAmount).max(java.math.BigDecimal.ZERO);
+        java.math.BigDecimal remainingAmount = totalAmount.subtract(paidAmount).max(java.math.BigDecimal.ZERO);
 
         return BookingResponse.builder()
                 .id(booking.getId())
@@ -262,6 +268,9 @@ public class BookingServiceImpl implements BookingService {
                 .paymentStatus(payment != null ? payment.getStatus() : null)
                 .paymentMethod(payment != null ? payment.getMethod() : null)
                 .paidAmount(paidAmount)
+                .discountAmount(discountAmount)
+                .totalAmount(totalAmount)
+                .remainingAmount(remainingAmount)
                 .cameraRtspUrl(isShopUser ? booking.getCameraRtspUrl() : null)
                 .cameraStreamUrl(streamUrl)
                 .cameraEnabled(cameraEnabled)
@@ -361,57 +370,7 @@ public class BookingServiceImpl implements BookingService {
     }
 
     private java.math.BigDecimal resolveSingleServicePrice(Service s, Integer petId, String petWeight) {
-        java.math.BigDecimal price = s.getPrice();
-        if (s.getPetWeight() != null) {
-            try {
-                List<String> weightTiers = new com.fasterxml.jackson.databind.ObjectMapper().readValue(s.getPetWeight(), new com.fasterxml.jackson.core.type.TypeReference<List<String>>() {});
-                List<java.math.BigDecimal> prices = null;
-                if (s.getPrices() != null) {
-                    prices = new com.fasterxml.jackson.databind.ObjectMapper().readValue(s.getPrices(), new com.fasterxml.jackson.core.type.TypeReference<List<java.math.BigDecimal>>() {});
-                }
-                if (weightTiers != null && !weightTiers.isEmpty() && prices != null && !prices.isEmpty()) {
-                    Double weight = null;
-                    if (petId != null) {
-                        Pet pet = petRepository.findById(petId).orElse(null);
-                        if (pet != null) {
-                            weight = (double) pet.getWeight();
-                        }
-                    }
-                    if (weight == null || weight <= 0) {
-                        if (petWeight != null) {
-                            try {
-                                weight = Double.parseDouble(petWeight.replaceAll("[^0-9.]", ""));
-                            } catch (Exception ignored) {}
-                        }
-                    }
-                    if (weight != null && weight > 0) {
-                        List<Double> thresholds = new java.util.ArrayList<>();
-                        for (String tier : weightTiers) {
-                            try {
-                                thresholds.add(Double.parseDouble(tier.replaceAll("[^0-9.]", "")));
-                            } catch (Exception e) {
-                                thresholds.add(0.0);
-                            }
-                        }
-                        int idx = 0;
-                        if (weight < thresholds.get(0)) {
-                            idx = 0;
-                        } else {
-                            for (int i = 0; i < thresholds.size(); i++) {
-                                if (weight >= thresholds.get(i)) {
-                                    idx = i;
-                                }
-                            }
-                        }
-                        if (idx < prices.size() && prices.get(idx) != null) {
-                            price = prices.get(idx);
-                        }
-                    }
-                }
-            } catch (Exception ignored) {
-            }
-        }
-        return price != null ? price : java.math.BigDecimal.ZERO;
+        return walletService.resolveSingleServicePrice(s, petId, petWeight);
     }
 
     /**
@@ -493,7 +452,7 @@ public class BookingServiceImpl implements BookingService {
         }
 
         long orderCode = ThreadLocalRandom.current().nextLong(10_000_000L, 99_999_999L);
-        String description = "Booking" + orderCode % 100000;
+        String description = "Thanh toan " + (orderCode % 100000);
         // Tổng giá tất cả services
         int rawAmount = resolveTotalPrice(effectiveServiceIds, request.getPetId(), request.getPetWeight()).intValue();
 
@@ -1086,7 +1045,7 @@ public class BookingServiceImpl implements BookingService {
         if (depositVnd % 1000 != 0) depositVnd = ((depositVnd / 1000) + 1) * 1000;
 
         long orderCode  = ThreadLocalRandom.current().nextLong(10_000_000L, 99_999_999L);
-        String description = "Deposit" + orderCode % 100000;
+        String description = "Dat coc " + (orderCode % 100000);
 
         // ── Lưu vào Redis (TTL 30 phút) — tái dùng PendingBooking ────────────
         PendingBooking pending = new PendingBooking(
@@ -1529,7 +1488,7 @@ public class BookingServiceImpl implements BookingService {
         // Extra payment needed
         int extraAmount = newAmountVnd - paidAmount;
         long orderCode = java.util.concurrent.ThreadLocalRandom.current().nextLong(10_000_000L, 99_999_999L);
-        String description = "Update " + booking.getId();
+        String description = "Doi lich " + booking.getId();
         if (description.length() > 25) description = description.substring(0, 25);
 
         PendingBooking pending = new PendingBooking(

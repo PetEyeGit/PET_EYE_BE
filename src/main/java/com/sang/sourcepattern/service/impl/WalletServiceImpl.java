@@ -161,52 +161,197 @@ public class WalletServiceImpl implements WalletService {
     @Override
     public BigDecimal resolveSingleServicePrice(com.sang.sourcepattern.entity.Service s, Integer petId, String petWeight) {
         BigDecimal price = s.getPrice();
-        if (s.getPetWeight() != null) {
-            try {
-                List<String> weightTiers = new com.fasterxml.jackson.databind.ObjectMapper().readValue(s.getPetWeight(), new com.fasterxml.jackson.core.type.TypeReference<List<String>>() {});
-                List<java.math.BigDecimal> prices = null;
-                if (s.getPrices() != null) {
-                    prices = new com.fasterxml.jackson.databind.ObjectMapper().readValue(s.getPrices(), new com.fasterxml.jackson.core.type.TypeReference<List<java.math.BigDecimal>>() {});
+        if (s.getPetWeight() == null || s.getPrices() == null) {
+            return price != null ? price : BigDecimal.ZERO;
+        }
+
+        try {
+            com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+            List<String> weightTiers = mapper.readValue(s.getPetWeight(), new com.fasterxml.jackson.core.type.TypeReference<List<String>>() {});
+            List<BigDecimal> prices = mapper.readValue(s.getPrices(), new com.fasterxml.jackson.core.type.TypeReference<List<BigDecimal>>() {});
+
+            if (weightTiers == null || weightTiers.isEmpty() || prices == null || prices.isEmpty()) {
+                return price != null ? price : BigDecimal.ZERO;
+            }
+
+            // Extract numeric thresholds from weightTiers (if they are single numbers or simple labels)
+            List<Double> parsedThresholds = new java.util.ArrayList<>();
+            for (String tier : weightTiers) {
+                java.util.regex.Matcher m = java.util.regex.Pattern.compile("([0-9]+(?:\\.[0-9]+)?)").matcher(tier);
+                if (m.find()) {
+                    parsedThresholds.add(Double.parseDouble(m.group(1)));
+                } else {
+                    parsedThresholds.add(0.0);
                 }
-                if (weightTiers != null && !weightTiers.isEmpty() && prices != null && !prices.isEmpty()) {
-                    Double weight = null;
-                    if (petId != null && petRepository != null) {
-                        com.sang.sourcepattern.entity.Pet pet = petRepository.findById(petId).orElse(null);
-                        if (pet != null) {
-                            weight = (double) pet.getWeight();
+            }
+
+            // 1. Direct or generated label match against petWeight string
+            if (petWeight != null && !petWeight.isBlank()) {
+                String cleanPetWeight = petWeight.trim().toLowerCase().replaceAll("\\s+", "").replace("kg", "");
+
+                for (int i = 0; i < weightTiers.size(); i++) {
+                    String rawTier = weightTiers.get(i);
+                    String cleanTier = rawTier.trim().toLowerCase().replaceAll("\\s+", "").replace("kg", "");
+
+                    // Exact equality match (with or without kg)
+                    if (cleanPetWeight.equals(cleanTier)) {
+                        if (i < prices.size() && prices.get(i) != null) {
+                            return prices.get(i);
                         }
                     }
-                    if (weight == null || weight <= 0) {
-                        if (petWeight != null) {
-                            try {
-                                weight = Double.parseDouble(petWeight.replaceAll("[^0-9.]", ""));
-                            } catch (Exception ignored) {}
-                        }
-                    }
-                    if (weight != null && weight > 0) {
-                        List<Double> thresholds = new java.util.ArrayList<>();
-                        for (String tier : weightTiers) {
-                            try {
-                                thresholds.add(Double.parseDouble(tier.replaceAll("[^0-9.]", "")));
-                            } catch (Exception e) {
-                                thresholds.add(0.0);
+
+                    // Friendly formatted label matching:
+                    // If tiers are thresholds like [5, 10, 15], then:
+                    // index 0 -> "<5", "duoi5", "<=5"
+                    // index 1 -> "5-10"
+                    // index 2 -> "10-15" (or ">10", "tren10", ">15", "tren15")
+                    if (parsedThresholds.size() >= 2) {
+                        if (i == 0) {
+                            double t0 = parsedThresholds.get(0);
+                            String t0Str = (t0 == (long) t0) ? String.format("%d", (long) t0) : String.valueOf(t0);
+                            if (cleanPetWeight.equals("<" + t0Str) || cleanPetWeight.equals("duoi" + t0Str) || cleanPetWeight.equals("<=" + t0Str)) {
+                                if (i < prices.size() && prices.get(i) != null) return prices.get(i);
+                            }
+                        } else if (i == parsedThresholds.size() - 1) {
+                            double tPrev = parsedThresholds.get(i - 1);
+                            double tCurr = parsedThresholds.get(i);
+                            String tPrevStr = (tPrev == (long) tPrev) ? String.format("%d", (long) tPrev) : String.valueOf(tPrev);
+                            String tCurrStr = (tCurr == (long) tCurr) ? String.format("%d", (long) tCurr) : String.valueOf(tCurr);
+                            if (cleanPetWeight.equals(tPrevStr + "-" + tCurrStr) || cleanPetWeight.equals(">" + tPrevStr) || cleanPetWeight.equals("tren" + tPrevStr) || cleanPetWeight.equals(">" + tCurrStr) || cleanPetWeight.equals("tren" + tCurrStr)) {
+                                if (i < prices.size() && prices.get(i) != null) return prices.get(i);
+                            }
+                        } else {
+                            double tPrev = parsedThresholds.get(i - 1);
+                            double tCurr = parsedThresholds.get(i);
+                            String tPrevStr = (tPrev == (long) tPrev) ? String.format("%d", (long) tPrev) : String.valueOf(tPrev);
+                            String tCurrStr = (tCurr == (long) tCurr) ? String.format("%d", (long) tCurr) : String.valueOf(tCurr);
+                            if (cleanPetWeight.equals(tPrevStr + "-" + tCurrStr)) {
+                                if (i < prices.size() && prices.get(i) != null) return prices.get(i);
                             }
                         }
-                        int idx = 0;
-                        if (weight >= thresholds.get(0)) {
-                            for (int i = 0; i < thresholds.size() - 1; i++) {
-                                if (weight >= thresholds.get(i)) {
-                                    idx = i + 1;
+                    }
+                }
+
+                // Match range-to-range if petWeight is a range (e.g. "5-10" or "5-10kg")
+                java.util.regex.Matcher pRangeMatcher = java.util.regex.Pattern.compile("([0-9]+(?:\\.[0-9]+)?)\\s*-\\s*([0-9]+(?:\\.[0-9]+)?)").matcher(petWeight);
+                if (pRangeMatcher.find()) {
+                    double pMin = Double.parseDouble(pRangeMatcher.group(1));
+                    double pMax = Double.parseDouble(pRangeMatcher.group(2));
+
+                    for (int i = 0; i < weightTiers.size(); i++) {
+                        String tier = weightTiers.get(i);
+                        java.util.regex.Matcher tRangeMatcher = java.util.regex.Pattern.compile("([0-9]+(?:\\.[0-9]+)?)\\s*-\\s*([0-9]+(?:\\.[0-9]+)?)").matcher(tier);
+                        if (tRangeMatcher.find()) {
+                            double tMin = Double.parseDouble(tRangeMatcher.group(1));
+                            double tMax = Double.parseDouble(tRangeMatcher.group(2));
+                            if (Math.abs(pMin - tMin) < 0.001 && Math.abs(pMax - tMax) < 0.001) {
+                                if (i < prices.size() && prices.get(i) != null) return prices.get(i);
+                            }
+                        } else if (parsedThresholds.size() >= 2 && i > 0) {
+                            double tMin = parsedThresholds.get(i - 1);
+                            double tMax = parsedThresholds.get(i);
+                            if (Math.abs(pMin - tMin) < 0.001 && Math.abs(pMax - tMax) < 0.001) {
+                                if (i < prices.size() && prices.get(i) != null) return prices.get(i);
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 2. Numeric weight resolution
+            Double weight = null;
+            if (petId != null && petRepository != null) {
+                com.sang.sourcepattern.entity.Pet pet = petRepository.findById(petId).orElse(null);
+                if (pet != null && pet.getWeight() > 0) {
+                    weight = (double) pet.getWeight();
+                }
+            }
+
+            // If weight not found from Pet entity, parse from petWeight string
+            if (weight == null || weight <= 0) {
+                if (petWeight != null && !petWeight.isBlank()) {
+                    java.util.regex.Matcher rangeMatcher = java.util.regex.Pattern.compile("([0-9]+(?:\\.[0-9]+)?)\\s*-\\s*([0-9]+(?:\\.[0-9]+)?)").matcher(petWeight);
+                    if (rangeMatcher.find()) {
+                        double min = Double.parseDouble(rangeMatcher.group(1));
+                        double max = Double.parseDouble(rangeMatcher.group(2));
+                        weight = (min + max) / 2.0;
+                    } else {
+                        java.util.regex.Matcher numMatcher = java.util.regex.Pattern.compile("([0-9]+(?:\\.[0-9]+)?)").matcher(petWeight);
+                        if (numMatcher.find()) {
+                            double val = Double.parseDouble(numMatcher.group(1));
+                            if (petWeight.toLowerCase().contains("dưới") || petWeight.contains("<") || petWeight.toLowerCase().contains("duoi")) {
+                                weight = Math.max(0.1, val - 0.5);
+                            } else if (petWeight.toLowerCase().contains("trên") || petWeight.contains(">") || petWeight.toLowerCase().contains("tren")) {
+                                weight = val + 1.0;
+                            } else {
+                                weight = val;
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (weight != null && weight > 0) {
+                // Check if tiers contain explicit ranges (e.g. "Dưới 5kg", "5-10kg", "Trên 10kg")
+                boolean hasExplicitIntervals = false;
+                for (String tier : weightTiers) {
+                    String lower = tier.toLowerCase();
+                    if (lower.contains("-") || lower.contains("<") || lower.contains(">") || lower.contains("dưới") || lower.contains("trên") || lower.contains("duoi") || lower.contains("tren")) {
+                        hasExplicitIntervals = true;
+                        break;
+                    }
+                }
+
+                if (hasExplicitIntervals) {
+                    for (int i = 0; i < weightTiers.size(); i++) {
+                        String tier = weightTiers.get(i);
+                        String lower = tier.toLowerCase();
+                        java.util.regex.Matcher rMatcher = java.util.regex.Pattern.compile("([0-9]+(?:\\.[0-9]+)?)\\s*-\\s*([0-9]+(?:\\.[0-9]+)?)").matcher(tier);
+                        if (rMatcher.find()) {
+                            double min = Double.parseDouble(rMatcher.group(1));
+                            double max = Double.parseDouble(rMatcher.group(2));
+                            if (weight >= min && weight <= max) {
+                                if (i < prices.size() && prices.get(i) != null) return prices.get(i);
+                            }
+                        } else if (lower.contains("dưới") || lower.contains("duoi") || lower.contains("<")) {
+                            java.util.regex.Matcher nMatcher = java.util.regex.Pattern.compile("([0-9]+(?:\\.[0-9]+)?)").matcher(tier);
+                            if (nMatcher.find()) {
+                                double max = Double.parseDouble(nMatcher.group(1));
+                                if (weight <= max) {
+                                    if (i < prices.size() && prices.get(i) != null) return prices.get(i);
+                                }
+                            }
+                        } else if (lower.contains("trên") || lower.contains("tren") || lower.contains(">")) {
+                            java.util.regex.Matcher nMatcher = java.util.regex.Pattern.compile("([0-9]+(?:\\.[0-9]+)?)").matcher(tier);
+                            if (nMatcher.find()) {
+                                double min = Double.parseDouble(nMatcher.group(1));
+                                if (weight >= min) {
+                                    if (i < prices.size() && prices.get(i) != null) return prices.get(i);
                                 }
                             }
                         }
-                        if (idx < prices.size() && prices.get(idx) != null) {
-                            price = prices.get(idx);
-                        }
                     }
                 }
-            } catch (Exception ignored) {
+
+                // If not matched by explicit interval, match by threshold array (identical to frontend matchPetWeight)
+                if (parsedThresholds.size() > 0) {
+                    int idx = 0;
+                    if (weight > parsedThresholds.get(0)) {
+                        for (int i = 0; i < parsedThresholds.size() - 1; i++) {
+                            if (weight > parsedThresholds.get(i)) {
+                                idx = i + 1;
+                            }
+                        }
+                    }
+                    if (idx >= prices.size()) {
+                        idx = prices.size() - 1;
+                    }
+                    if (idx < prices.size() && prices.get(idx) != null) {
+                        return prices.get(idx);
+                    }
+                }
             }
+        } catch (Exception ignored) {
         }
         return price != null ? price : BigDecimal.ZERO;
     }
