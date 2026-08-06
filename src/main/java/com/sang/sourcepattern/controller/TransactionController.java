@@ -51,4 +51,19 @@ public class TransactionController {
                 .result(transactionService.getShopTransactions(jwt.getClaim("email"), page, size))
                 .build();
     }
+
+    @GetMapping("/admin/all")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Admin lấy danh sách tất cả giao dịch toàn hệ thống có bộ lọc")
+    public ApiResponse<PageResponse<TransactionResponse>> getAllTransactionsForAdmin(
+            @RequestParam(required = false) Integer shopId,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String type,
+            @RequestParam(required = false) String search,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        return ApiResponse.<PageResponse<TransactionResponse>>builder()
+                .result(transactionService.getAllTransactionsForAdmin(shopId, status, type, search, page, size))
+                .build();
+    }
 }
