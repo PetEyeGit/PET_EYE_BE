@@ -76,6 +76,31 @@ public class TransactionServiceImpl implements TransactionService {
                 .build();
     }
 
+    @Override
+    public PageResponse<TransactionResponse> getAllTransactionsForAdmin(Integer shopId, String status, String type, String search, int page, int size) {
+        Pageable pageable = PageRequest.of(Math.max(0, page - 1), size);
+        Page<Transaction> transactionPage = transactionRepository.searchTransactionsForAdmin(
+                shopId,
+                (status != null && !status.isBlank()) ? status : null,
+                (type != null && !type.isBlank()) ? type : null,
+                (search != null && !search.isBlank()) ? search.trim() : null,
+                pageable
+        );
+
+        List<TransactionResponse> content = transactionPage.getContent().stream()
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
+
+        return PageResponse.<TransactionResponse>builder()
+                .content(content)
+                .page(page)
+                .size(size)
+                .totalElements(transactionPage.getTotalElements())
+                .totalPages(transactionPage.getTotalPages())
+                .last(transactionPage.isLast())
+                .build();
+    }
+
     private TransactionResponse mapToResponse(Transaction t) {
         TransactionResponse.TransactionResponseBuilder builder = TransactionResponse.builder()
                 .id(t.getId())
@@ -88,10 +113,20 @@ public class TransactionServiceImpl implements TransactionService {
                 .description(t.getDescription())
                 .createdAt(t.getCreatedAt());
 
+        if (t.getShop() != null) {
+            builder.shopId(t.getShop().getId());
+            builder.shopName(t.getShop().getShopName());
+        }
+
         if (t.getBooking() != null) {
             builder.bookingId(t.getBooking().getId());
             if (t.getBooking().getShop() != null) {
+                builder.shopId(t.getBooking().getShop().getId());
                 builder.shopName(t.getBooking().getShop().getShopName());
+            }
+            if (t.getBooking().getUser() != null) {
+                builder.customerName(t.getBooking().getUser().getFullName());
+                builder.customerEmail(t.getBooking().getUser().getEmail());
             }
             if (t.getBooking().getServices() != null && !t.getBooking().getServices().isEmpty()) {
                 String serviceNames = t.getBooking().getServices().stream()

@@ -22,8 +22,11 @@ public class TransactionResponse {
     String description;
     LocalDateTime createdAt;
     
-    // Booking details (if applicable)
+    // Booking / Shop / Customer details
     Integer bookingId;
+    Integer shopId;
     String shopName;
     String serviceName;
+    String customerName;
+    String customerEmail;
 }
