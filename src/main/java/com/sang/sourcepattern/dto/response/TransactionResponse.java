@@ -21,6 +21,7 @@ public class TransactionResponse {
     String gatewayTransactionId;
     String description;
     LocalDateTime createdAt;
+    LocalDateTime completedAt;
     
     // Booking / Shop / Customer details
     Integer bookingId;

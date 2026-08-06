@@ -462,18 +462,25 @@ public class WalletServiceImpl implements WalletService {
             // Ghi thêm 1 transaction BOOKING_PAYMENT CASH cho phần còn lại.
             paymentMethod = "CASH_DEPOSIT";
 
-            transactionRepository.save(Transaction.builder()
-                    .booking(booking)
-                    .shop(booking.getShop())
-                    .type("BOOKING_PAYMENT")
-                    .amount(shopShare)
-                    .paymentMethod("CASH")
-                    .status("SUCCESS")
-                    .description(String.format(
-                            "Thu tiền mặt tại quầy cho đơn #%d (Phần của Shop: %s VND)",
-                            bookingId, fullPrice.toPlainString()))
-                    .completedAt(LocalDateTime.now())
-                    .build());
+            boolean hasCashTx = transactionRepository.findByBookingIdOrderByCreatedAtDesc(bookingId)
+                    .stream().anyMatch(t -> "CASH".equalsIgnoreCase(t.getPaymentMethod()) && "BOOKING_PAYMENT".equals(t.getType()));
+
+            if (!hasCashTx) {
+                transactionRepository.save(Transaction.builder()
+                        .booking(booking)
+                        .shop(booking.getShop())
+                        .type("BOOKING_PAYMENT")
+                        .amount(shopShare)
+                        .paymentMethod("CASH")
+                        .status("SUCCESS")
+                        .description(String.format(
+                                "Thu tiền mặt tại quầy cho đơn #%d (Phần của Shop: %s VND)",
+                                bookingId, fullPrice.toPlainString()))
+                        .completedAt(LocalDateTime.now())
+                        .build());
+            } else {
+                log.info("Cash payment transaction already exists for booking {}, skipping creation.", bookingId);
+            }
 
         } else if (payment == null || !"SUCCESS".equals(payment.getStatus())) {
             // ── Legacy cash booking (không có cọc) ───────────────────────────
