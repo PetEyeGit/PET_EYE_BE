@@ -111,7 +111,8 @@ public class TransactionServiceImpl implements TransactionService {
                 .payosOrderCode(t.getPayosOrderCode())
                 .gatewayTransactionId(t.getGatewayTransactionId())
                 .description(t.getDescription())
-                .createdAt(t.getCreatedAt());
+                .createdAt(t.getCreatedAt())
+                .completedAt(t.getCompletedAt() != null ? t.getCompletedAt() : t.getCreatedAt());
 
         if (t.getShop() != null) {
             builder.shopId(t.getShop().getId());
