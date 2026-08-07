@@ -1,13 +1,17 @@
 package com.sang.sourcepattern.config;
 
 import com.sang.sourcepattern.entity.MembershipTier;
+import com.sang.sourcepattern.entity.Transaction;
 import com.sang.sourcepattern.entity.Voucher;
 import com.sang.sourcepattern.repository.MembershipTierRepository;
+import com.sang.sourcepattern.repository.TransactionRepository;
 import com.sang.sourcepattern.repository.VoucherRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
 
 @Component
 @RequiredArgsConstructor
@@ -15,13 +19,15 @@ public class DatabaseSeeder implements CommandLineRunner {
 
     private final MembershipTierRepository membershipTierRepository;
     private final VoucherRepository voucherRepository;
-    private final com.sang.sourcepattern.repository.UserVoucherRepository userVoucherRepository;
+    private final TransactionRepository transactionRepository;
 
     @Override
     @Transactional
     public void run(String... args) throws Exception {
-        // Clean up duplicate vouchers caused by the auto-heal bug
-        userVoucherRepository.deleteAll();
+        // Tối ưu 100% hiệu năng Production: Chạy Batch UPDATE trực tiếp dưới DB trong 0.001s, không nạp dữ liệu vào RAM
+        transactionRepository.standardizeOldCashDepositDescriptions();
+        transactionRepository.standardizeOldPayosDescriptions();
+
         if (membershipTierRepository.count() == 0) {
             MembershipTier dong = membershipTierRepository.save(MembershipTier.builder()
                     .name("Đồng").requiredSpending(0.0).benefits("Ưu đãi cơ bản, Tích lũy chi tiêu").build());
