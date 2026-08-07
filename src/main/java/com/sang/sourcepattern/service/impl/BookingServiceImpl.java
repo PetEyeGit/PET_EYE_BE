@@ -747,13 +747,13 @@ public class BookingServiceImpl implements BookingService {
         notificationRepository.save(notifOwner);
         messagingTemplate.convertAndSend("/topic/shop/" + shop.getId() + "/notifications", java.util.Map.of("message", "Có đơn hàng mới!"));
 
-        try {
-            if (shop.getEmail() != null && !shop.getEmail().isBlank()) {
-                emailService.sendNewBookingToShopEmail(shop.getEmail(), booking);
-            }
-        } catch (Exception e) {
-            log.warn("Failed to send new booking email to shop {}: {}", shop.getId(), e.getMessage());
-        }
+//        try {
+//            if (shop.getEmail() != null && !shop.getEmail().isBlank()) {
+//                emailService.sendNewBookingToShopEmail(shop.getEmail(), booking);
+//            }
+//        } catch (Exception e) {
+//            log.warn("Failed to send new booking email to shop {}: {}", shop.getId(), e.getMessage());
+//        }
 
         try {
             java.util.List<User> admins = userRepository.findByRoleName("ADMIN");
@@ -957,13 +957,13 @@ public class BookingServiceImpl implements BookingService {
         notificationRepository.save(notifOwner);
         messagingTemplate.convertAndSend("/topic/shop/" + shop.getId() + "/notifications", java.util.Map.of("message", "Có đơn hàng mới!"));
 
-        try {
-            if (shop.getEmail() != null && !shop.getEmail().isBlank()) {
-                emailService.sendNewBookingToShopEmail(shop.getEmail(), booking);
-            }
-        } catch (Exception e) {
-            log.warn("Failed to send new booking email to shop {}: {}", shop.getId(), e.getMessage());
-        }
+//        try {
+//            if (shop.getEmail() != null && !shop.getEmail().isBlank()) {
+//                emailService.sendNewBookingToShopEmail(shop.getEmail(), booking);
+//            }
+//        } catch (Exception e) {
+//            log.warn("Failed to send new booking email to shop {}: {}", shop.getId(), e.getMessage());
+//        }
 
         try {
             java.util.List<User> admins = userRepository.findByRoleName("ADMIN");
@@ -1280,13 +1280,13 @@ public class BookingServiceImpl implements BookingService {
         notificationRepository.save(notifOwner);
         messagingTemplate.convertAndSend("/topic/shop/" + shop.getId() + "/notifications", java.util.Map.of("message", "Có đơn hàng mới!"));
 
-        try {
-            if (shop.getEmail() != null && !shop.getEmail().isBlank()) {
-                emailService.sendNewBookingToShopEmail(shop.getEmail(), booking);
-            }
-        } catch (Exception e) {
-            log.warn("Failed to send new booking email to shop {}: {}", shop.getId(), e.getMessage());
-        }
+//        try {
+//            if (shop.getEmail() != null && !shop.getEmail().isBlank()) {
+//                emailService.sendNewBookingToShopEmail(shop.getEmail(), booking);
+//            }
+//        } catch (Exception e) {
+//            log.warn("Failed to send new booking email to shop {}: {}", shop.getId(), e.getMessage());
+//        }
 
         try {
             java.util.List<User> admins = userRepository.findByRoleName("ADMIN");
