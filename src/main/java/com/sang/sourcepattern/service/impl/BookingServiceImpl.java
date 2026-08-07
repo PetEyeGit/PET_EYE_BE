@@ -724,7 +724,9 @@ public class BookingServiceImpl implements BookingService {
                 .status("SUCCESS")
                 .payosOrderCode(orderCode)
                 .gatewayTransactionId(info.getData() != null ? info.getData().getId() : null)
-                .description("Thanh toán qua PayOS cho đơn #" + booking.getId())
+                .description(pending != null && pending.getDescription() != null && !pending.getDescription().isBlank()
+                        ? pending.getDescription()
+                        : "Thanh toan " + (orderCode % 100000))
                 .completedAt(LocalDateTime.now())
                 .build());
 
@@ -1257,8 +1259,9 @@ public class BookingServiceImpl implements BookingService {
                 .status("SUCCESS")
                 .payosOrderCode(orderCode)
                 .gatewayTransactionId(gatewayTxId)
-                .description(String.format(
-                        "Đã thanh toán cọc (PayOS) cho đơn #%d", booking.getId()))
+                .description(pending != null && pending.getDescription() != null && !pending.getDescription().isBlank()
+                        ? pending.getDescription()
+                        : "Dat coc " + (orderCode % 100000))
                 .completedAt(LocalDateTime.now())
                 .build());
 

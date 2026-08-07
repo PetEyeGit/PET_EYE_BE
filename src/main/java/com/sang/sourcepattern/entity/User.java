@@ -58,6 +58,10 @@ public class User {
     @Builder.Default
     Double totalSpending = 0.0;
 
+    @Builder.Default
+    @Column(name = "failed_login_attempts")
+    Integer failedLoginAttempts = 0;
+
     @ManyToMany
     @Builder.Default
     Set<Role> roles = new HashSet<>();

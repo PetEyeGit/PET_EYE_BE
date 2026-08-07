@@ -67,4 +67,17 @@ public interface TransactionRepository extends JpaRepository<Transaction, Intege
             @org.springframework.data.repository.query.Param("search") String search,
             Pageable pageable
     );
+
+    @org.springframework.data.jpa.repository.Modifying
+    @Query("UPDATE Transaction t SET t.description = CONCAT('Dat coc ', MOD(t.payosOrderCode, 100000)) " +
+           "WHERE t.payosOrderCode IS NOT NULL AND UPPER(t.paymentMethod) = 'CASH_DEPOSIT' AND " +
+           "(t.description IS NULL OR t.description LIKE '%deposit paid%' OR t.description LIKE '%Thanh toán qua PayOS%' OR t.description LIKE '%Đã thanh toán cọc%')")
+    int standardizeOldCashDepositDescriptions();
+
+    @org.springframework.data.jpa.repository.Modifying
+    @Query("UPDATE Transaction t SET t.description = CONCAT('Thanh toan ', MOD(t.payosOrderCode, 100000)) " +
+           "WHERE t.payosOrderCode IS NOT NULL AND UPPER(t.paymentMethod) != 'CASH_DEPOSIT' AND " +
+           "(t.description IS NULL OR t.description LIKE '%deposit paid%' OR t.description LIKE '%Thanh toán qua PayOS%' OR t.description LIKE '%Đã thanh toán cọc%')")
+    int standardizeOldPayosDescriptions();
 }
+
