@@ -54,6 +54,7 @@ public interface TransactionRepository extends JpaRepository<Transaction, Intege
         WHERE (:shopId IS NULL OR t.shop.id = :shopId OR (t.booking IS NOT NULL AND t.booking.shop.id = :shopId))
           AND (:status IS NULL OR :status = '' OR UPPER(t.status) = UPPER(:status) OR (:status = 'FAILED' AND UPPER(t.status) IN ('CANCELLED', 'FAILED', 'REJECTED', 'EXPIRED')))
           AND (:type IS NULL OR :type = '' OR UPPER(t.type) = UPPER(:type))
+          AND (:source IS NULL OR :source = '' OR :source = 'ALL' OR (:source = 'PAYOS' AND t.payosOrderCode IS NOT NULL) OR (:source = 'CASH' AND t.payosOrderCode IS NULL))
           AND (:search IS NULL OR :search = '' OR 
                LOWER(t.description) LIKE LOWER(CONCAT('%', :search, '%')) OR 
                (t.booking IS NOT NULL AND LOWER(t.booking.user.fullName) LIKE LOWER(CONCAT('%', :search, '%'))) OR 
@@ -65,6 +66,7 @@ public interface TransactionRepository extends JpaRepository<Transaction, Intege
             @org.springframework.data.repository.query.Param("shopId") Integer shopId,
             @org.springframework.data.repository.query.Param("status") String status,
             @org.springframework.data.repository.query.Param("type") String type,
+            @org.springframework.data.repository.query.Param("source") String source,
             @org.springframework.data.repository.query.Param("search") String search,
             Pageable pageable
     );
