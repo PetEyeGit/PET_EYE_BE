@@ -333,7 +333,7 @@ public class AdminController {
 
         int daysInMonth = YearMonth.of(year, month).lengthOfMonth();
 
-        List<com.sang.sourcepattern.entity.Booking> allMonthBookings = bookingRepository.findActiveAndCompletedBookingsWithServicesByMonthAndYear(year, month);
+        List<com.sang.sourcepattern.entity.Booking> allMonthBookings = bookingRepository.findBookingsWithServicesByMonthAndYear(year, month);
         List<com.sang.sourcepattern.entity.Booking> monthBookings;
 
         if (status != null && !status.isBlank() && !"ALL".equalsIgnoreCase(status)) {

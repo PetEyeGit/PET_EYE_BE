@@ -57,7 +57,8 @@ public interface TransactionRepository extends JpaRepository<Transaction, Intege
           AND (:search IS NULL OR :search = '' OR 
                LOWER(t.description) LIKE LOWER(CONCAT('%', :search, '%')) OR 
                (t.booking IS NOT NULL AND LOWER(t.booking.user.fullName) LIKE LOWER(CONCAT('%', :search, '%'))) OR 
-               (t.booking IS NOT NULL AND LOWER(t.booking.user.email) LIKE LOWER(CONCAT('%', :search, '%'))))
+               (t.booking IS NOT NULL AND LOWER(t.booking.user.email) LIKE LOWER(CONCAT('%', :search, '%'))) OR
+               (t.booking IS NOT NULL AND CAST(t.booking.id AS string) LIKE CONCAT('%', :search, '%')))
         ORDER BY t.createdAt DESC
     """)
     Page<Transaction> searchTransactionsForAdmin(

@@ -80,6 +80,9 @@ public interface BookingRepository extends JpaRepository<Booking, Integer> {
     @Query("SELECT DISTINCT b FROM Booking b LEFT JOIN FETCH b.services WHERE b.status != 'CANCELLED' AND YEAR(COALESCE(b.appointmentDatetime, b.createdAt)) = :year AND MONTH(COALESCE(b.appointmentDatetime, b.createdAt)) = :month")
     List<Booking> findActiveAndCompletedBookingsWithServicesByMonthAndYear(@Param("year") int year, @Param("month") int month);
 
+    @Query("SELECT DISTINCT b FROM Booking b LEFT JOIN FETCH b.services WHERE YEAR(COALESCE(b.appointmentDatetime, b.createdAt)) = :year AND MONTH(COALESCE(b.appointmentDatetime, b.createdAt)) = :month")
+    List<Booking> findBookingsWithServicesByMonthAndYear(@Param("year") int year, @Param("month") int month);
+
     @Query("SELECT DISTINCT b FROM Booking b LEFT JOIN FETCH b.services WHERE b.status NOT IN ('COMPLETED', 'CANCELLED') AND YEAR(COALESCE(b.appointmentDatetime, b.createdAt)) = :year AND MONTH(COALESCE(b.appointmentDatetime, b.createdAt)) = :month")
     List<Booking> findFrozenBookingsWithServicesByMonthAndYear(@Param("year") int year, @Param("month") int month);
 
