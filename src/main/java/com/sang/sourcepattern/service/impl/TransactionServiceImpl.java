@@ -77,12 +77,13 @@ public class TransactionServiceImpl implements TransactionService {
     }
 
     @Override
-    public PageResponse<TransactionResponse> getAllTransactionsForAdmin(Integer shopId, String status, String type, String search, int page, int size) {
+    public PageResponse<TransactionResponse> getAllTransactionsForAdmin(Integer shopId, String status, String type, String source, String search, int page, int size) {
         Pageable pageable = PageRequest.of(Math.max(0, page - 1), size);
         Page<Transaction> transactionPage = transactionRepository.searchTransactionsForAdmin(
                 shopId,
                 (status != null && !status.isBlank()) ? status : null,
                 (type != null && !type.isBlank()) ? type : null,
+                (source != null && !source.isBlank()) ? source : null,
                 (search != null && !search.isBlank()) ? search.trim() : null,
                 pageable
         );

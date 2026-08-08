@@ -59,11 +59,12 @@ public class TransactionController {
             @RequestParam(required = false) Integer shopId,
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String type,
+            @RequestParam(required = false) String source,
             @RequestParam(required = false) String search,
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "10") int size) {
         return ApiResponse.<PageResponse<TransactionResponse>>builder()
-                .result(transactionService.getAllTransactionsForAdmin(shopId, status, type, search, page, size))
+                .result(transactionService.getAllTransactionsForAdmin(shopId, status, type, source, search, page, size))
                 .build();
     }
 }
