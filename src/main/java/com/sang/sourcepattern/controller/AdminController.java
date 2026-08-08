@@ -333,7 +333,7 @@ public class AdminController {
 
         int daysInMonth = YearMonth.of(year, month).lengthOfMonth();
 
-        List<com.sang.sourcepattern.entity.Booking> allMonthBookings = bookingRepository.findAllBookingsWithServicesByMonthAndYear(year, month);
+        List<com.sang.sourcepattern.entity.Booking> allMonthBookings = bookingRepository.findActiveAndCompletedBookingsWithServicesByMonthAndYear(year, month);
         List<com.sang.sourcepattern.entity.Booking> monthBookings;
 
         if (status != null && !status.isBlank() && !"ALL".equalsIgnoreCase(status)) {
@@ -341,9 +341,7 @@ public class AdminController {
                     .filter(b -> b.getStatus() != null && b.getStatus().equalsIgnoreCase(status))
                     .toList();
         } else {
-            monthBookings = allMonthBookings.stream()
-                    .filter(b -> b.getStatus() != null && !"CANCELLED".equalsIgnoreCase(b.getStatus()))
-                    .toList();
+            monthBookings = allMonthBookings;
         }
 
         Map<Integer, BigDecimal> dailyRevenueMap = new java.util.HashMap<>();
