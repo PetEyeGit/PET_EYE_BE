@@ -71,13 +71,19 @@ public interface TransactionRepository extends JpaRepository<Transaction, Intege
     @org.springframework.data.jpa.repository.Modifying
     @Query("UPDATE Transaction t SET t.description = CONCAT('Dat coc ', MOD(t.payosOrderCode, 100000)) " +
            "WHERE t.payosOrderCode IS NOT NULL AND UPPER(t.paymentMethod) = 'CASH_DEPOSIT' AND " +
-           "(t.description IS NULL OR t.description LIKE '%deposit paid%' OR t.description LIKE '%Thanh toán qua PayOS%' OR t.description LIKE '%Đã thanh toán cọc%')")
+           "(t.description IS NULL OR t.description LIKE '%deposit paid%' OR t.description LIKE '%Thanh toán qua PayOS%' OR t.description LIKE '%Đã thanh toán cọc%' OR t.description LIKE '%Thu tiền mặt tại quầy%')")
     int standardizeOldCashDepositDescriptions();
 
     @org.springframework.data.jpa.repository.Modifying
     @Query("UPDATE Transaction t SET t.description = CONCAT('Thanh toan ', MOD(t.payosOrderCode, 100000)) " +
            "WHERE t.payosOrderCode IS NOT NULL AND UPPER(t.paymentMethod) != 'CASH_DEPOSIT' AND " +
-           "(t.description IS NULL OR t.description LIKE '%deposit paid%' OR t.description LIKE '%Thanh toán qua PayOS%' OR t.description LIKE '%Đã thanh toán cọc%')")
+           "(t.description IS NULL OR t.description LIKE '%deposit paid%' OR t.description LIKE '%Thanh toán qua PayOS%' OR t.description LIKE '%Đã thanh toán cọc%' OR t.description LIKE '%Thu tiền mặt tại quầy%')")
     int standardizeOldPayosDescriptions();
+
+    @org.springframework.data.jpa.repository.Modifying
+    @Query("UPDATE Transaction t SET t.description = CONCAT('Cash collected at venue for booking #', t.booking.id) " +
+           "WHERE t.payosOrderCode IS NULL AND t.booking IS NOT NULL AND " +
+           "(t.description IS NULL OR t.description LIKE '%Thu tiền mặt tại quầy%' OR t.description LIKE '%Thanh toán%')")
+    int standardizeOldVenueCashDescriptions();
 }
 

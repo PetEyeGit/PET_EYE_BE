@@ -27,6 +27,9 @@ public interface WalletService {
     /** Tính tổng phí hoa hồng admin cho danh sách service IDs */
     BigDecimal calculateAdminCommission(List<Integer> serviceIds, Integer petId, String petWeight);
 
+    /** Tính tổng phí hoa hồng admin cho danh sách service IDs có tính số ngày lưu trú (checkIn, checkOut) */
+    BigDecimal calculateAdminCommission(List<Integer> serviceIds, Integer petId, String petWeight, java.time.LocalDateTime checkIn, java.time.LocalDateTime checkOut);
+
     /** Tính tổng phí hoa hồng admin cho 1 booking cụ thể */
     BigDecimal calculateAdminCommissionForBooking(com.sang.sourcepattern.entity.Booking booking);
 

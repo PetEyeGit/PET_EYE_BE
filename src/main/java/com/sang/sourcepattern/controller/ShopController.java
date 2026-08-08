@@ -101,14 +101,15 @@ public class ShopController {
     }
 
     @GetMapping("/public/paged")
-    @Operation(summary = "Search verified shops (public, paginated, 10 per page)")
+    @Operation(summary = "Search verified shops (public, paginated, 4 per page)")
     public ApiResponse<com.sang.sourcepattern.dto.response.PageResponse<ShopResponse>> searchPublicPaged(
             @RequestParam(required = false) String keyword,
             @RequestParam(required = false) String city,
             @RequestParam(required = false) String shopType,
-            @RequestParam(defaultValue = "0") int page) {
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "4") int size) {
         return ApiResponse.<com.sang.sourcepattern.dto.response.PageResponse<ShopResponse>>builder()
-                .result(shopService.searchVerifiedShopsPaged(keyword, city, shopType, page))
+                .result(shopService.searchVerifiedShopsPaged(keyword, city, shopType, page, size))
                 .build();
     }
 

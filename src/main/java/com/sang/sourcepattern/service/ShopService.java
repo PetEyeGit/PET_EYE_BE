@@ -25,6 +25,7 @@ public interface ShopService {
 
     /** Public: only verified shops, optional keyword/city/shopType filter */
     List<ShopResponse> searchVerifiedShops(String keyword, String city, String shopType);
+    PageResponse<ShopResponse> searchVerifiedShopsPaged(String keyword, String city, String shopType, int page, int size);
     PageResponse<ShopResponse> searchVerifiedShopsPaged(String keyword, String city, String shopType, int page);
 
     /** Public: get a single verified shop by id */

@@ -328,11 +328,22 @@ public class AdminController {
     @GetMapping("/dashboard/monthly-history")
     public ApiResponse<Map<String, List<Map<String, Object>>>> getMonthlyHistory(
             @RequestParam int month,
-            @RequestParam int year) {
+            @RequestParam int year,
+            @RequestParam(required = false) String status) {
 
         int daysInMonth = YearMonth.of(year, month).lengthOfMonth();
 
-        List<com.sang.sourcepattern.entity.Booking> monthBookings = bookingRepository.findActiveAndCompletedBookingsWithServicesByMonthAndYear(year, month);
+        List<com.sang.sourcepattern.entity.Booking> allMonthBookings = bookingRepository.findActiveAndCompletedBookingsWithServicesByMonthAndYear(year, month);
+        List<com.sang.sourcepattern.entity.Booking> monthBookings;
+
+        if (status != null && !status.isBlank() && !"ALL".equalsIgnoreCase(status)) {
+            monthBookings = allMonthBookings.stream()
+                    .filter(b -> b.getStatus() != null && b.getStatus().equalsIgnoreCase(status))
+                    .toList();
+        } else {
+            monthBookings = allMonthBookings;
+        }
+
         Map<Integer, BigDecimal> dailyRevenueMap = new java.util.HashMap<>();
         Map<Integer, BigDecimal> dailyFrozenMap = new java.util.HashMap<>();
         Map<Integer, Long> dailyBookingCountMap = new java.util.HashMap<>();
