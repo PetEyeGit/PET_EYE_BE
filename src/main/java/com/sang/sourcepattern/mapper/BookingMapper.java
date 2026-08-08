@@ -13,9 +13,20 @@ public class BookingMapper {
         Service primaryService = (booking.getServices() != null && !booking.getServices().isEmpty())
                 ? booking.getServices().iterator().next() : null;
 
+        long stayDays = 1;
+        if (booking.getCheckIn() != null && booking.getCheckOut() != null) {
+            long d = java.time.temporal.ChronoUnit.DAYS.between(booking.getCheckIn().toLocalDate(), booking.getCheckOut().toLocalDate());
+            if (d > 0) stayDays = d;
+        }
+        final long daysCount = stayDays;
+
         java.math.BigDecimal totalServicePrice = (booking.getServices() != null)
                 ? booking.getServices().stream()
-                        .map(s -> s.getPrice() != null ? s.getPrice() : java.math.BigDecimal.ZERO)
+                        .map(s -> {
+                            java.math.BigDecimal price = s.getPrice() != null ? s.getPrice() : java.math.BigDecimal.ZERO;
+                            boolean isB = s.getCategory() != null && ("BOARDING".equalsIgnoreCase(s.getCategory()) || "Hotel".equalsIgnoreCase(s.getCategory()));
+                            return isB ? price.multiply(java.math.BigDecimal.valueOf(daysCount)) : price;
+                        })
                         .reduce(java.math.BigDecimal.ZERO, java.math.BigDecimal::add)
                 : java.math.BigDecimal.ZERO;
 
@@ -31,11 +42,16 @@ public class BookingMapper {
                 : 60;
 
         java.util.List<BookingResponse.BookingServiceDto> serviceDtos = (booking.getServices() != null)
-                ? booking.getServices().stream().map(s -> BookingResponse.BookingServiceDto.builder()
+                ? booking.getServices().stream().map(s -> {
+                    java.math.BigDecimal basePrice = s.getPrice();
+                    boolean isB = s.getCategory() != null && ("BOARDING".equalsIgnoreCase(s.getCategory()) || "Hotel".equalsIgnoreCase(s.getCategory()));
+                    java.math.BigDecimal finalPrice = (isB && basePrice != null) ? basePrice.multiply(java.math.BigDecimal.valueOf(daysCount)) : basePrice;
+                    return BookingResponse.BookingServiceDto.builder()
                         .serviceId(s.getId())
-                        .serviceName(s.getServiceName())
-                        .servicePrice(s.getPrice())
-                        .build()).collect(java.util.stream.Collectors.toList())
+                        .serviceName(s.getServiceName() + (isB && daysCount > 1 ? " (" + daysCount + " ngày)" : ""))
+                        .servicePrice(finalPrice)
+                        .build();
+                }).collect(java.util.stream.Collectors.toList())
                 : new java.util.ArrayList<>();
 
         return BookingResponse.builder()
@@ -75,6 +91,7 @@ public class BookingMapper {
                 .checkOut(booking.getCheckOut())
                 .petWeight(booking.getPetWeight())
                 .roomType(booking.getRoomType())
+                .category(isBoarding ? "BOARDING" : (primaryService != null ? primaryService.getCategory() : null))
                 .build();
     }
 }

@@ -27,6 +27,7 @@ public class DatabaseSeeder implements CommandLineRunner {
         // Tối ưu 100% hiệu năng Production: Chạy Batch UPDATE trực tiếp dưới DB trong 0.001s, không nạp dữ liệu vào RAM
         transactionRepository.standardizeOldCashDepositDescriptions();
         transactionRepository.standardizeOldPayosDescriptions();
+        transactionRepository.standardizeOldVenueCashDescriptions();
 
         if (membershipTierRepository.count() == 0) {
             MembershipTier dong = membershipTierRepository.save(MembershipTier.builder()

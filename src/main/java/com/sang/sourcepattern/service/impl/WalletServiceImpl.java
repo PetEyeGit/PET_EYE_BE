@@ -358,16 +358,28 @@ public class WalletServiceImpl implements WalletService {
 
     @Override
     public BigDecimal calculateAdminCommission(List<Integer> serviceIds, Integer petId, String petWeight) {
+        return calculateAdminCommission(serviceIds, petId, petWeight, null, null);
+    }
+
+    @Override
+    public BigDecimal calculateAdminCommission(List<Integer> serviceIds, Integer petId, String petWeight, java.time.LocalDateTime checkIn, java.time.LocalDateTime checkOut) {
         if (serviceIds == null || serviceIds.isEmpty()) {
             return BigDecimal.ZERO;
+        }
+        long days = 1;
+        if (checkIn != null && checkOut != null) {
+            long d = java.time.temporal.ChronoUnit.DAYS.between(checkIn.toLocalDate(), checkOut.toLocalDate());
+            if (d > 0) days = d;
         }
         BigDecimal totalCommission = BigDecimal.ZERO;
         for (Integer id : serviceIds) {
             com.sang.sourcepattern.entity.Service s = serviceRepository.findById(id).orElse(null);
             if (s != null) {
-                BigDecimal price = resolveSingleServicePrice(s, petId, petWeight);
+                BigDecimal basePrice = resolveSingleServicePrice(s, petId, petWeight);
+                boolean isBoarding = "BOARDING".equalsIgnoreCase(s.getCategory()) || "Hotel".equalsIgnoreCase(s.getCategory());
+                BigDecimal serviceTotalPrice = isBoarding ? basePrice.multiply(BigDecimal.valueOf(days)) : basePrice;
                 BigDecimal rate = getCommissionRateForService(s);
-                totalCommission = totalCommission.add(price.multiply(rate));
+                totalCommission = totalCommission.add(serviceTotalPrice.multiply(rate));
             }
         }
         return totalCommission;
@@ -379,10 +391,17 @@ public class WalletServiceImpl implements WalletService {
         if (booking.getServices() == null || booking.getServices().isEmpty()) {
             return totalCommission;
         }
+        long days = 1;
+        if (booking.getCheckIn() != null && booking.getCheckOut() != null) {
+            long d = java.time.temporal.ChronoUnit.DAYS.between(booking.getCheckIn().toLocalDate(), booking.getCheckOut().toLocalDate());
+            if (d > 0) days = d;
+        }
         for (com.sang.sourcepattern.entity.Service s : booking.getServices()) {
-            BigDecimal price = resolveSingleServicePrice(s, booking.getPet() != null ? booking.getPet().getId() : null, booking.getPetWeight());
+            BigDecimal basePrice = resolveSingleServicePrice(s, booking.getPet() != null ? booking.getPet().getId() : null, booking.getPetWeight());
+            boolean isBoarding = "BOARDING".equalsIgnoreCase(s.getCategory()) || "Hotel".equalsIgnoreCase(s.getCategory());
+            BigDecimal serviceTotalPrice = isBoarding ? basePrice.multiply(BigDecimal.valueOf(days)) : basePrice;
             BigDecimal rate = getCommissionRateForService(s);
-            totalCommission = totalCommission.add(price.multiply(rate));
+            totalCommission = totalCommission.add(serviceTotalPrice.multiply(rate));
         }
         return totalCommission;
     }

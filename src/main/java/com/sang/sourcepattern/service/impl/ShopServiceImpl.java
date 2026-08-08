@@ -628,10 +628,11 @@ public class ShopServiceImpl implements ShopService {
     }
 
     @Override
-    public com.sang.sourcepattern.dto.response.PageResponse<ShopResponse> searchVerifiedShopsPaged(String keyword, String city, String shopType, int page) {
+    public com.sang.sourcepattern.dto.response.PageResponse<ShopResponse> searchVerifiedShopsPaged(String keyword, String city, String shopType, int page, int size) {
+        int pageSize = size > 0 ? size : 4;
         org.springframework.data.domain.Page<Shop> pageResult =
                 shopRepository.searchVerifiedPaged(keyword, city, shopType,
-                        org.springframework.data.domain.PageRequest.of(page, 10));
+                        org.springframework.data.domain.PageRequest.of(page, pageSize));
         return com.sang.sourcepattern.dto.response.PageResponse.<ShopResponse>builder()
                 .content(pageResult.getContent().stream().map(shopMapper::toShopResponse).toList())
                 .page(pageResult.getNumber())
@@ -640,6 +641,11 @@ public class ShopServiceImpl implements ShopService {
                 .totalPages(pageResult.getTotalPages())
                 .last(pageResult.isLast())
                 .build();
+    }
+
+    @Override
+    public com.sang.sourcepattern.dto.response.PageResponse<ShopResponse> searchVerifiedShopsPaged(String keyword, String city, String shopType, int page) {
+        return searchVerifiedShopsPaged(keyword, city, shopType, page, 4);
     }
 
     @Override
