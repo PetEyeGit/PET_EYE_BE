@@ -30,7 +30,10 @@ public class VoucherController {
     @PreAuthorize("hasRole('ADMIN')")
     public ApiResponse<List<Voucher>> getAllVouchers() {
         List<Voucher> vouchers = voucherRepository.findAll();
-        vouchers.forEach(v -> v.setIssuedQuantity(userVoucherRepository.countByVoucherId(v.getId())));
+        vouchers.forEach(v -> {
+            v.setIssuedQuantity(userVoucherRepository.countByVoucherId(v.getId()));
+            v.setUsedQuantity(userVoucherRepository.countByVoucherIdAndIsUsedTrue(v.getId()));
+        });
         return ApiResponse.<List<Voucher>>builder()
                 .result(vouchers)
                 .build();
@@ -49,8 +52,13 @@ public class VoucherController {
     @GetMapping("/newcomer")
     @PreAuthorize("hasRole('ADMIN')")
     public ApiResponse<List<Voucher>> getNewcomerVouchers() {
+        List<Voucher> vouchers = voucherRepository.findByVoucherType("NEWCOMER");
+        vouchers.forEach(v -> {
+            v.setIssuedQuantity(userVoucherRepository.countByVoucherId(v.getId()));
+            v.setUsedQuantity(userVoucherRepository.countByVoucherIdAndIsUsedTrue(v.getId()));
+        });
         return ApiResponse.<List<Voucher>>builder()
-                .result(voucherRepository.findByVoucherType("NEWCOMER"))
+                .result(vouchers)
                 .message("Danh sach voucher tan thu")
                 .build();
     }

@@ -48,6 +48,9 @@ public class Voucher {
     @Transient
     Long issuedQuantity;
 
+    @Transient
+    Long usedQuantity;
+
     /**
      * Giới hạn áp dụng theo category dịch vụ.
      * null = áp dụng mọi dịch vụ; "SPA", "GROOMING", ... = giới hạn category.

@@ -44,11 +44,11 @@ public class VoucherServiceImpl implements VoucherService {
                 continue;
             }
 
-            // Kiem tra quota su dung
-            long used = userVoucherRepository.countByVoucherIdAndIsUsedTrue(voucher.getId());
-            if (voucher.getIssueQuantity() != null && used >= voucher.getIssueQuantity()) {
-                log.info("Voucher {} da het quota su dung ({}/{}), khong phat them.",
-                        voucher.getCode(), used, voucher.getIssueQuantity());
+            // Kiem tra quota cap phat (so luong da phat phai < issueQuantity)
+            long issued = userVoucherRepository.countByVoucherId(voucher.getId());
+            if (voucher.getIssueQuantity() != null && issued >= voucher.getIssueQuantity()) {
+                log.info("Voucher {} da het quota cap phat ({}/{}), khong phat them.",
+                        voucher.getCode(), issued, voucher.getIssueQuantity());
                 continue;
             }
 
@@ -69,7 +69,7 @@ public class VoucherServiceImpl implements VoucherService {
                     voucher.getCode(),
                     voucher.getDiscountValue(),
                     user.getEmail(),
-                    used,
+                    issued,
                     voucher.getIssueQuantity());
         }
         
