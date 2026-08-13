@@ -102,7 +102,26 @@ public class TransactionServiceImpl implements TransactionService {
                 .build();
     }
 
+    @Override
+    @org.springframework.transaction.annotation.Transactional
+    public TransactionResponse updateTransactionDate(int id, java.time.LocalDateTime createdAt) {
+        Transaction transaction = transactionRepository.findById(id)
+                .orElseThrow(() -> new AppException(ErrorCode.TRANSACTION_NOT_FOUND));
+
+        transaction.setCreatedAt(createdAt);
+        if (transaction.getCompletedAt() != null) {
+            transaction.setCompletedAt(createdAt);
+        }
+        if (transaction.getBooking() != null) {
+            transaction.getBooking().setCreatedAt(createdAt);
+        }
+
+        Transaction updated = transactionRepository.save(transaction);
+        return mapToResponse(updated);
+    }
+
     private TransactionResponse mapToResponse(Transaction t) {
+
         TransactionResponse.TransactionResponseBuilder builder = TransactionResponse.builder()
                 .id(t.getId())
                 .type(t.getType())

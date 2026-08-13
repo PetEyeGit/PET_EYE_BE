@@ -63,6 +63,7 @@ public enum ErrorCode {
     PET_ID_REQUIRED(5010, "Pet ID is required", HttpStatus.BAD_REQUEST),
     APPOINTMENT_DATETIME_REQUIRED(5011, "Appointment datetime is required", HttpStatus.BAD_REQUEST),
     APPOINTMENT_MUST_BE_FUTURE(5012, "Appointment must be in the future", HttpStatus.BAD_REQUEST),
+    TRANSACTION_NOT_FOUND(5013, "Transaction not found", HttpStatus.NOT_FOUND),
 
 //   Email verification errors
     EMAIL_NOT_VERIFIED(6001, "Email is not verified. Please check your inbox.", HttpStatus.FORBIDDEN),

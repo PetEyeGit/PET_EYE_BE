@@ -12,7 +12,12 @@ import lombok.experimental.FieldDefaults;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
+import com.sang.sourcepattern.dto.request.UpdateTransactionDateRequest;
+import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -67,4 +72,16 @@ public class TransactionController {
                 .result(transactionService.getAllTransactionsForAdmin(shopId, status, type, source, search, page, size))
                 .build();
     }
+
+    @PutMapping("/admin/{id}/created-at")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Admin chỉnh sửa ngày tạo giao dịch (Fake / rải đều lịch sử)")
+    public ApiResponse<TransactionResponse> updateTransactionDate(
+            @PathVariable int id,
+            @RequestBody @Valid UpdateTransactionDateRequest request) {
+        return ApiResponse.<TransactionResponse>builder()
+                .result(transactionService.updateTransactionDate(id, request.getCreatedAt()))
+                .build();
+    }
 }
+
