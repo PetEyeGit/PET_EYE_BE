@@ -341,7 +341,10 @@ public class AdminController {
                     .filter(b -> b.getStatus() != null && b.getStatus().equalsIgnoreCase(status))
                     .toList();
         } else {
-            monthBookings = allMonthBookings;
+            // Loại bỏ các đơn đã HỦY (CANCELLED/REJECTED) khỏi tính toán báo cáo tài chính
+            monthBookings = allMonthBookings.stream()
+                    .filter(b -> b.getStatus() == null || (!"CANCELLED".equalsIgnoreCase(b.getStatus()) && !"REJECTED".equalsIgnoreCase(b.getStatus())))
+                    .toList();
         }
 
         Map<Integer, BigDecimal> dailyRevenueMap = new java.util.HashMap<>();
@@ -367,11 +370,17 @@ public class AdminController {
                         fullPrice = fullPrice.add(p);
                     }
                 }
-                BigDecimal shopFrozen = fullPrice.subtract(commission);
-                if (shopFrozen.compareTo(BigDecimal.ZERO) < 0) shopFrozen = BigDecimal.ZERO;
-                dailyFrozenMap.put(day, dailyFrozenMap.getOrDefault(day, BigDecimal.ZERO).add(shopFrozen));
+
+                // Chỉ cộng số dư đóng băng cho các đơn chưa tất toán (Đang chờ duyệt, Đã xác nhận, Đang thực hiện)
+                String bStatus = b.getStatus() != null ? b.getStatus().toUpperCase() : "";
+                if ("CONFIRMED".equals(bStatus) || "WAITING_SHOP_APPROVAL".equals(bStatus) || "IN_PROGRESS".equals(bStatus) || "PENDING".equals(bStatus)) {
+                    BigDecimal shopFrozen = fullPrice.subtract(commission);
+                    if (shopFrozen.compareTo(BigDecimal.ZERO) < 0) shopFrozen = BigDecimal.ZERO;
+                    dailyFrozenMap.put(day, dailyFrozenMap.getOrDefault(day, BigDecimal.ZERO).add(shopFrozen));
+                }
             }
         }
+
 
         List<Map<String, Object>> revenueSeries = new java.util.ArrayList<>();
         List<Map<String, Object>> frozenSeries = new java.util.ArrayList<>();
